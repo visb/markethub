@@ -28,7 +28,7 @@ briefing/    screenshots de referência
 |------|------|-------|
 | 0 | Fundação | `phase-0-foundation/` |
 | 1 | Catálogo + ERP + Enriquecimento | `phase-1-catalog-erp-enrichment/` |
-| 2 | Marketplace (cliente) | _detalhar ao iniciar_ |
+| 2 | Marketplace (cliente) | `phase-2-marketplace-customer/` |
 | 3 | Picking (separador) | _detalhar ao iniciar_ |
 | 4 | Delivery (entregador) | _detalhar ao iniciar_ |
 | 5 | Rastreio, avaliações, admin, polish | _detalhar ao iniciar_ |
@@ -54,14 +54,16 @@ Ordem de construção: **Base → catálogo/ERP/enriquecimento → cliente → p
 - S1.6 API de catálogo
 - S1.7 Admin de catálogo
 
-### Fase 2 — Marketplace (cliente) _(epics, detalhar ao iniciar)_
-- Home de merchant + browse por categoria (ref: `briefing/.../Merchant Home.jpg`)
-- Busca (produto, marca, departamento)
-- Carrinho multi-loja com quantidades e variações de peso (ref: `Cart.jpg`)
-- Cupons e cálculo de frete/taxas por merchant
-- Checkout: endereço, método de entrega (portaria/porta), janela/agendamento (ref: `Shipping Settings.jpg`)
-- Pagamento PIX (QR dinâmico + webhook) (ref: `Payment.jpg`, `Confirmed.jpg`)
-- Criação de pedido + histórico (ref: `Order Created.jpg`, `Orders.jpg`)
+### Fase 2 — Marketplace (cliente)
+- S2.1 Modelo de pedido, carrinho e endereço
+- S2.2 Endereços do cliente
+- S2.3 Carrinho multi-loja
+- S2.4 Cupons, frete e taxas
+- S2.5 Checkout: entrega e agendamento
+- S2.6 Pagamento PIX (QR dinâmico + webhook)
+- S2.7 Pedido: criação, status e histórico
+- S2.8 App cliente: vitrine, busca e carrinho
+- S2.9 App cliente: checkout, PIX e pedidos
 
 ### Fase 3 — Picking (separador) _(epics, detalhar ao iniciar)_
 - Atribuição de pedido ao separador
