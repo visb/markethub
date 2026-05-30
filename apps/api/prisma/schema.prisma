@@ -74,6 +74,13 @@ enum EnrichmentStatus {
   needs_review
 }
 
+// Como o produto é vendido — dirige o input de quantidade no carrinho.
+// unit = embalado (conta unidades); weight = vendido por peso (carne, frutas, frios).
+enum SaleType {
+  unit
+  weight
+}
+
 // Rede/varejista (ex.: Supermercado Europa).
 model Merchant {
   id        String   @id @default(cuid())
@@ -138,7 +145,8 @@ model Product {
   gtin             String?          @unique // EAN/GTIN normalizado quando houver
   name             String
   brand            String?
-  unit             String? // ex.: "kg", "un", "L", "300g"
+  packageSize      String? // rótulo descritivo da embalagem: "2L", "380g", "1kg"
+  saleType         SaleType @default(unit) // un|weight — dirige input de quantidade no carrinho
   imageUrl         String?
   description      String?
   category         Category?        @relation(fields: [categoryId], references: [id])

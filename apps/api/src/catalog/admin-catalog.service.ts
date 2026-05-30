@@ -6,12 +6,13 @@ import type { Paginated } from "./catalog.service";
 export interface AdminProductUpdate {
   name?: string;
   brand?: string | null;
-  unit?: string | null;
+  packageSize?: string | null;
+  saleType?: "unit" | "weight";
   imageUrl?: string | null;
   categoryId?: string | null;
 }
 
-const LOCKABLE = ["name", "brand", "unit", "imageUrl", "category"] as const;
+const LOCKABLE = ["name", "brand", "packageSize", "saleType", "imageUrl", "category"] as const;
 
 @Injectable()
 export class AdminCatalogService {
@@ -53,7 +54,8 @@ export class AdminCatalogService {
           brand: true,
           gtin: true,
           imageUrl: true,
-          unit: true,
+          packageSize: true,
+          saleType: true,
           enrichmentStatus: true,
           completenessScore: true,
           lockedFields: true,
@@ -108,9 +110,13 @@ export class AdminCatalogService {
       data.brand = update.brand;
       locked.add("brand");
     }
-    if (update.unit !== undefined) {
-      data.unit = update.unit;
-      locked.add("unit");
+    if (update.packageSize !== undefined) {
+      data.packageSize = update.packageSize;
+      locked.add("packageSize");
+    }
+    if (update.saleType !== undefined) {
+      data.saleType = update.saleType;
+      locked.add("saleType");
     }
     if (update.imageUrl !== undefined) {
       data.imageUrl = update.imageUrl;

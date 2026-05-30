@@ -9,7 +9,7 @@ describe("completenessScore", () => {
         gtin: false,
         brand: false,
         imageUrl: false,
-        unit: false,
+        packageSize: false,
         category: false,
       }),
     ).toBe(0);
@@ -21,7 +21,7 @@ describe("completenessScore", () => {
         gtin: true,
         brand: true,
         imageUrl: true,
-        unit: true,
+        packageSize: true,
         category: true,
       }),
     ).toBe(100);
@@ -34,7 +34,7 @@ describe("completenessScore", () => {
         gtin: true,
         brand: false,
         imageUrl: false,
-        unit: false,
+        packageSize: false,
         category: false,
       }),
     ).toBe(40);

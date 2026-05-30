@@ -5,7 +5,7 @@ export interface CompletenessInput {
   gtin: boolean;
   brand: boolean;
   imageUrl: boolean;
-  unit: boolean;
+  packageSize: boolean;
   category: boolean;
 }
 
@@ -15,7 +15,7 @@ const WEIGHTS: Record<keyof CompletenessInput, number> = {
   brand: 15,
   gtin: 15,
   category: 15,
-  unit: 10,
+  packageSize: 10,
 };
 
 export function completenessScore(input: CompletenessInput): number {

@@ -184,7 +184,8 @@ export class CatalogService {
           id: true,
           name: true,
           brand: true,
-          unit: true,
+          packageSize: true,
+          saleType: true,
           imageUrl: true,
           gtin: true,
           category: { select: { id: true, name: true, slug: true } },
@@ -217,7 +218,8 @@ type OfferRow = {
     id: string;
     name: string;
     brand: string | null;
-    unit: string | null;
+    packageSize: string | null;
+    saleType: "unit" | "weight";
     imageUrl: string | null;
     gtin: string | null;
     category: { id: string; name: string; slug: string } | null;

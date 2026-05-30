@@ -9,11 +9,13 @@ interface Offer {
   available: boolean;
   store: { name: string; merchant: { name: string } };
 }
+type SaleType = "unit" | "weight";
 interface Product {
   id: string;
   name: string;
   brand: string | null;
-  unit: string | null;
+  packageSize: string | null;
+  saleType: SaleType;
   imageUrl: string | null;
   gtin: string | null;
   enrichmentStatus: string;
@@ -30,13 +32,25 @@ export function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const { api } = useAuth();
   const [product, setProduct] = useState<Product | null>(null);
-  const [form, setForm] = useState({ name: "", brand: "", unit: "", imageUrl: "" });
+  const [form, setForm] = useState({
+    name: "",
+    brand: "",
+    packageSize: "",
+    saleType: "unit" as SaleType,
+    imageUrl: "",
+  });
   const [msg, setMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const p = await api.request<Product>(`/admin/products/${id}`, { auth: true });
     setProduct(p);
-    setForm({ name: p.name, brand: p.brand ?? "", unit: p.unit ?? "", imageUrl: p.imageUrl ?? "" });
+    setForm({
+      name: p.name,
+      brand: p.brand ?? "",
+      packageSize: p.packageSize ?? "",
+      saleType: p.saleType,
+      imageUrl: p.imageUrl ?? "",
+    });
   }, [api, id]);
 
   useEffect(() => {
@@ -80,11 +94,11 @@ export function ProductDetail() {
       <div className="cards">
         <section className="card">
           <h2>Editar (override manual)</h2>
-          {(["name", "brand", "unit", "imageUrl"] as const).map((f) => (
+          {(["name", "brand", "packageSize", "imageUrl"] as const).map((f) => (
             <label key={f} className="field">
               <span>
-                {f}
-                {product.lockedFields.includes(f === "name" ? "name" : f) && (
+                {f === "packageSize" ? "embalagem (rótulo)" : f}
+                {product.lockedFields.includes(f) && (
                   <button className="lock" onClick={() => unlock(f)} title="destravar">
                     🔒 destravar
                   </button>
@@ -97,6 +111,24 @@ export function ProductDetail() {
               />
             </label>
           ))}
+          <label className="field">
+            <span>
+              tipo de venda
+              {product.lockedFields.includes("saleType") && (
+                <button className="lock" onClick={() => unlock("saleType")} title="destravar">
+                  🔒 destravar
+                </button>
+              )}
+            </span>
+            <select
+              className="input"
+              value={form.saleType}
+              onChange={(e) => setForm({ ...form, saleType: e.target.value as SaleType })}
+            >
+              <option value="unit">Unidade (embalado)</option>
+              <option value="weight">Peso (em gramas)</option>
+            </select>
+          </label>
           <div className="row">
             <button className="btn-primary" onClick={save}>
               Salvar

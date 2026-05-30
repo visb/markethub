@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import type { SyncType } from "@prisma/client";
 import { EnrichmentQueueService } from "../enrichment/enrichment.queue";
 import { PrismaService } from "../prisma/prisma.service";
-import { cleanGtin, slugify } from "./catalog-normalize";
+import { cleanGtin, inferSaleType, slugify } from "./catalog-normalize";
 import { ConnectorRegistry } from "./connector-registry";
 import type { ErpConnector } from "./connector.interface";
 import type { ConnectorContext, RawProduct, SyncCounters } from "./erp.types";
@@ -201,6 +201,8 @@ export class ErpService {
     gtin: string | null,
     categoryId: string | null,
   ): Promise<string> {
+    const saleType = inferSaleType(raw.unit, raw.categoryName ? slugify(raw.categoryName) : null);
+
     if (gtin) {
       const existing = await this.prisma.product.findUnique({ where: { gtin } });
       if (existing) return existing.id;
@@ -209,7 +211,8 @@ export class ErpService {
           gtin,
           name: raw.name,
           brand: raw.brand ?? null,
-          unit: raw.unit ?? null,
+          packageSize: raw.unit ?? null,
+          saleType,
           imageUrl: raw.imageUrl ?? null,
           categoryId,
         },
@@ -226,7 +229,8 @@ export class ErpService {
       data: {
         name: raw.name,
         brand: raw.brand ?? null,
-        unit: raw.unit ?? null,
+        packageSize: raw.unit ?? null,
+        saleType,
         imageUrl: raw.imageUrl ?? null,
         categoryId,
       },

@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import type { EnrichmentStatus } from "@prisma/client";
-import { IsArray, IsOptional, IsString } from "class-validator";
+import { IsArray, IsIn, IsOptional, IsString } from "class-validator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { EnrichmentService } from "../enrichment/enrichment.service";
 import { AdminCatalogService } from "./admin-catalog.service";
@@ -8,7 +8,8 @@ import { AdminCatalogService } from "./admin-catalog.service";
 class UpdateProductDto {
   @IsOptional() @IsString() name?: string;
   @IsOptional() @IsString() brand?: string | null;
-  @IsOptional() @IsString() unit?: string | null;
+  @IsOptional() @IsString() packageSize?: string | null;
+  @IsOptional() @IsIn(["unit", "weight"]) saleType?: "unit" | "weight";
   @IsOptional() @IsString() imageUrl?: string | null;
   @IsOptional() @IsString() categoryId?: string | null;
 }

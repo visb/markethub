@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
-import { normalizeGtin, slugify } from "../erp/catalog-normalize";
+import { inferSaleType, normalizeGtin, slugify } from "../erp/catalog-normalize";
 import { PrismaService } from "../prisma/prisma.service";
 import { CATEGORY_MAPPER, type CategoryMapper } from "./category-mapper.interface";
 import { completenessScore } from "./completeness";
@@ -30,7 +30,10 @@ export class EnrichmentService {
 
   /** Enriquece um produto: Cosmos (cacheado) + mapeamento de categoria + score. Idempotente. */
   async enrichProduct(productId: string): Promise<EnrichResult> {
-    const product = await this.prisma.product.findUnique({ where: { id: productId } });
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      include: { category: { select: { slug: true } } },
+    });
     if (!product) {
       throw new NotFoundException({ code: "PRODUCT_NOT_FOUND", message: "Product not found" });
     }
@@ -38,6 +41,7 @@ export class EnrichmentService {
     const locked = new Set(product.lockedFields);
     const provenance: Record<string, string> = {};
     const data: Prisma.ProductUpdateInput = {};
+    let resolvedCategorySlug: string | null = null;
 
     const gtin = normalizeGtin(product.gtin);
     let result: EnrichmentResult | null = null;
@@ -61,17 +65,26 @@ export class EnrichmentService {
         data.imageUrl = result.imageUrl;
         provenance.imageUrl = source;
       }
-      if (result.unit && !locked.has("unit")) {
-        data.unit = result.unit;
-        provenance.unit = source;
+      if (result.unit && !locked.has("packageSize")) {
+        data.packageSize = result.unit;
+        provenance.packageSize = source;
       }
       if (result.cosmosCategory && !locked.has("category")) {
         const categoryId = await this.resolveCategory(result.cosmosCategory);
         if (categoryId) {
           data.category = { connect: { id: categoryId } };
           provenance.category = this.mapper.name;
+          resolvedCategorySlug = await this.categorySlug(categoryId);
         }
       }
+    }
+
+    // saleType (un|weight) recomputado pela heurística, salvo se travado manualmente.
+    if (!locked.has("saleType")) {
+      const packageSize = (data.packageSize as string | undefined) ?? product.packageSize;
+      const categorySlug = resolvedCategorySlug ?? product.category?.slug ?? null;
+      data.saleType = inferSaleType(packageSize, categorySlug);
+      provenance.saleType = "heuristic";
     }
 
     const found = result !== null;
@@ -80,7 +93,7 @@ export class EnrichmentService {
       gtin: Boolean(gtin),
       brand: Boolean(data.brand ?? product.brand),
       imageUrl: Boolean(data.imageUrl ?? product.imageUrl),
-      unit: Boolean(data.unit ?? product.unit),
+      packageSize: Boolean(data.packageSize ?? product.packageSize),
       category: Boolean(data.category ?? product.categoryId),
     };
     const score = completenessScore(final);
@@ -167,6 +180,14 @@ export class EnrichmentService {
       },
     });
     return result;
+  }
+
+  private async categorySlug(categoryId: string): Promise<string | null> {
+    const c = await this.prisma.category.findUnique({
+      where: { id: categoryId },
+      select: { slug: true },
+    });
+    return c?.slug ?? null;
   }
 
   /**

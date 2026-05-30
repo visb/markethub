@@ -45,3 +45,26 @@ export function normalizeGtin(raw: string | null | undefined): string | null {
   if (!cleaned) return null;
   return isValidGtin(cleaned) ? cleaned : null;
 }
+
+export type SaleTypeValue = "unit" | "weight";
+
+const BARE_WEIGHT_LABELS = ["kg", "g", "grama", "gramas", "kilo", "quilo", "kgs"];
+const WEIGHT_CATEGORIES = ["acougue", "hortifruti"];
+
+/**
+ * Infere como o produto é vendido a partir do rótulo de embalagem + categoria.
+ * - Rótulo "kg"/"g" puro (sem número) → vendido por peso (weight).
+ * - Categoria Açougue/Hortifruti sem tamanho de embalagem → weight.
+ * - Caso contrário (ex.: "2L", "380g", "1kg", embalados) → unidade (unit).
+ */
+export function inferSaleType(
+  packageSize: string | null | undefined,
+  categorySlug?: string | null,
+): SaleTypeValue {
+  const label = (packageSize ?? "").trim().toLowerCase();
+  const hasNumber = /\d/.test(label);
+
+  if (!hasNumber && BARE_WEIGHT_LABELS.includes(label)) return "weight";
+  if (!hasNumber && categorySlug && WEIGHT_CATEGORIES.includes(categorySlug)) return "weight";
+  return "unit";
+}
