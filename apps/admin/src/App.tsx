@@ -7,6 +7,8 @@ import { Dashboard } from "@/pages/Dashboard";
 import { Catalog } from "@/pages/Catalog";
 import { ProductDetail } from "@/pages/ProductDetail";
 import { ErpRuns } from "@/pages/ErpRuns";
+import { Users } from "@/pages/Users";
+import { MarketplaceCategories } from "@/pages/MarketplaceCategories";
 
 function Placeholder({ title }: { title: string }) {
   return (
@@ -28,6 +30,8 @@ export function App() {
               <Route index element={<Dashboard />} />
               <Route path="catalog" element={<Catalog />} />
               <Route path="catalog/:id" element={<ProductDetail />} />
+              <Route path="categories" element={<MarketplaceCategories />} />
+              <Route path="users" element={<Users />} />
               <Route path="orders" element={<Placeholder title="Pedidos" />} />
               <Route path="erp" element={<ErpRuns />} />
             </Route>

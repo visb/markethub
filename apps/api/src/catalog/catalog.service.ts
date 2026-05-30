@@ -59,15 +59,26 @@ export class CatalogService {
   /** Produtos disponíveis numa loja (com preço da oferta), paginado. */
   async listStoreProducts(
     storeId: string,
-    opts: { categoryId?: string; page?: number; pageSize?: number },
+    opts: {
+      categoryId?: string;
+      marketplaceCategoryId?: string;
+      page?: number;
+      pageSize?: number;
+    },
   ): Promise<Paginated<unknown>> {
     await this.assertStore(storeId);
     const { page, pageSize, skip, take } = this.paginate(opts.page, opts.pageSize);
 
+    const productFilter: Prisma.ProductWhereInput = {
+      ...(opts.categoryId ? { categoryId: opts.categoryId } : {}),
+      ...(opts.marketplaceCategoryId
+        ? { category: { marketplaceCategoryId: opts.marketplaceCategoryId } }
+        : {}),
+    };
     const where: Prisma.OfferWhereInput = {
       storeId,
       available: true,
-      ...(opts.categoryId ? { product: { categoryId: opts.categoryId } } : {}),
+      ...(Object.keys(productFilter).length ? { product: productFilter } : {}),
     };
 
     const [rows, total] = await this.prisma.$transaction([

@@ -30,7 +30,18 @@ async function main(): Promise<void> {
   console.log(`Seed ok. Admin: ${email} / admin12345`);
 
   await seedCatalog();
+  await seedMarketplaceCategories();
+  await seedExampleUsers(passwordHash);
 }
+
+// Departamentos curados (aparecem no marketplace) — nome, ícone, ordem.
+const CURATED = [
+  { name: "Hortifruti", icon: "🥬", order: 1 },
+  { name: "Padaria", icon: "🥖", order: 2 },
+  { name: "Açougue", icon: "🥩", order: 3 },
+  { name: "Bebidas", icon: "🥤", order: 4 },
+  { name: "Mercearia", icon: "🛒", order: 5 },
+] as const;
 
 // Categorias canônicas (departamentos dos screenshots).
 const CATEGORIES = ["Padaria", "Hortifruti", "Açougue", "Bebidas", "Mercearia"] as const;
@@ -84,6 +95,62 @@ async function seedCatalog(): Promise<void> {
     `Catalog seed ok: ${merchants.length} merchants + ${CATEGORIES.length} categorias. ` +
       `Produtos via sync ERP (csv).`,
   );
+}
+
+// Categorias curadas + mapeia a categoria crua de mesmo nome para a curada.
+async function seedMarketplaceCategories(): Promise<void> {
+  for (const c of CURATED) {
+    const slug = slugify(c.name);
+    const mkt = await prisma.marketplaceCategory.upsert({
+      where: { slug },
+      update: { icon: c.icon, displayOrder: c.order },
+      create: { name: c.name, slug, icon: c.icon, displayOrder: c.order, visible: true },
+    });
+    // Liga a categoria crua homônima (se existir) à curada.
+    await prisma.category.updateMany({
+      where: { slug },
+      data: { marketplaceCategoryId: mkt.id },
+    });
+  }
+  console.log(`Marketplace categories ok: ${CURATED.length} curadas.`);
+}
+
+// Usuários de exemplo: 1 merchant-manager + 1 separador (Europa), 1 cliente, 1 entregador.
+async function seedExampleUsers(passwordHash: string): Promise<void> {
+  const europa = await prisma.merchant.findUnique({ where: { slug: "supermercado-europa" } });
+  const store = europa ? await prisma.store.findFirst({ where: { merchantId: europa.id } }) : null;
+
+  const upsertUser = async (email: string, name: string, role: RoleName) => {
+    return prisma.user.upsert({
+      where: { email },
+      update: {},
+      create: {
+        email,
+        name,
+        passwordHash,
+        roles: { create: [{ role: { connect: { name: role } } }] },
+      },
+    });
+  };
+
+  await upsertUser("cliente@markethub.local", "Cliente Exemplo", "customer");
+  await upsertUser("entregador@markethub.local", "Entregador Exemplo", "driver");
+  const manager = await upsertUser("gerente.europa@markethub.local", "Gerente Europa", "merchant");
+  const picker = await upsertUser("separador.europa@markethub.local", "Separador Europa", "picker");
+
+  if (store) {
+    for (const [user, staffRole] of [
+      [manager, "manager"],
+      [picker, "picker"],
+    ] as const) {
+      await prisma.storeStaff.upsert({
+        where: { userId_storeId_staffRole: { userId: user.id, storeId: store.id, staffRole } },
+        update: {},
+        create: { userId: user.id, storeId: store.id, staffRole },
+      });
+    }
+  }
+  console.log(`Example users ok (senha de todos: admin12345).`);
 }
 
 main()

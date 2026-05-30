@@ -27,11 +27,13 @@ export class CatalogController {
   products(
     @Param("id") id: string,
     @Query("categoryId") categoryId?: string,
+    @Query("marketplaceCategoryId") marketplaceCategoryId?: string,
     @Query("page") page?: string,
     @Query("pageSize") pageSize?: string,
   ) {
     return this.catalog.listStoreProducts(id, {
       categoryId,
+      marketplaceCategoryId,
       page: page ? Number(page) : undefined,
       pageSize: pageSize ? Number(pageSize) : undefined,
     });

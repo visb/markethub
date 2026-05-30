@@ -4,6 +4,8 @@ import { useAuth } from "@/auth/auth-context";
 const NAV = [
   { to: "/", label: "Visão geral", end: true },
   { to: "/catalog", label: "Catálogo" },
+  { to: "/categories", label: "Categorias" },
+  { to: "/users", label: "Usuários" },
   { to: "/orders", label: "Pedidos" },
   { to: "/erp", label: "Integração ERP" },
 ];

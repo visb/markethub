@@ -55,6 +55,7 @@ export class AuthService {
 
     const ok = await this.tokens.verifyHash(user.passwordHash, dto.password);
     if (!ok) throw this.invalidCredentials();
+    if (!user.active) throw this.accountDisabled();
 
     const roles = user.roles.map((r) => r.role.name);
     return this.issueSession({ id: user.id, email: user.email, roles }, userAgent);
@@ -88,7 +89,7 @@ export class AuthService {
       where: { id: session.userId },
       include: { roles: { include: { role: true } } },
     });
-    if (!user) throw this.invalidToken();
+    if (!user || !user.active) throw this.invalidToken();
     const roles = user.roles.map((r) => r.role.name);
 
     // Rotação: cria nova sessão e revoga a antiga, apontando para a nova.
@@ -174,6 +175,10 @@ export class AuthService {
 
   private invalidToken(): UnauthorizedException {
     return new UnauthorizedException({ code: "INVALID_TOKEN", message: "Invalid refresh token" });
+  }
+
+  private accountDisabled(): UnauthorizedException {
+    return new UnauthorizedException({ code: "ACCOUNT_DISABLED", message: "Conta desativada" });
   }
 }
 

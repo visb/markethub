@@ -10,6 +10,7 @@ import { QueueModule } from "./queue/queue.module";
 import { ErpModule } from "./erp/erp.module";
 import { EnrichmentModule } from "./enrichment/enrichment.module";
 import { CatalogModule } from "./catalog/catalog.module";
+import { UsersModule } from "./users/users.module";
 import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
 import { RolesGuard } from "./auth/guards/roles.guard";
 
@@ -24,6 +25,7 @@ import { RolesGuard } from "./auth/guards/roles.guard";
     EnrichmentModule,
     ErpModule,
     CatalogModule,
+    UsersModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

@@ -16,14 +16,16 @@ enum RoleName {
 }
 
 model User {
-  id           String     @id @default(cuid())
-  email        String     @unique
+  id           String       @id @default(cuid())
+  email        String       @unique
   passwordHash String
   name         String
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  active       Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
   roles        UserRole[]
   sessions     Session[]
+  staffOf      StoreStaff[]
 
   @@map("users")
 }
@@ -60,6 +62,28 @@ model Session {
 
   @@index([userId])
   @@map("sessions")
+}
+
+// Papel do funcionário dentro de uma loja.
+enum StaffRole {
+  manager // usuário do merchant que gerencia a loja
+  picker // separador (faz o picking)
+}
+
+// Vínculo de um usuário (funcionário) a uma loja específica, com papel operacional.
+model StoreStaff {
+  id        String    @id @default(cuid())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  store     Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  storeId   String
+  staffRole StaffRole
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+
+  @@unique([userId, storeId, staffRole])
+  @@index([storeId])
+  @@map("store_staff")
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -118,13 +142,15 @@ model Store {
   updatedAt  DateTime @updatedAt
   offers     Offer[]
   stocks     Stock[]
+  staff      StoreStaff[]
 
   @@unique([merchantId, externalId])
   @@index([merchantId])
   @@map("stores")
 }
 
-// Árvore de categorias canônicas (Padaria, Hortifruti, Açougue, Bebidas, Mercearia...).
+// Categoria CRUA (origem ERP/Cosmos, criada automaticamente). Mapeia para uma categoria
+// CURADA (MarketplaceCategory) que é o que aparece no marketplace.
 model Category {
   id       String     @id @default(cuid())
   name     String
@@ -134,9 +160,33 @@ model Category {
   children Category[] @relation("CategoryTree")
   products Product[]
   mappings CategoryMapping[]
+  // Curadoria: categoria do marketplace que agrupa esta categoria crua.
+  marketplaceCategory   MarketplaceCategory? @relation(fields: [marketplaceCategoryId], references: [id])
+  marketplaceCategoryId String?
 
   @@index([parentId])
+  @@index([marketplaceCategoryId])
   @@map("categories")
+}
+
+// Categoria CURADA, gerida pelo admin — é o que aparece no marketplace (app cliente).
+model MarketplaceCategory {
+  id           String                @id @default(cuid())
+  name         String
+  slug         String                @unique
+  icon         String? // emoji ou URL de ícone
+  displayOrder Int                   @default(0)
+  visible      Boolean               @default(true)
+  parent       MarketplaceCategory?  @relation("MktCatTree", fields: [parentId], references: [id])
+  parentId     String?
+  children     MarketplaceCategory[] @relation("MktCatTree")
+  rawCategories Category[]
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  @@index([parentId])
+  @@index([visible, displayOrder])
+  @@map("marketplace_categories")
 }
 
 // Produto canônico (global, cross-loja). Enriquecido pelo pipeline (S1.5).
