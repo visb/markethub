@@ -1,0 +1,9 @@
+externalId,gtin,name,brand,unit,categoryName,imageUrl,priceCents,promoPriceCents,available,stockQuantity
+E001,7891000100103,Leite Integral 1L,Ninho,1L,Bebidas,,549,499,1,120
+E002,7894900011517,Refrigerante Cola 2L,Coca-Cola,2L,Bebidas,,899,,1,80
+E003,7896005800010,Pão Francês,,kg,Padaria,,1490,,1,40
+E004,7896036090019,Banana Prata,,kg,Hortifruti,,599,549,1,200
+E005,7891910000197,Açúcar Refinado 1kg,União,1kg,Mercearia,,489,,1,150
+E006,7891991010924,Cerveja Pilsen Lata 350ml,Brahma,350ml,Bebidas,,329,299,1,300
+E007,7896102500011,Picanha Bovina,,kg,Açougue,,5990,,1,25
+E008,,Bolo de Cenoura Fatia,Padaria Europa,un,Padaria,,790,,1,15

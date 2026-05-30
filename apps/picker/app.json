@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "MarketHub Separador",
+    "slug": "markethub-picker",
+    "scheme": "markethubpicker",
+    "version": "0.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#00A859"
+    },
+    "ios": { "supportsTablet": true, "bundleIdentifier": "com.markethub.picker" },
+    "android": { "package": "com.markethub.picker" },
+    "web": { "bundler": "metro", "output": "single" },
+    "plugins": ["expo-router", "expo-secure-store"]
+  }
+}

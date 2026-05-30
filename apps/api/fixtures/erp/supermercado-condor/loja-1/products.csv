@@ -1,0 +1,6 @@
+externalId,gtin,name,brand,unit,categoryName,imageUrl,priceCents,promoPriceCents,available,stockQuantity
+C001,7891000100103,Leite Ninho Integral 1L,Nestlé Ninho,1L,Bebidas,,569,,1,90
+C002,7894900011517,Coca-Cola 2 Litros,Coca-Cola,2L,Bebidas,,879,829,1,110
+C003,7891910000197,Acucar Refinado Uniao 1kg,Uniao,1kg,Mercearia,,479,,1,140
+C004,7896102500028,Alcatra Bovina,,kg,Acougue,,4790,4490,1,30
+C005,,Coxinha de Frango,Padaria Condor,un,Padaria,,650,,1,60

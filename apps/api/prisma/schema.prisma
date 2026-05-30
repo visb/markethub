@@ -1,0 +1,272 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RoleName {
+  customer
+  picker
+  driver
+  merchant
+  admin
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  roles        UserRole[]
+  sessions     Session[]
+
+  @@map("users")
+}
+
+model Role {
+  id    String     @id @default(cuid())
+  name  RoleName   @unique
+  users UserRole[]
+
+  @@map("roles")
+}
+
+model UserRole {
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  roleId String
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+// Refresh-token session. Suporta rotação e revogação (detecção de reuse).
+model Session {
+  id               String    @id @default(cuid())
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId           String
+  refreshTokenHash String
+  userAgent        String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  replacedBySessionId String?
+  createdAt        DateTime  @default(now())
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Catálogo (S1.1)
+// Produto CANÔNICO (global) é separado da OFERTA (por loja). Isso viabiliza
+// dedup e enriquecimento entre lojas/merchants.
+// ─────────────────────────────────────────────────────────────
+
+enum EnrichmentStatus {
+  pending
+  enriched
+  needs_review
+}
+
+// Rede/varejista (ex.: Supermercado Europa).
+model Merchant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  active    Boolean  @default(true)
+  // Integração ERP (S1.2): tipo de conector e config (ex.: { "dir": "..." } pro CSV).
+  connectorType   String?
+  connectorConfig Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  stores    Store[]
+
+  @@map("merchants")
+}
+
+// Loja física de um merchant. Origem dos dados do ERP.
+model Store {
+  id         String   @id @default(cuid())
+  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  merchantId String
+  name       String
+  externalId String? // id da loja no ERP do merchant
+  // endereço
+  street     String?
+  number     String?
+  district   String?
+  city       String?
+  state      String?
+  zipCode    String?
+  latitude   Float?
+  longitude  Float?
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  offers     Offer[]
+  stocks     Stock[]
+
+  @@unique([merchantId, externalId])
+  @@index([merchantId])
+  @@map("stores")
+}
+
+// Árvore de categorias canônicas (Padaria, Hortifruti, Açougue, Bebidas, Mercearia...).
+model Category {
+  id       String     @id @default(cuid())
+  name     String
+  slug     String     @unique
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  parentId String?
+  children Category[] @relation("CategoryTree")
+  products Product[]
+  mappings CategoryMapping[]
+
+  @@index([parentId])
+  @@map("categories")
+}
+
+// Produto canônico (global, cross-loja). Enriquecido pelo pipeline (S1.5).
+model Product {
+  id               String           @id @default(cuid())
+  gtin             String?          @unique // EAN/GTIN normalizado quando houver
+  name             String
+  brand            String?
+  unit             String? // ex.: "kg", "un", "L", "300g"
+  imageUrl         String?
+  description      String?
+  category         Category?        @relation(fields: [categoryId], references: [id])
+  categoryId       String?
+  enrichmentStatus EnrichmentStatus @default(pending)
+  completenessScore Int             @default(0) // 0-100
+  // Campos editados manualmente (S1.7) que o pipeline NÃO sobrescreve.
+  lockedFields     String[]         @default([])
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  offers           Offer[]
+  stocks           Stock[]
+  enrichment       ProductEnrichment?
+
+  @@index([name])
+  @@index([brand])
+  @@index([categoryId])
+  @@index([enrichmentStatus])
+  @@map("products")
+}
+
+// Oferta de um produto numa loja: preço + disponibilidade. Reconcilia ERP via externalId.
+model Offer {
+  id           String   @id @default(cuid())
+  store        Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  storeId      String
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId    String
+  externalId   String? // id do produto no ERP daquela loja
+  priceCents   Int
+  promoPriceCents Int?
+  available    Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([storeId, productId])
+  @@unique([storeId, externalId])
+  @@index([productId])
+  @@map("offers")
+}
+
+// Estoque por loja/produto (quantidade opcional; alguns ERPs só dão flag).
+model Stock {
+  id        String   @id @default(cuid())
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  storeId   String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String
+  quantity  Int?
+  available Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+
+  @@unique([storeId, productId])
+  @@index([productId])
+  @@map("stocks")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Integração ERP — auditoria de sync (S1.2)
+// ─────────────────────────────────────────────────────────────
+
+enum SyncType {
+  full
+  prices
+  stock
+}
+
+enum SyncStatus {
+  running
+  success
+  failed
+}
+
+model SyncRun {
+  id             String     @id @default(cuid())
+  storeId        String
+  type           SyncType
+  status         SyncStatus @default(running)
+  startedAt      DateTime   @default(now())
+  finishedAt     DateTime?
+  itemsProcessed Int        @default(0)
+  itemsUpdated   Int        @default(0)
+  itemsFailed    Int        @default(0)
+  error          String?
+
+  @@index([storeId, startedAt])
+  @@map("sync_runs")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Enriquecimento (S1.5) — Cosmos Bluesoft + mapeamento de categoria
+// ─────────────────────────────────────────────────────────────
+
+// Cache de respostas do Cosmos por GTIN (rate limit + evitar recomputo).
+model CosmosCache {
+  gtin      String   @id
+  found     Boolean
+  payload   Json?
+  fetchedAt DateTime @default(now())
+
+  @@map("cosmos_cache")
+}
+
+// Mapeamento categoria de origem (ex.: Cosmos GPC/descrição) → Category da plataforma.
+// Persistido e reusado; IA/heurística só roda para sourceKey novo.
+model CategoryMapping {
+  id         String    @id @default(cuid())
+  source     String // "cosmos"
+  sourceKey  String // texto da categoria de origem
+  category   Category? @relation(fields: [categoryId], references: [id])
+  categoryId String?
+  confidence Float     @default(0)
+  mapper     String // "heuristic" | "ai" | "manual"
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([source, sourceKey])
+  @@map("category_mappings")
+}
+
+// Dados crus do enriquecimento + proveniência por campo (auditoria).
+model ProductEnrichment {
+  productId  String   @id
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  source     String // "cosmos" | "mock"
+  raw        Json?
+  provenance Json? // { name: "cosmos", category: "heuristic", ... }
+  fetchedAt  DateTime @default(now())
+
+  @@map("product_enrichments")
+}

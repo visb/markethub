@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "MarketHub",
+    "slug": "markethub-customer",
+    "scheme": "markethubcustomer",
+    "version": "0.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#00A859"
+    },
+    "ios": { "supportsTablet": true, "bundleIdentifier": "com.markethub.customer" },
+    "android": { "package": "com.markethub.customer" },
+    "web": { "bundler": "metro", "output": "single" },
+    "plugins": ["expo-router", "expo-secure-store"]
+  }
+}
