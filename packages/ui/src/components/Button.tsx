@@ -11,8 +11,10 @@ import { colors, radius, spacing, typography } from "../tokens";
 
 export interface ButtonProps extends Omit<PressableProps, "children"> {
   title: string;
-  variant?: "primary" | "secondary" | "ghost";
+  /** primary = vermelho sólido; outline = branco c/ borda vermelha (CTA full-width das telas). */
+  variant?: "primary" | "outline" | "secondary" | "ghost";
   loading?: boolean;
+  size?: "md" | "sm";
 }
 
 export function Button({
@@ -20,17 +22,21 @@ export function Button({
   variant = "primary",
   loading,
   disabled,
+  size = "md",
   style,
   ...rest
 }: ButtonProps) {
   const isDisabled = disabled || loading;
+  const labelColor = variant === "primary" ? colors.white : colors.primary;
   return (
     <Pressable
       accessibilityRole="button"
       disabled={isDisabled}
       style={(state) => [
         styles.base,
+        size === "sm" && styles.sm,
         variant === "primary" && styles.primary,
+        variant === "outline" && styles.outline,
         variant === "secondary" && styles.secondary,
         variant === "ghost" && styles.ghost,
         isDisabled && styles.disabled,
@@ -40,16 +46,9 @@ export function Button({
     >
       <View style={styles.content}>
         {loading ? (
-          <ActivityIndicator color={variant === "primary" ? colors.white : colors.primary} />
+          <ActivityIndicator color={labelColor} />
         ) : (
-          <Text
-            style={[
-              styles.label,
-              variant === "primary" ? styles.labelPrimary : styles.labelSecondary,
-            ]}
-          >
-            {title}
-          </Text>
+          <Text style={[styles.label, { color: labelColor }]}>{title}</Text>
         )}
       </View>
     </Pressable>
@@ -63,12 +62,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: spacing.lg,
   },
+  sm: { height: 40, borderRadius: radius.sm, paddingHorizontal: spacing.md },
   primary: { backgroundColor: colors.primary },
+  outline: { backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.primary },
   secondary: { backgroundColor: colors.primaryLight },
   ghost: { backgroundColor: "transparent" },
   disabled: { opacity: 0.5 },
   content: { flexDirection: "row", justifyContent: "center", alignItems: "center" },
   label: { ...typography.button },
-  labelPrimary: { color: colors.white },
-  labelSecondary: { color: colors.primary },
 });

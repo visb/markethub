@@ -1,19 +1,20 @@
-/** Design tokens MarketHub — derivados dos screenshots (verde de marca, PIX, R$). */
+/** Design tokens MarketHub — derivados dos screenshots (marca VERMELHA, R$, PIX). */
 
 export const colors = {
-  primary: "#00A859", // verde MarketHub
-  primaryDark: "#00824A",
-  primaryLight: "#E6F7EF",
-  accent: "#FF6B00",
+  primary: "#E11A2C", // vermelho MarketHub
+  primaryDark: "#B5141F",
+  primaryLight: "#FDECEE", // fundo claro de seleção
+  accent: "#E11A2C",
   text: "#1A1A1A",
-  textMuted: "#6B7280",
-  border: "#E5E7EB",
+  textMuted: "#9AA0A6",
+  border: "#ECECEC",
   background: "#FFFFFF",
   surface: "#F7F8FA",
-  danger: "#DC2626",
+  danger: "#C0182A",
   success: "#16A34A",
   warning: "#F59E0B",
   white: "#FFFFFF",
+  strike: "#E11A2C", // preço antigo riscado (vermelho claro)
 } as const;
 
 export const spacing = {
@@ -35,6 +36,7 @@ export const radius = {
 export const typography = {
   h1: { fontSize: 24, fontWeight: "700" as const },
   h2: { fontSize: 20, fontWeight: "700" as const },
+  title: { fontSize: 18, fontWeight: "700" as const },
   body: { fontSize: 16, fontWeight: "400" as const },
   caption: { fontSize: 13, fontWeight: "400" as const },
   button: { fontSize: 16, fontWeight: "600" as const },

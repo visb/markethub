@@ -98,6 +98,16 @@ export function marketplace(api: ApiClient) {
       api.request<Paginated<ProductView>>(
         `/search?storeId=${storeId}&q=${encodeURIComponent(q)}`,
       ),
+    sections: (storeId: string) =>
+      api.request<{
+        featured: ProductView[];
+        mostBought: ProductView[];
+        recommended: ProductView[];
+      }>(`/stores/${storeId}/sections`),
+    categories: () =>
+      api.request<{ id: string; name: string; slug: string; icon: string | null }[]>(
+        "/marketplace-categories",
+      ),
 
     getCart: () => api.request<CartView>("/cart", { auth: true }),
     addItem: (body: { offerId: string; quantity?: number; weightGrams?: number }) =>

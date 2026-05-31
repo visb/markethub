@@ -1,11 +1,15 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { Button, Screen, Text, colors, radius, spacing } from "@markethub/ui";
+import { Button, Text, colors, radius, spacing } from "@markethub/ui";
 import { useAuth } from "@/auth-context";
 import { marketplace, type Address } from "@/api/marketplace";
+import { Header } from "@/components/Header";
 
 type Method = "gate" | "door";
+type When = "now" | "schedule";
 
 export default function CheckoutScreen() {
   const { api } = useAuth();
@@ -14,6 +18,7 @@ export default function CheckoutScreen() {
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [method, setMethod] = useState<Method>("gate");
+  const [when, setWhen] = useState<When>("now");
   const [loading, setLoading] = useState(true);
   const [placing, setPlacing] = useState(false);
   const [form, setForm] = useState({ label: "Casa", street: "", number: "", city: "", state: "", zipCode: "" });
@@ -53,68 +58,113 @@ export default function CheckoutScreen() {
 
   if (loading) {
     return (
-      <Screen>
-        <ActivityIndicator color={colors.primary} />
-      </Screen>
+      <SafeAreaView style={styles.flex} edges={["top"]}>
+        <Header title="Finalizar compra" />
+        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
+      </SafeAreaView>
     );
   }
 
+  const addr = addresses.find((a) => a.id === selected);
+
   return (
-    <Screen>
-      <Text variant="h2">Finalizar compra</Text>
-
-      <Text variant="caption" muted style={{ marginTop: spacing.lg }}>
-        Endereço de entrega
-      </Text>
-      {addresses.map((a) => (
-        <Pressable key={a.id} onPress={() => setSelected(a.id)} style={[styles.option, selected === a.id && styles.optionActive]}>
-          <Text>
-            {a.label} · {a.street}, {a.number}
-          </Text>
-        </Pressable>
-      ))}
-
-      {addresses.length === 0 && (
-        <View style={{ gap: spacing.sm, marginTop: spacing.sm }}>
-          {(["street", "number", "city", "state", "zipCode"] as const).map((f) => (
-            <TextInput
-              key={f}
-              style={styles.input}
-              placeholder={f}
-              value={form[f]}
-              onChangeText={(v) => setForm({ ...form, [f]: v })}
-              placeholderTextColor={colors.textMuted}
-            />
-          ))}
-          <Button title="Salvar endereço" variant="secondary" onPress={addAddress} />
+    <SafeAreaView style={styles.flex} edges={["top"]}>
+      <Header title="Finalizar compra" />
+      <ScrollView contentContainerStyle={{ padding: spacing.md, gap: spacing.md }}>
+        {/* Entrega */}
+        <View style={styles.card}>
+          <View style={styles.cardHead}>
+            <Ionicons name="bicycle" size={20} color={colors.primary} />
+            <Text style={{ flex: 1, fontWeight: "700" }}>Entrega</Text>
+            <Text style={styles.link}>alterar endereço</Text>
+          </View>
+          {addr ? (
+            <View style={styles.cardBody}>
+              <Text>{addr.label}</Text>
+              <Text muted>
+                {addr.street}, {addr.number}
+              </Text>
+              <Text muted>
+                {addr.city} - {addr.state}
+              </Text>
+            </View>
+          ) : (
+            <View style={[styles.cardBody, { gap: spacing.sm }]}>
+              {(["street", "number", "city", "state", "zipCode"] as const).map((f) => (
+                <TextInput
+                  key={f}
+                  style={styles.input}
+                  placeholder={f}
+                  value={form[f]}
+                  onChangeText={(v) => setForm({ ...form, [f]: v })}
+                  placeholderTextColor={colors.textMuted}
+                />
+              ))}
+              <Button title="Salvar endereço" variant="outline" onPress={addAddress} />
+            </View>
+          )}
         </View>
-      )}
 
-      <Text variant="caption" muted style={{ marginTop: spacing.lg }}>
-        Como entregar
-      </Text>
-      <Pressable onPress={() => setMethod("gate")} style={[styles.option, method === "gate" && styles.optionActive]}>
-        <Text>Vou receber na portaria/portão</Text>
-      </Pressable>
-      <Pressable onPress={() => setMethod("door")} style={[styles.option, method === "door" && styles.optionActive]}>
-        <Text>Entregar na minha porta (+R$4,00)</Text>
-      </Pressable>
+        {/* Como entregar */}
+        <Text style={styles.sectionLabel}>Como entregar</Text>
+        <View style={styles.card}>
+          <Radio label="Vou receber na portaria/portão" selected={method === "gate"} onPress={() => setMethod("gate")} />
+          <Radio label="Entregar na minha porta (+R$4,00)" selected={method === "door"} onPress={() => setMethod("door")} last />
+        </View>
 
-      <View style={{ flex: 1 }} />
-      <Button title="Ir para pagamento" loading={placing} onPress={place} />
-    </Screen>
+        {/* Quando entregar */}
+        <Text style={styles.sectionLabel}>Quando entregar</Text>
+        <View style={styles.card}>
+          <Radio label="Receber assim que possível" selected={when === "now"} onPress={() => setWhen("now")} />
+          <Radio label="Agendar entrega" selected={when === "schedule"} onPress={() => setWhen("schedule")} last />
+        </View>
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <Button title="Prosseguir para Pagamento" variant="outline" loading={placing} onPress={place} />
+      </View>
+    </SafeAreaView>
+  );
+}
+
+function Radio({
+  label,
+  selected,
+  onPress,
+  last,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+  last?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.radioRow, !last && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
+    >
+      <View style={[styles.radio, selected && styles.radioOn]}>
+        {selected && <View style={styles.radioDot} />}
+      </View>
+      <Text>{label}</Text>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  option: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
+  flex: { flex: 1, backgroundColor: colors.background },
+  card: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, overflow: "hidden" },
+  cardHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
     padding: spacing.md,
-    marginTop: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  optionActive: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
+  cardBody: { padding: spacing.md, gap: 2 },
+  link: { color: colors.primary, textDecorationLine: "underline", fontSize: 13 },
+  sectionLabel: { color: colors.textMuted, fontSize: 13, marginTop: spacing.sm },
   input: {
     height: 44,
     borderWidth: 1,
@@ -123,4 +173,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     color: colors.text,
   },
+  radioRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md },
+  radio: {
+    width: 22,
+    height: 22,
+    borderRadius: radius.full,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  radioOn: { borderColor: colors.primary },
+  radioDot: { width: 12, height: 12, borderRadius: radius.full, backgroundColor: colors.primary },
+  footer: { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
 });
