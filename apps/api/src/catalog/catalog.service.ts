@@ -184,6 +184,57 @@ export class CatalogService {
     };
   }
 
+  /**
+   * Feed da home do marketplace: por departamento curado, produtos de VÁRIOS mercados
+   * (cada card traz o mercado + frete + tempo). Proximidade real entra com geo (Fase 4).
+   */
+  async feed(opts: { limitPerCategory?: number } = {}) {
+    const take = Math.min(20, Math.max(1, opts.limitPerCategory ?? 10));
+    const cats = await this.prisma.marketplaceCategory.findMany({
+      where: { visible: true },
+      orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
+      select: { id: true, name: true, slug: true, icon: true },
+    });
+
+    const sections = await Promise.all(
+      cats.map(async (cat) => {
+        const offers = await this.prisma.offer.findMany({
+          where: {
+            available: true,
+            product: { category: { marketplaceCategoryId: cat.id } },
+          },
+          take,
+          orderBy: { updatedAt: "desc" },
+          select: {
+            id: true,
+            priceCents: true,
+            promoPriceCents: true,
+            store: {
+              select: {
+                id: true,
+                name: true,
+                merchant: { select: { name: true, deliveryFeeCents: true } },
+              },
+            },
+            product: {
+              select: {
+                id: true,
+                name: true,
+                brand: true,
+                packageSize: true,
+                saleType: true,
+                imageUrl: true,
+              },
+            },
+          },
+        });
+        return { category: cat, items: offers.map(toFeedView) };
+      }),
+    );
+
+    return sections.filter((s) => s.items.length > 0);
+  }
+
   // ─── helpers ───
   private offerSelect() {
     return {
@@ -243,6 +294,36 @@ function toOfferView(row: OfferRow) {
     offerId: row.id,
     priceCents: row.priceCents,
     promoPriceCents: row.promoPriceCents,
+    ...row.product,
+  };
+}
+
+type FeedRow = {
+  id: string;
+  priceCents: number;
+  promoPriceCents: number | null;
+  store: { id: string; name: string; merchant: { name: string; deliveryFeeCents: number } };
+  product: {
+    id: string;
+    name: string;
+    brand: string | null;
+    packageSize: string | null;
+    saleType: "unit" | "weight";
+    imageUrl: string | null;
+  };
+};
+
+/** Card do feed multi-mercado: produto + mercado + frete + tempo. */
+function toFeedView(row: FeedRow) {
+  return {
+    offerId: row.id,
+    priceCents: row.priceCents,
+    promoPriceCents: row.promoPriceCents,
+    storeId: row.store.id,
+    merchant: row.store.merchant.name,
+    deliveryFeeCents: row.store.merchant.deliveryFeeCents,
+    deliveryEta: "30 min",
+    distanceKm: null as number | null, // proximidade real: Fase 4 (geo)
     ...row.product,
   };
 }

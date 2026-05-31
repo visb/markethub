@@ -8,6 +8,11 @@ import { CatalogService } from "./catalog.service";
 export class CatalogController {
   constructor(private readonly catalog: CatalogService) {}
 
+  @Get("feed")
+  feed() {
+    return this.catalog.feed();
+  }
+
   @Get("merchants")
   merchants() {
     return this.catalog.listMerchants();

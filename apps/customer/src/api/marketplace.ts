@@ -78,6 +78,36 @@ export interface OrderSummary {
   payment: { status: string } | null;
 }
 
+export interface FeedItem extends ProductView {
+  storeId: string;
+  merchant: string;
+  deliveryFeeCents: number;
+  deliveryEta: string;
+  distanceKm: number | null;
+}
+export interface FeedSection {
+  category: { id: string; name: string; slug: string; icon: string | null };
+  items: FeedItem[];
+}
+
+export interface ProductDetail {
+  id: string;
+  name: string;
+  brand: string | null;
+  packageSize: string | null;
+  saleType: SaleType;
+  imageUrl: string | null;
+  description: string | null;
+  gtin: string | null;
+  category: { name: string } | null;
+  offers: {
+    id: string;
+    priceCents: number;
+    promoPriceCents: number | null;
+    store: { id: string; name: string; merchant: { name: string } };
+  }[];
+}
+
 export interface PaymentView {
   status: string;
   amountCents: number;
@@ -90,6 +120,8 @@ export interface PaymentView {
 /** Wrapper tipado sobre o ApiClient para o marketplace. */
 export function marketplace(api: ApiClient) {
   return {
+    feed: () => api.request<FeedSection[]>("/feed"),
+    productDetail: (productId: string) => api.request<ProductDetail>(`/products/${productId}`),
     merchants: () => api.request<Merchant[]>("/merchants"),
     stores: (merchantId: string) => api.request<Store[]>(`/merchants/${merchantId}/stores`),
     products: (storeId: string, page = 1) =>
@@ -110,7 +142,7 @@ export function marketplace(api: ApiClient) {
       ),
 
     getCart: () => api.request<CartView>("/cart", { auth: true }),
-    addItem: (body: { offerId: string; quantity?: number; weightGrams?: number }) =>
+    addItem: (body: { offerId: string; quantity?: number; weightGrams?: number; note?: string }) =>
       api.request<CartView>("/cart/items", { method: "POST", auth: true, body }),
     updateItem: (id: string, body: { quantity?: number; weightGrams?: number }) =>
       api.request<CartView>(`/cart/items/${id}`, { method: "PATCH", auth: true, body }),
@@ -122,6 +154,8 @@ export function marketplace(api: ApiClient) {
     addresses: () => api.request<Address[]>("/addresses", { auth: true }),
     addAddress: (body: Partial<Address>) =>
       api.request<Address>("/addresses", { method: "POST", auth: true, body }),
+    setDefaultAddress: (id: string) =>
+      api.request<Address>(`/addresses/${id}/default`, { method: "POST", auth: true }),
 
     checkout: (body: { addressId: string; deliveryMethod: "gate" | "door" }) =>
       api.request<{ id: string }>("/checkout", { method: "POST", auth: true, body }),
