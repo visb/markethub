@@ -121,6 +121,14 @@ export interface PaymentView {
 export function marketplace(api: ApiClient) {
   return {
     feed: () => api.request<FeedSection[]>("/feed"),
+    categoryFeed: (categoryId: string) =>
+      api.request<{ category: FeedSection["category"]; items: FeedItem[] }>(
+        `/marketplace-categories/${categoryId}/feed`,
+      ),
+    storeCategoryProducts: (storeId: string, categoryId: string) =>
+      api.request<Paginated<ProductView>>(
+        `/stores/${storeId}/products?marketplaceCategoryId=${categoryId}&pageSize=50`,
+      ),
     productDetail: (productId: string) => api.request<ProductDetail>(`/products/${productId}`),
     merchants: () => api.request<Merchant[]>("/merchants"),
     stores: (merchantId: string) => api.request<Store[]>(`/merchants/${merchantId}/stores`),

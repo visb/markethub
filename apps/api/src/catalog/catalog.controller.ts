@@ -13,6 +13,18 @@ export class CatalogController {
     return this.catalog.feed();
   }
 
+  @Get("marketplace-categories/:id/feed")
+  categoryFeed(
+    @Param("id") id: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
+  ) {
+    return this.catalog.categoryFeed(id, {
+      page: page ? Number(page) : undefined,
+      pageSize: pageSize ? Number(pageSize) : undefined,
+    });
+  }
+
   @Get("merchants")
   merchants() {
     return this.catalog.listMerchants();

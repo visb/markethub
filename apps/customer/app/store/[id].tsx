@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -8,6 +8,7 @@ import { useAuth } from "@/auth-context";
 import { brl, marketplace, type ProductView } from "@/api/marketplace";
 import { useCart } from "@/use-cart";
 import { ProductCard } from "@/components/ProductCard";
+import { CategoryMenu, type MenuCategory } from "@/components/CategoryMenu";
 import { Header } from "@/components/Header";
 
 export default function StoreHome() {
@@ -21,6 +22,9 @@ export default function StoreHome() {
     mostBought: ProductView[];
     recommended: ProductView[];
   } | null>(null);
+  const [categories, setCategories] = useState<MenuCategory[]>([]);
+  const [search, setSearch] = useState("");
+  const [results, setResults] = useState<ProductView[] | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -28,6 +32,7 @@ export default function StoreHome() {
     setLoading(true);
     try {
       setSections(await mkt.sections(id));
+      setCategories(await mkt.categories());
     } finally {
       setLoading(false);
     }
@@ -37,6 +42,25 @@ export default function StoreHome() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function runSearch() {
+    if (!id) return;
+    const q = search.trim();
+    if (!q) {
+      setResults(null);
+      return;
+    }
+    setResults((await mkt.search(id, q)).items);
+  }
+
+  const cardProps = (item: ProductView) => ({
+    product: item,
+    cartLabel: cart.labelFor(item.offerId, item.saleType),
+    onAdd: () => cart.add(item.offerId, item.saleType),
+    onInc: () => cart.inc(item.offerId, item.saleType),
+    onDec: () => cart.dec(item.offerId, item.saleType),
+    onPress: () => router.push(`/product/${item.id}`),
+  });
 
   const renderSection = (title: string, data: ProductView[]) => {
     if (data.length === 0) return null;
@@ -49,16 +73,7 @@ export default function StoreHome() {
           data={data}
           keyExtractor={(p) => p.offerId}
           contentContainerStyle={{ paddingHorizontal: spacing.md, gap: spacing.md }}
-          renderItem={({ item }) => (
-            <ProductCard
-              product={item}
-              cartLabel={cart.labelFor(item.offerId, item.saleType)}
-              onAdd={() => cart.add(item.offerId, item.saleType)}
-              onInc={() => cart.inc(item.offerId, item.saleType)}
-              onDec={() => cart.dec(item.offerId, item.saleType)}
-              onPress={() => router.push(`/product/${item.id}`)}
-            />
-          )}
+          renderItem={({ item }) => <ProductCard {...cardProps(item)} />}
         />
       </View>
     );
@@ -67,6 +82,7 @@ export default function StoreHome() {
   return (
     <SafeAreaView style={styles.flex} edges={["top"]}>
       <Header title={name ?? "Loja"} />
+
       <View style={styles.storeHead}>
         <View style={styles.logo}>
           <Ionicons name="storefront" size={20} color={colors.white} />
@@ -83,8 +99,43 @@ export default function StoreHome() {
         <Button title="♡ Seguir" size="sm" onPress={() => {}} />
       </View>
 
+      {/* Busca no header da loja */}
+      <View style={styles.searchWrap}>
+        <Ionicons name="search" size={18} color={colors.primary} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Busque nesta loja..."
+          placeholderTextColor={colors.textMuted}
+          value={search}
+          onChangeText={(v) => {
+            setSearch(v);
+            if (!v.trim()) setResults(null);
+          }}
+          onSubmitEditing={runSearch}
+          returnKeyType="search"
+        />
+      </View>
+
+      {/* Menu de categorias (filtra por esta loja) */}
+      <CategoryMenu
+        categories={categories}
+        onSelect={(c) =>
+          router.push(`/category/${c.id}?name=${encodeURIComponent(c.name)}&storeId=${id}`)
+        }
+      />
+
       {loading ? (
         <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xxl }} />
+      ) : results ? (
+        <FlatList
+          data={results}
+          keyExtractor={(p) => p.offerId}
+          numColumns={2}
+          columnWrapperStyle={{ gap: spacing.md, paddingHorizontal: spacing.md }}
+          contentContainerStyle={{ gap: spacing.lg, paddingVertical: spacing.md, paddingBottom: spacing.xxl }}
+          ListEmptyComponent={<Text muted style={{ padding: spacing.lg }}>Nada encontrado.</Text>}
+          renderItem={({ item }) => <ProductCard {...cardProps(item)} />}
+        />
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: spacing.xxl }}>
           {renderSection("Ofertas em destaque", sections?.featured ?? [])}
@@ -115,6 +166,18 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   storeName: { color: colors.primary, fontSize: 18, fontWeight: "700" },
+  searchWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginHorizontal: spacing.md,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    height: 48,
+  },
+  searchInput: { flex: 1, color: colors.text },
   section: {
     fontSize: 16,
     fontWeight: "700",

@@ -9,6 +9,7 @@ import { brl, marketplace, type Address, type FeedSection } from "@/api/marketpl
 import { useCart } from "@/use-cart";
 import { ProductCard } from "@/components/ProductCard";
 import { BottomTabs } from "@/components/BottomTabs";
+import { CategoryMenu } from "@/components/CategoryMenu";
 import Logo from "@/assets/logo.svg";
 
 export default function MarketplaceHome() {
@@ -62,19 +63,10 @@ export default function MarketplaceHome() {
         />
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.cats}
-        contentContainerStyle={{ alignItems: "center", gap: spacing.lg, paddingHorizontal: spacing.md }}
-      >
-        <Ionicons name="menu" size={20} color={colors.primary} />
-        {sections.map((s) => (
-          <Text key={s.category.id} style={styles.catLink}>
-            {s.category.name}
-          </Text>
-        ))}
-      </ScrollView>
+      <CategoryMenu
+        categories={sections.map((s) => s.category)}
+        onSelect={(c) => router.push(`/category/${c.id}?name=${encodeURIComponent(c.name)}`)}
+      />
 
       {loading ? (
         <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xxl }} />
@@ -148,8 +140,6 @@ const styles = StyleSheet.create({
     height: 48,
   },
   searchInput: { flex: 1, color: colors.text },
-  cats: { paddingVertical: spacing.md, maxHeight: 56 },
-  catLink: { color: colors.primary, fontWeight: "600" },
   section: {
     fontSize: 16,
     fontWeight: "700",

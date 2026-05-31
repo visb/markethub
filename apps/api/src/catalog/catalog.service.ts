@@ -197,42 +197,43 @@ export class CatalogService {
     });
 
     const sections = await Promise.all(
-      cats.map(async (cat) => {
-        const offers = await this.prisma.offer.findMany({
-          where: {
-            available: true,
-            product: { category: { marketplaceCategoryId: cat.id } },
-          },
-          take,
-          orderBy: { updatedAt: "desc" },
-          select: {
-            id: true,
-            priceCents: true,
-            promoPriceCents: true,
-            store: {
-              select: {
-                id: true,
-                name: true,
-                merchant: { select: { name: true, deliveryFeeCents: true } },
-              },
-            },
-            product: {
-              select: {
-                id: true,
-                name: true,
-                brand: true,
-                packageSize: true,
-                saleType: true,
-                imageUrl: true,
-              },
-            },
-          },
-        });
-        return { category: cat, items: offers.map(toFeedView) };
-      }),
+      cats.map(async (cat) => ({ category: cat, items: await this.categoryOffers(cat.id, take) })),
     );
 
     return sections.filter((s) => s.items.length > 0);
+  }
+
+  /** Produtos de uma categoria curada, de vários mercados (página de categoria global). */
+  async categoryFeed(marketplaceCategoryId: string, opts: { page?: number; pageSize?: number } = {}) {
+    const cat = await this.prisma.marketplaceCategory.findUnique({
+      where: { id: marketplaceCategoryId },
+      select: { id: true, name: true, slug: true, icon: true },
+    });
+    if (!cat) throw this.notFound("CATEGORY_NOT_FOUND", "Categoria não encontrada");
+    const { page, pageSize, skip, take } = this.paginate(opts.page, opts.pageSize);
+    const items = await this.categoryOffers(marketplaceCategoryId, take, skip);
+    return { category: cat, items, page, pageSize };
+  }
+
+  private async categoryOffers(marketplaceCategoryId: string, take: number, skip = 0) {
+    const offers = await this.prisma.offer.findMany({
+      where: { available: true, product: { category: { marketplaceCategoryId } } },
+      take,
+      skip,
+      orderBy: { updatedAt: "desc" },
+      select: {
+        id: true,
+        priceCents: true,
+        promoPriceCents: true,
+        store: {
+          select: { id: true, name: true, merchant: { select: { name: true, deliveryFeeCents: true } } },
+        },
+        product: {
+          select: { id: true, name: true, brand: true, packageSize: true, saleType: true, imageUrl: true },
+        },
+      },
+    });
+    return offers.map(toFeedView);
   }
 
   // ─── helpers ───
