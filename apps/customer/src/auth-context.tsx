@@ -6,6 +6,7 @@ import { SecureTokenStore } from "./token-store";
 interface AuthState {
   user: AuthUser | null;
   loading: boolean;
+  api: ApiClient;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -64,8 +65,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [client]);
 
   const value = useMemo(
-    () => ({ user, loading, login, logout }),
-    [user, loading, login, logout],
+    () => ({ user, loading, api: client, login, logout }),
+    [user, loading, client, login, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
