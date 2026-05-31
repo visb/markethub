@@ -16,10 +16,14 @@ export class CatalogController {
   @Get("marketplace-categories/:id/feed")
   categoryFeed(
     @Param("id") id: string,
+    @Query("q") q?: string,
+    @Query("storeId") storeId?: string,
     @Query("page") page?: string,
     @Query("pageSize") pageSize?: string,
   ) {
     return this.catalog.categoryFeed(id, {
+      q,
+      storeId,
       page: page ? Number(page) : undefined,
       pageSize: pageSize ? Number(pageSize) : undefined,
     });

@@ -203,21 +203,50 @@ export class CatalogService {
     return sections.filter((s) => s.items.length > 0);
   }
 
-  /** Produtos de uma categoria curada, de vários mercados (página de categoria global). */
-  async categoryFeed(marketplaceCategoryId: string, opts: { page?: number; pageSize?: number } = {}) {
+  /**
+   * Produtos de uma categoria curada. Global (vários mercados) ou de uma loja (storeId).
+   * Busca opcional (q) é restrita à categoria (e à loja, se informada).
+   */
+  async categoryFeed(
+    marketplaceCategoryId: string,
+    opts: { page?: number; pageSize?: number; q?: string; storeId?: string } = {},
+  ) {
     const cat = await this.prisma.marketplaceCategory.findUnique({
       where: { id: marketplaceCategoryId },
       select: { id: true, name: true, slug: true, icon: true },
     });
     if (!cat) throw this.notFound("CATEGORY_NOT_FOUND", "Categoria não encontrada");
     const { page, pageSize, skip, take } = this.paginate(opts.page, opts.pageSize);
-    const items = await this.categoryOffers(marketplaceCategoryId, take, skip);
+    const items = await this.categoryOffers(marketplaceCategoryId, take, skip, {
+      q: opts.q,
+      storeId: opts.storeId,
+    });
     return { category: cat, items, page, pageSize };
   }
 
-  private async categoryOffers(marketplaceCategoryId: string, take: number, skip = 0) {
+  private async categoryOffers(
+    marketplaceCategoryId: string,
+    take: number,
+    skip = 0,
+    opts: { q?: string; storeId?: string } = {},
+  ) {
+    const q = opts.q?.trim();
     const offers = await this.prisma.offer.findMany({
-      where: { available: true, product: { category: { marketplaceCategoryId } } },
+      where: {
+        available: true,
+        ...(opts.storeId ? { storeId: opts.storeId } : {}),
+        product: {
+          category: { marketplaceCategoryId },
+          ...(q
+            ? {
+                OR: [
+                  { name: { contains: q, mode: "insensitive" } },
+                  { brand: { contains: q, mode: "insensitive" } },
+                ],
+              }
+            : {}),
+        },
+      },
       take,
       skip,
       orderBy: { updatedAt: "desc" },
