@@ -11,6 +11,8 @@ import { ErpModule } from "./erp/erp.module";
 import { EnrichmentModule } from "./enrichment/enrichment.module";
 import { CatalogModule } from "./catalog/catalog.module";
 import { UsersModule } from "./users/users.module";
+import { MarketplaceModule } from "./marketplace/marketplace.module";
+import { PaymentModule } from "./payment/payment.module";
 import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
 import { RolesGuard } from "./auth/guards/roles.guard";
 
@@ -26,6 +28,8 @@ import { RolesGuard } from "./auth/guards/roles.guard";
     ErpModule,
     CatalogModule,
     UsersModule,
+    MarketplaceModule,
+    PaymentModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

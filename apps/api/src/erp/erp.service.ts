@@ -17,6 +17,40 @@ export class ErpService {
     private readonly enrichmentQueue: EnrichmentQueueService,
   ) {}
 
+  /**
+   * Empurra um OrderGroup (sub-pedido de um merchant) ao ERP via o conector configurado.
+   * Idempotente: não reenvia grupo já empurrado. Best-effort (loga falha, não derruba pedido).
+   */
+  async pushOrderGroup(orderGroupId: string): Promise<void> {
+    const group = await this.prisma.orderGroup.findUnique({
+      where: { id: orderGroupId },
+      include: { store: { include: { merchant: true } }, items: true },
+    });
+    if (!group || group.erpPushedAt) return;
+
+    try {
+      const connector = this.registry.resolve(group.store.merchant.connectorType);
+      const ctx: ConnectorContext = {
+        merchantId: group.store.merchantId,
+        store: { id: group.storeId, externalId: group.store.externalId },
+        config: group.store.merchant.connectorConfig,
+      };
+      const { externalOrderId } = await connector.pushOrder(ctx, {
+        orderId: group.id,
+        items: group.items.map((it) => ({
+          externalId: it.offerId ?? it.productId ?? it.id,
+          quantity: it.weightGrams ?? it.quantity,
+        })),
+      });
+      await this.prisma.orderGroup.update({
+        where: { id: group.id },
+        data: { externalOrderId, erpPushedAt: new Date() },
+      });
+    } catch (e) {
+      this.logger.warn(`pushOrderGroup ${orderGroupId} failed: ${(e as Error).message}`);
+    }
+  }
+
   /** Sync completo de produtos+preços+estoque de uma loja. Enfileira enriquecimento ao fim. */
   async runFullSync(storeId: string): Promise<string> {
     const runId = await this.runSync(storeId, "full", async (connector, ctx, counters) => {

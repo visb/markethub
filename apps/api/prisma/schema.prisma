@@ -26,6 +26,9 @@ model User {
   roles        UserRole[]
   sessions     Session[]
   staffOf      StoreStaff[]
+  addresses    Address[]
+  cart         Cart?
+  orders       Order[]
 
   @@map("users")
 }
@@ -114,9 +117,15 @@ model Merchant {
   // Integração ERP (S1.2): tipo de conector e config (ex.: { "dir": "..." } pro CSV).
   connectorType   String?
   connectorConfig Json?
+  // Tarifas (S2.4) — em centavos / basis points.
+  deliveryFeeCents Int @default(700)
+  prepFeeCents     Int @default(0)
+  platformFeeBps   Int @default(1000) // 1000 = 10%
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   stores    Store[]
+  orderGroups OrderGroup[]
+  coupons   Coupon[]
 
   @@map("merchants")
 }
@@ -143,6 +152,7 @@ model Store {
   offers     Offer[]
   stocks     Stock[]
   staff      StoreStaff[]
+  orderGroups OrderGroup[]
 
   @@unique([merchantId, externalId])
   @@index([merchantId])
@@ -231,6 +241,7 @@ model Offer {
   available    Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  cartItems    CartItem[]
 
   @@unique([storeId, productId])
   @@unique([storeId, externalId])
@@ -327,4 +338,201 @@ model ProductEnrichment {
   fetchedAt  DateTime @default(now())
 
   @@map("product_enrichments")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Marketplace — pedido, carrinho, endereço, cupom, pagamento (Fase 2)
+// ─────────────────────────────────────────────────────────────
+
+enum DeliveryMethod {
+  gate // receber na portaria/portão
+  door // entregar na porta (+taxa)
+}
+
+enum OrderStatus {
+  created
+  paid
+  preparing
+  picking
+  on_the_way
+  delivered
+  canceled
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  expired
+  failed
+  refunded
+}
+
+enum CouponType {
+  fixed // valor fixo em centavos
+  percent // percentual (value = %)
+  free_shipping
+}
+
+model Address {
+  id         String   @id @default(cuid())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  label      String // Casa, Trabalho...
+  street     String
+  number     String
+  district   String?
+  city       String
+  state      String
+  zipCode    String
+  complement String?
+  latitude   Float?
+  longitude  Float?
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  orders     Order[]
+
+  @@index([userId])
+  @@map("addresses")
+}
+
+model Cart {
+  id         String     @id @default(cuid())
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String     @unique
+  couponCode String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  items      CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id          String   @id @default(cuid())
+  cart        Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  cartId      String
+  offer       Offer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  offerId     String
+  quantity    Int      @default(1) // saleType=unit: nº de unidades
+  weightGrams Int? // saleType=weight: gramas
+  note        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([cartId, offerId])
+  @@index([cartId])
+  @@map("cart_items")
+}
+
+model Coupon {
+  id          String     @id @default(cuid())
+  code        String     @unique
+  type        CouponType
+  value       Int        @default(0) // fixed: centavos; percent: %
+  merchant    Merchant?  @relation(fields: [merchantId], references: [id])
+  merchantId  String? // null = global
+  minOrderCents Int?
+  validFrom   DateTime?
+  validTo     DateTime?
+  maxUses     Int?
+  usedCount   Int        @default(0)
+  active      Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+
+  @@map("coupons")
+}
+
+model Order {
+  id        String      @id @default(cuid())
+  user      User        @relation(fields: [userId], references: [id])
+  userId    String
+  status    OrderStatus @default(created)
+  // entrega
+  address        Address?      @relation(fields: [addressId], references: [id])
+  addressId      String?
+  deliveryMethod DeliveryMethod @default(gate)
+  scheduledFrom  DateTime?
+  scheduledTo    DateTime?
+  // snapshot do endereço (caso o Address mude/seja apagado)
+  addressSnapshot Json?
+  // totais (centavos)
+  itemsCents       Int @default(0)
+  deliveryCents    Int @default(0)
+  prepCents        Int @default(0)
+  platformFeeCents Int @default(0)
+  discountCents    Int @default(0)
+  totalCents       Int @default(0)
+  couponCode       String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  groups    OrderGroup[]
+  payment   Payment?
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@map("orders")
+}
+
+model OrderGroup {
+  id         String   @id @default(cuid())
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId    String
+  merchant   Merchant @relation(fields: [merchantId], references: [id])
+  merchantId String
+  store      Store    @relation(fields: [storeId], references: [id])
+  storeId    String
+  status     OrderStatus @default(created)
+  subtotalCents    Int @default(0)
+  deliveryCents    Int @default(0)
+  prepCents        Int @default(0)
+  platformFeeCents Int @default(0)
+  // push ao ERP (S2.7)
+  externalOrderId String?
+  erpPushedAt     DateTime?
+  items      OrderItem[]
+
+  @@index([orderId])
+  @@index([storeId])
+  @@map("order_groups")
+}
+
+model OrderItem {
+  id            String   @id @default(cuid())
+  group         OrderGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId       String
+  // snapshot (catálogo pode mudar depois)
+  productId     String?
+  offerId       String?
+  nameSnapshot  String
+  gtinSnapshot  String?
+  saleType      SaleType @default(unit)
+  unitPriceCents Int // unit: preço/un; weight: preço/kg
+  quantity      Int      @default(1)
+  weightGrams   Int?
+  lineTotalCents Int
+
+  @@index([groupId])
+  @@map("order_items")
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  order           Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId         String        @unique
+  provider        String // "pagarme" | "mock"
+  providerChargeId String?
+  method          String        @default("pix")
+  status          PaymentStatus @default(pending)
+  amountCents     Int
+  pixQrCode       String?
+  pixQrCodeUrl    String?
+  expiresAt       DateTime?
+  paidAt          DateTime?
+  raw             Json?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([providerChargeId])
+  @@map("payments")
 }

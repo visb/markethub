@@ -19,6 +19,13 @@ export const envSchema = z.object({
   COSMOS_TOKEN: z.string().optional(),
   COSMOS_BASE_URL: z.string().default("https://api.cosmos.bluesoft.com.br"),
 
+  // Pagamento (S2.6). mock = sem gateway (dev/test).
+  PAYMENT_PROVIDER: z.enum(["mock", "pagarme"]).default("mock"),
+  PAGARME_SECRET_KEY: z.string().optional(),
+  PAGARME_BASE_URL: z.string().default("https://api.pagar.me/core/v5"),
+  PAGARME_WEBHOOK_SECRET: z.string().optional(),
+  PIX_EXPIRES_SECONDS: z.coerce.number().int().positive().default(1800),
+
   JWT_ACCESS_SECRET: z.string().min(16),
   JWT_REFRESH_SECRET: z.string().min(16),
   JWT_ACCESS_TTL: z.string().default("15m"),

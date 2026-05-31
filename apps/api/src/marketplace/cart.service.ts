@@ -1,0 +1,224 @@
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
+import { computeCart, type CalcCoupon, type CalcGroup } from "./pricing";
+
+export interface AddItemInput {
+  offerId: string;
+  quantity?: number;
+  weightGrams?: number | null;
+  note?: string | null;
+}
+
+const DOOR_SURCHARGE_CENTS = 400; // entregar na porta (+R$4) — usado no checkout
+
+@Injectable()
+export class CartService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  /** Garante 1 carrinho por usuário. */
+  private async ensureCart(userId: string) {
+    return this.prisma.cart.upsert({
+      where: { userId },
+      update: {},
+      create: { userId },
+    });
+  }
+
+  async getCart(userId: string, opts: { doorSurchargeCents?: number } = {}) {
+    const cart = await this.ensureCart(userId);
+    return this.buildView(cart.id, cart.couponCode, opts.doorSurchargeCents ?? 0);
+  }
+
+  async addItem(userId: string, input: AddItemInput) {
+    const cart = await this.ensureCart(userId);
+    const offer = await this.prisma.offer.findUnique({
+      where: { id: input.offerId },
+      include: { product: true },
+    });
+    if (!offer || !offer.available) {
+      throw new BadRequestException({ code: "OFFER_UNAVAILABLE", message: "Oferta indisponível" });
+    }
+
+    const { quantity, weightGrams } = this.normalizeQty(offer.product.saleType, input);
+
+    await this.prisma.cartItem.upsert({
+      where: { cartId_offerId: { cartId: cart.id, offerId: input.offerId } },
+      update: { quantity, weightGrams, note: input.note ?? null },
+      create: {
+        cartId: cart.id,
+        offerId: input.offerId,
+        quantity,
+        weightGrams,
+        note: input.note ?? null,
+      },
+    });
+    return this.buildView(cart.id, cart.couponCode, 0);
+  }
+
+  async updateItem(userId: string, itemId: string, input: Omit<AddItemInput, "offerId">) {
+    const cart = await this.ensureCart(userId);
+    const item = await this.prisma.cartItem.findUnique({
+      where: { id: itemId },
+      include: { offer: { include: { product: true } } },
+    });
+    if (!item || item.cartId !== cart.id) {
+      throw new NotFoundException({ code: "ITEM_NOT_FOUND", message: "Item não encontrado" });
+    }
+    const { quantity, weightGrams } = this.normalizeQty(item.offer.product.saleType, {
+      quantity: input.quantity,
+      weightGrams: input.weightGrams,
+    });
+    await this.prisma.cartItem.update({
+      where: { id: itemId },
+      data: { quantity, weightGrams, note: input.note ?? item.note },
+    });
+    return this.buildView(cart.id, cart.couponCode, 0);
+  }
+
+  async removeItem(userId: string, itemId: string) {
+    const cart = await this.ensureCart(userId);
+    await this.prisma.cartItem.deleteMany({ where: { id: itemId, cartId: cart.id } });
+    return this.buildView(cart.id, cart.couponCode, 0);
+  }
+
+  async clear(userId: string) {
+    const cart = await this.ensureCart(userId);
+    await this.prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
+    await this.prisma.cart.update({ where: { id: cart.id }, data: { couponCode: null } });
+    return this.buildView(cart.id, null, 0);
+  }
+
+  async applyCoupon(userId: string, code: string) {
+    const cart = await this.ensureCart(userId);
+    const coupon = await this.loadValidCoupon(code);
+    if (!coupon) throw new BadRequestException({ code: "INVALID_COUPON", message: "Cupom inválido" });
+    await this.prisma.cart.update({ where: { id: cart.id }, data: { couponCode: code } });
+    return this.buildView(cart.id, code, 0);
+  }
+
+  async removeCoupon(userId: string) {
+    const cart = await this.ensureCart(userId);
+    await this.prisma.cart.update({ where: { id: cart.id }, data: { couponCode: null } });
+    return this.buildView(cart.id, null, 0);
+  }
+
+  // ─── montagem da visão + totais ───
+  async buildView(cartId: string, couponCode: string | null, doorSurchargeCents: number) {
+    const items = await this.prisma.cartItem.findMany({
+      where: { cartId },
+      include: {
+        offer: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                gtin: true,
+                name: true,
+                imageUrl: true,
+                saleType: true,
+                packageSize: true,
+              },
+            },
+            store: { include: { merchant: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    // Agrupa por merchant.
+    const byMerchant = new Map<string, typeof items>();
+    for (const it of items) {
+      const mid = it.offer.store.merchantId;
+      if (!byMerchant.has(mid)) byMerchant.set(mid, []);
+      byMerchant.get(mid)!.push(it);
+    }
+
+    const calcGroups: CalcGroup[] = [];
+    const viewGroups = [...byMerchant.entries()].map(([mid, its]) => {
+      const merchant = its[0]!.offer.store.merchant;
+      calcGroups.push({
+        merchantId: mid,
+        deliveryFeeCents: merchant.deliveryFeeCents,
+        prepFeeCents: merchant.prepFeeCents,
+        platformFeeBps: merchant.platformFeeBps,
+        items: its.map((it) => ({
+          saleType: it.offer.product.saleType,
+          unitPriceCents: it.offer.promoPriceCents ?? it.offer.priceCents,
+          quantity: it.quantity,
+          weightGrams: it.weightGrams,
+        })),
+      });
+      return {
+        merchantId: mid,
+        merchant: merchant.name,
+        storeId: its[0]!.offer.storeId,
+        items: its.map((it) => ({
+          id: it.id,
+          offerId: it.offerId,
+          productId: it.offer.product.id,
+          gtin: it.offer.product.gtin,
+          name: it.offer.product.name,
+          imageUrl: it.offer.product.imageUrl,
+          saleType: it.offer.product.saleType,
+          packageSize: it.offer.product.packageSize,
+          unitPriceCents: it.offer.promoPriceCents ?? it.offer.priceCents,
+          quantity: it.quantity,
+          weightGrams: it.weightGrams,
+          available: it.offer.available,
+          note: it.note,
+        })),
+      };
+    });
+
+    const coupon = couponCode ? await this.loadValidCoupon(couponCode) : null;
+    const totals = computeCart(calcGroups, { coupon, doorSurchargeCents });
+
+    return {
+      couponCode,
+      itemCount: items.length,
+      groups: viewGroups,
+      totals,
+    };
+  }
+
+  private normalizeQty(
+    saleType: "unit" | "weight",
+    input: { quantity?: number; weightGrams?: number | null },
+  ): { quantity: number; weightGrams: number | null } {
+    if (saleType === "weight") {
+      const grams = Math.trunc(input.weightGrams ?? 0);
+      if (grams <= 0) {
+        throw new BadRequestException({
+          code: "WEIGHT_REQUIRED",
+          message: "Produto por peso requer weightGrams > 0",
+        });
+      }
+      return { quantity: 1, weightGrams: grams };
+    }
+    const qty = Math.trunc(input.quantity ?? 1);
+    if (qty <= 0) {
+      throw new BadRequestException({ code: "QTY_REQUIRED", message: "Quantidade deve ser > 0" });
+    }
+    return { quantity: qty, weightGrams: null };
+  }
+
+  private async loadValidCoupon(code: string): Promise<CalcCoupon | null> {
+    const c = await this.prisma.coupon.findUnique({ where: { code } });
+    if (!c || !c.active) return null;
+    const now = new Date();
+    if (c.validFrom && c.validFrom > now) return null;
+    if (c.validTo && c.validTo < now) return null;
+    if (c.maxUses !== null && c.usedCount >= c.maxUses) return null;
+    return {
+      type: c.type,
+      value: c.value,
+      merchantId: c.merchantId,
+      minOrderCents: c.minOrderCents,
+    };
+  }
+
+  static get DOOR_SURCHARGE_CENTS() {
+    return DOOR_SURCHARGE_CENTS;
+  }
+}
