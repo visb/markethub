@@ -1,10 +1,10 @@
 /** Design tokens MarketHub — derivados dos screenshots (marca VERMELHA, R$, PIX). */
 
 export const colors = {
-  primary: "#E11A2C", // vermelho MarketHub
-  primaryDark: "#B5141F",
-  primaryLight: "#FDECEE", // fundo claro de seleção
-  accent: "#E11A2C",
+  primary: "#E40613", // vermelho MarketHub (logo)
+  primaryDark: "#B5040F",
+  primaryLight: "#FDECEC", // fundo claro de seleção
+  accent: "#E40613",
   text: "#1A1A1A",
   textMuted: "#9AA0A6",
   border: "#ECECEC",
@@ -14,7 +14,7 @@ export const colors = {
   success: "#16A34A",
   warning: "#F59E0B",
   white: "#FFFFFF",
-  strike: "#E11A2C", // preço antigo riscado (vermelho claro)
+  strike: "#E40613", // preço antigo riscado
 } as const;
 
 export const spacing = {

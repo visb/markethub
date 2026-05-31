@@ -6,6 +6,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Button, Text, colors, radius, spacing } from "@markethub/ui";
 import { useAuth } from "@/auth-context";
 import { brl, marketplace, type ProductView } from "@/api/marketplace";
+import { useCart } from "@/use-cart";
 import { ProductCard } from "@/components/ProductCard";
 import { Header } from "@/components/Header";
 
@@ -14,12 +15,12 @@ export default function StoreHome() {
   const { api } = useAuth();
   const mkt = marketplace(api);
   const router = useRouter();
+  const cart = useCart();
   const [sections, setSections] = useState<{
     featured: ProductView[];
     mostBought: ProductView[];
     recommended: ProductView[];
   } | null>(null);
-  const [cartTotal, setCartTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -27,8 +28,6 @@ export default function StoreHome() {
     setLoading(true);
     try {
       setSections(await mkt.sections(id));
-      const cart = await mkt.getCart();
-      setCartTotal(cart.totals.totalCents);
     } finally {
       setLoading(false);
     }
@@ -39,12 +38,31 @@ export default function StoreHome() {
     void load();
   }, [load]);
 
-  async function add(p: ProductView) {
-    if (p.saleType === "weight") await mkt.addItem({ offerId: p.offerId, weightGrams: 300 });
-    else await mkt.addItem({ offerId: p.offerId, quantity: 1 });
-    const cart = await mkt.getCart();
-    setCartTotal(cart.totals.totalCents);
-  }
+  const renderSection = (title: string, data: ProductView[]) => {
+    if (data.length === 0) return null;
+    return (
+      <View key={title}>
+        <Text style={styles.section}>{title}</Text>
+        <FlatList
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          data={data}
+          keyExtractor={(p) => p.offerId}
+          contentContainerStyle={{ paddingHorizontal: spacing.md, gap: spacing.md }}
+          renderItem={({ item }) => (
+            <ProductCard
+              product={item}
+              cartLabel={cart.labelFor(item.offerId, item.saleType)}
+              onAdd={() => cart.add(item.offerId, item.saleType)}
+              onInc={() => cart.inc(item.offerId, item.saleType)}
+              onDec={() => cart.dec(item.offerId, item.saleType)}
+              onPress={() => router.push(`/product/${item.id}`)}
+            />
+          )}
+        />
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.flex} edges={["top"]}>
@@ -69,48 +87,19 @@ export default function StoreHome() {
         <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xxl }} />
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-          <Section title="Ofertas em destaque" data={sections?.featured ?? []} add={add} open={(p) => router.push(`/product/${p.id}`)} />
-          <Section title="Mais comprados" data={sections?.mostBought ?? []} add={add} open={(p) => router.push(`/product/${p.id}`)} />
-          <Section title="Recomendados para você" data={sections?.recommended ?? []} add={add} open={(p) => router.push(`/product/${p.id}`)} />
+          {renderSection("Ofertas em destaque", sections?.featured ?? [])}
+          {renderSection("Mais comprados", sections?.mostBought ?? [])}
+          {renderSection("Recomendados para você", sections?.recommended ?? [])}
         </ScrollView>
       )}
 
-      {cartTotal > 0 && (
+      {cart.total > 0 && (
         <Pressable style={styles.fab} onPress={() => router.push("/cart")}>
           <Ionicons name="cart" size={24} color={colors.white} />
-          <Text style={styles.fabTotal}>{brl(cartTotal)}</Text>
+          <Text style={styles.fabTotal}>{brl(cart.total)}</Text>
         </Pressable>
       )}
     </SafeAreaView>
-  );
-}
-
-function Section({
-  title,
-  data,
-  add,
-  open,
-}: {
-  title: string;
-  data: ProductView[];
-  add: (p: ProductView) => void;
-  open: (p: ProductView) => void;
-}) {
-  if (data.length === 0) return null;
-  return (
-    <View>
-      <Text style={styles.section}>{title}</Text>
-      <FlatList
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        data={data}
-        keyExtractor={(p) => p.offerId}
-        contentContainerStyle={{ paddingHorizontal: spacing.md, gap: spacing.md }}
-        renderItem={({ item }) => (
-          <ProductCard product={item} onAdd={() => add(item)} onPress={() => open(item)} />
-        )}
-      />
-    </View>
   );
 }
 

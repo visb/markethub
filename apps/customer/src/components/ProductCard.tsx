@@ -1,5 +1,6 @@
 import React from "react";
 import { Image, Pressable, StyleSheet, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { Button, Text, colors, radius, spacing } from "@markethub/ui";
 import { brl, type ProductView } from "@/api/marketplace";
 import { QtyStepper } from "./QtyStepper";
@@ -8,6 +9,7 @@ interface MerchantHeader {
   merchant: string;
   eta: string;
   distanceKm: number | null;
+  deliveryFeeCents: number;
 }
 
 interface ProductCardProps {
@@ -40,14 +42,23 @@ export function ProductCard({
     <View style={styles.card}>
       {header ? (
         <View style={styles.merchant}>
-          <View style={styles.dot} />
-          <Text variant="caption" muted numberOfLines={1} style={{ flex: 1 }}>
-            {header.merchant}
-            {header.distanceKm != null ? ` (${header.distanceKm}km)` : ""}
-          </Text>
-          <Text variant="caption" muted>
-            🛵 ⏱ {header.eta}
-          </Text>
+          <View style={styles.merchantLine}>
+            <View style={styles.dot} />
+            <Text variant="caption" numberOfLines={1} style={{ flex: 1, fontWeight: "600" }}>
+              {header.merchant}
+              {header.distanceKm != null ? ` (${header.distanceKm}km)` : ""}
+            </Text>
+          </View>
+          <View style={styles.deliveryLine}>
+            <Ionicons name="bicycle" size={13} color={colors.textMuted} />
+            <Text variant="caption" muted>
+              {brl(header.deliveryFeeCents)}
+            </Text>
+            <Ionicons name="time-outline" size={13} color={colors.textMuted} style={{ marginLeft: 6 }} />
+            <Text variant="caption" muted>
+              {header.eta}
+            </Text>
+          </View>
         </View>
       ) : null}
 
@@ -86,7 +97,9 @@ export function ProductCard({
 
 const styles = StyleSheet.create({
   card: { width: 158, gap: spacing.xs },
-  merchant: { flexDirection: "row", alignItems: "center", gap: 4 },
+  merchant: { gap: 2 },
+  merchantLine: { flexDirection: "row", alignItems: "center", gap: 4 },
+  deliveryLine: { flexDirection: "row", alignItems: "center", gap: 2 },
   dot: { width: 14, height: 14, borderRadius: radius.full, backgroundColor: colors.border },
   img: { width: "100%", height: 92, borderRadius: radius.sm, backgroundColor: colors.white },
   imgEmpty: { borderWidth: 1, borderColor: colors.border },

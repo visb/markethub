@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, FlatList, StyleSheet, TextInput, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Text, colors, radius, spacing } from "@markethub/ui";
 import { useAuth } from "@/auth-context";
-import { marketplace, type ProductView, type Store } from "@/api/marketplace";
+import { brl, marketplace, type ProductView, type Store } from "@/api/marketplace";
+import { useCart } from "@/use-cart";
 import { ProductCard } from "@/components/ProductCard";
 import { BottomTabs } from "@/components/BottomTabs";
 
@@ -13,6 +14,7 @@ export default function ExploreScreen() {
   const { api } = useAuth();
   const mkt = marketplace(api);
   const router = useRouter();
+  const cart = useCart();
   const [store, setStore] = useState<Store | null>(null);
   const [products, setProducts] = useState<ProductView[]>([]);
   const [search, setSearch] = useState("");
@@ -43,12 +45,6 @@ export default function ExploreScreen() {
     setProducts(r.items);
   }
 
-  async function add(p: ProductView) {
-    if (p.saleType === "weight") await mkt.addItem({ offerId: p.offerId, weightGrams: 300 });
-    else await mkt.addItem({ offerId: p.offerId, quantity: 1 });
-    router.push("/cart");
-  }
-
   return (
     <SafeAreaView style={styles.flex} edges={["top"]}>
       <View style={styles.searchWrap}>
@@ -71,12 +67,26 @@ export default function ExploreScreen() {
           keyExtractor={(p) => p.offerId}
           numColumns={2}
           columnWrapperStyle={{ gap: spacing.md, paddingHorizontal: spacing.md }}
-          contentContainerStyle={{ gap: spacing.lg, paddingVertical: spacing.md }}
+          contentContainerStyle={{ gap: spacing.lg, paddingVertical: spacing.md, paddingBottom: spacing.xxl }}
           ListEmptyComponent={<Text muted style={{ padding: spacing.lg }}>Nada encontrado.</Text>}
           renderItem={({ item }) => (
-            <ProductCard product={item} onAdd={() => add(item)} />
+            <ProductCard
+              product={item}
+              cartLabel={cart.labelFor(item.offerId, item.saleType)}
+              onAdd={() => cart.add(item.offerId, item.saleType)}
+              onInc={() => cart.inc(item.offerId, item.saleType)}
+              onDec={() => cart.dec(item.offerId, item.saleType)}
+              onPress={() => router.push(`/product/${item.id}`)}
+            />
           )}
         />
+      )}
+
+      {cart.total > 0 && (
+        <Pressable style={styles.fab} onPress={() => router.push("/cart")}>
+          <Ionicons name="cart" size={24} color={colors.white} />
+          <Text style={styles.fabTotal}>{brl(cart.total)}</Text>
+        </Pressable>
       )}
       <BottomTabs active="explore" />
     </SafeAreaView>
@@ -97,4 +107,16 @@ const styles = StyleSheet.create({
     height: 48,
   },
   searchInput: { flex: 1, color: colors.text },
+  fab: {
+    position: "absolute",
+    right: spacing.lg,
+    bottom: 84,
+    backgroundColor: colors.primary,
+    borderRadius: radius.full,
+    width: 72,
+    height: 72,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  fabTotal: { color: colors.white, fontSize: 11, fontWeight: "700" },
 });
