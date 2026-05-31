@@ -8,6 +8,10 @@ import { useAuth } from "@/auth-context";
 import { brl, marketplace, type ProductDetail } from "@/api/marketplace";
 import { Header } from "@/components/Header";
 import { QtyStepper } from "@/components/QtyStepper";
+import { Select } from "@/components/Select";
+
+const OUT_OF_STOCK_OPTIONS = ["Prefiro o reembolso", "Trocar por similar", "Cancelar a compra"];
+const MATURITY_OPTIONS = ["Verde", "Maduro", "Bem maduro"];
 
 /** Detalhe do produto (modal full screen): imagem, preço, opções, info, preço em outros mercados. */
 export default function ProductDetailScreen() {
@@ -17,6 +21,8 @@ export default function ProductDetailScreen() {
   const router = useRouter();
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [note, setNote] = useState("");
+  const [maturity, setMaturity] = useState("Maduro");
+  const [outOfStock, setOutOfStock] = useState(OUT_OF_STOCK_OPTIONS[0]);
   const [qty, setQty] = useState(1);
   const [grams, setGrams] = useState(300);
 
@@ -44,8 +50,15 @@ export default function ProductDetailScreen() {
   const isWeight = product.saleType === "weight";
 
   async function addFromOffer(offerId: string) {
-    if (isWeight) await mkt.addItem({ offerId, weightGrams: grams, note });
-    else await mkt.addItem({ offerId, quantity: qty, note });
+    const meta = [
+      isWeight ? `Maturação: ${maturity}` : null,
+      `Fora de estoque: ${outOfStock}`,
+      note.trim() ? `Obs: ${note.trim()}` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    if (isWeight) await mkt.addItem({ offerId, weightGrams: grams, note: meta });
+    else await mkt.addItem({ offerId, quantity: qty, note: meta });
     router.push("/cart");
   }
 
@@ -75,18 +88,12 @@ export default function ProductDetailScreen() {
 
         {isWeight ? (
           <Field label="Maturação">
-            <View style={styles.select}>
-              <Text>Maduro</Text>
-              <Ionicons name="chevron-down" size={18} color={colors.textMuted} />
-            </View>
+            <Select value={maturity} options={MATURITY_OPTIONS} onChange={setMaturity} />
           </Field>
         ) : null}
 
         <Field label="Se meu produto estiver fora de estoque">
-          <View style={styles.select}>
-            <Text>Prefiro o reembolso</Text>
-            <Ionicons name="chevron-down" size={18} color={colors.textMuted} />
-          </View>
+          <Select value={outOfStock} options={OUT_OF_STOCK_OPTIONS} onChange={setOutOfStock} />
         </Field>
 
         <Field label="Observações">
