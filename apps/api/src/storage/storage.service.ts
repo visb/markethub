@@ -86,6 +86,65 @@ export class StorageService {
     };
   }
 
+  /**
+   * Upload server-side: PUT dos bytes direto no bucket (SigV4 com Authorization header e
+   * payload hash). Usado para ingerir imagens externas (ex.: thumbnail do Cosmos) no nosso
+   * storage em vez de só guardar a URL remota. Retorna a publicUrl gravada como imageUrl.
+   */
+  async uploadBuffer(key: string, body: Buffer, contentType: string): Promise<string> {
+    const url = new URL(`${this.endpoint}/${this.bucket}/${encodeKey(key)}`);
+    const host = url.host;
+    const now = new Date();
+    const amzDate = toAmzDate(now);
+    const dateStamp = amzDate.slice(0, 8);
+    const credentialScope = `${dateStamp}/${this.region}/s3/aws4_request`;
+    const payloadHash = sha256HexBuffer(body);
+
+    const canonicalHeaders =
+      `content-type:${contentType}\n` +
+      `host:${host}\n` +
+      `x-amz-content-sha256:${payloadHash}\n` +
+      `x-amz-date:${amzDate}\n`;
+    const signedHeaders = "content-type;host;x-amz-content-sha256;x-amz-date";
+
+    const canonicalRequest = [
+      "PUT",
+      url.pathname,
+      "",
+      canonicalHeaders,
+      signedHeaders,
+      payloadHash,
+    ].join("\n");
+
+    const stringToSign = [
+      "AWS4-HMAC-SHA256",
+      amzDate,
+      credentialScope,
+      sha256Hex(canonicalRequest),
+    ].join("\n");
+
+    const signature = hmacHex(this.signingKey(dateStamp), stringToSign);
+    const authorization =
+      `AWS4-HMAC-SHA256 Credential=${this.accessKey}/${credentialScope}, ` +
+      `SignedHeaders=${signedHeaders}, Signature=${signature}`;
+
+    const res = await fetch(url.toString(), {
+      method: "PUT",
+      headers: {
+        "Content-Type": contentType,
+        "x-amz-content-sha256": payloadHash,
+        "x-amz-date": amzDate,
+        Authorization: authorization,
+      },
+      body,
+    });
+    if (!res.ok) {
+      throw new Error(`Storage upload failed ${res.status}`);
+    }
+
+    return `${this.publicBase}/${encodeKey(key)}`;
+  }
+
   private signingKey(dateStamp: string): Buffer {
     const kDate = hmac(`AWS4${this.secretKey}`, dateStamp);
     const kRegion = hmac(kDate, this.region);
@@ -112,6 +171,10 @@ function encodeKey(key: string): string {
 
 function sha256Hex(data: string): string {
   return createHash("sha256").update(data, "utf8").digest("hex");
+}
+
+function sha256HexBuffer(data: Buffer): string {
+  return createHash("sha256").update(data).digest("hex");
 }
 
 function hmac(key: string | Buffer, data: string): Buffer {

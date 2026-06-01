@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { inferSaleType, normalizeGtin, slugify } from "../erp/catalog-normalize";
 import { PrismaService } from "../prisma/prisma.service";
+import { StorageService } from "../storage/storage.service";
 import { CATEGORY_MAPPER, type CategoryMapper } from "./category-mapper.interface";
 import { completenessScore } from "./completeness";
 import type { EnrichmentResult } from "./enrichment.types";
@@ -26,6 +27,7 @@ export class EnrichmentService {
     private readonly prisma: PrismaService,
     @Inject(ENRICHMENT_PROVIDER) private readonly provider: EnrichmentProvider,
     @Inject(CATEGORY_MAPPER) private readonly mapper: CategoryMapper,
+    private readonly storage: StorageService,
   ) {}
 
   /** Enriquece um produto: Cosmos (cacheado) + mapeamento de categoria + score. Idempotente. */
@@ -62,8 +64,10 @@ export class EnrichmentService {
         provenance.brand = source;
       }
       if (result.imageUrl && !locked.has("imageUrl")) {
-        data.imageUrl = result.imageUrl;
-        provenance.imageUrl = source;
+        // Baixa a imagem da origem e grava no nosso storage; cai pra URL remota se falhar.
+        const ingested = await this.ingestImage(gtin ?? productId, result.imageUrl);
+        data.imageUrl = ingested ?? result.imageUrl;
+        provenance.imageUrl = ingested ? `${source}+storage` : source;
       }
       if (result.unit && !locked.has("packageSize")) {
         data.packageSize = result.unit;
@@ -182,6 +186,28 @@ export class EnrichmentService {
     return result;
   }
 
+  /**
+   * Baixa a imagem da URL de origem (ex.: thumbnail do Cosmos) e sobe pro nosso storage.
+   * Retorna a publicUrl, ou null se download/upload falhar (chamador usa a URL remota).
+   */
+  private async ingestImage(keyBase: string, remoteUrl: string): Promise<string | null> {
+    try {
+      const res = await fetch(remoteUrl, {
+        headers: { "User-Agent": "MarketHub/0.1 (catalog enrichment)" },
+      });
+      if (!res.ok) {
+        throw new Error(`fetch ${res.status}`);
+      }
+      const contentType = res.headers.get("content-type")?.split(";")[0]?.trim() || "image/jpeg";
+      const body = Buffer.from(await res.arrayBuffer());
+      const key = `products/${keyBase}.${extForContentType(contentType)}`;
+      return await this.storage.uploadBuffer(key, body, contentType);
+    } catch (e) {
+      this.logger.warn(`image ingest failed for ${remoteUrl}: ${(e as Error).message}`);
+      return null;
+    }
+  }
+
   private async categorySlug(categoryId: string): Promise<string | null> {
     const c = await this.prisma.category.findUnique({
       where: { id: categoryId },
@@ -222,5 +248,21 @@ export class EnrichmentService {
     });
 
     return classified && classified.confidence >= CATEGORY_CONFIDENCE_THRESHOLD ? categoryId : null;
+  }
+}
+
+/** Extensão de arquivo a partir do content-type da imagem. */
+function extForContentType(contentType: string): string {
+  switch (contentType) {
+    case "image/png":
+      return "png";
+    case "image/webp":
+      return "webp";
+    case "image/gif":
+      return "gif";
+    case "image/avif":
+      return "avif";
+    default:
+      return "jpg";
   }
 }
