@@ -26,6 +26,17 @@ export const envSchema = z.object({
   PAGARME_WEBHOOK_SECRET: z.string().optional(),
   PIX_EXPIRES_SECONDS: z.coerce.number().int().positive().default(1800),
 
+  // Rotas/entrega (Fase 4). mock = haversine local (sem token Google).
+  ROUTING_PROVIDER: z.enum(["mock", "google"]).default("mock"),
+  GOOGLE_MAPS_API_KEY: z.string().optional(),
+  MATCHING_SCHEDULE_ENABLED: z.coerce.boolean().default(true),
+  // Precificação do ganho do entregador (centavos).
+  DELIVERY_BASE_CENTS: z.coerce.number().int().nonnegative().default(500),
+  DELIVERY_PER_KM_CENTS: z.coerce.number().int().nonnegative().default(150),
+  DELIVERY_PER_STOP_CENTS: z.coerce.number().int().nonnegative().default(100),
+  // Janela de decisão da oferta de rota (S4.4).
+  OFFER_TTL_SECONDS: z.coerce.number().int().positive().default(30),
+
   // Storage de imagens (S3.10). Compatível com S3/MinIO via presigned PUT (SigV4).
   STORAGE_ENDPOINT: z.string().default("http://localhost:9002"),
   STORAGE_REGION: z.string().default("us-east-1"),
