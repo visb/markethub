@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -12,6 +13,7 @@ import { IsIn, IsInt, IsOptional, IsString, Min, MinLength } from "class-validat
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import type { AuthUser } from "../auth/auth.types";
+import { PackingService } from "./packing.service";
 import { PickingSessionService } from "./picking-session.service";
 import { PickingService } from "./picking.service";
 import { SubstitutionService } from "./substitution.service";
@@ -34,6 +36,7 @@ export class PickingController {
     private readonly picking: PickingService,
     private readonly session: PickingSessionService,
     private readonly substitution: SubstitutionService,
+    private readonly packing: PackingService,
   ) {}
 
   /** Lojas em que o usuário atua como separador. */
@@ -97,5 +100,41 @@ export class PickingController {
     @Body() dto: ProposeSubstitutionDto,
   ) {
     return this.substitution.propose(user.id, id, itemId, dto.substituteOfferId);
+  }
+
+  // ── Empacotamento em caixas (S3.5) ──
+
+  @Post(":id/boxes")
+  createBox(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.packing.createBox(user.id, id);
+  }
+
+  @Post(":id/boxes/:boxId/items/:itemId")
+  allocate(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @Param("boxId") boxId: string,
+    @Param("itemId") itemId: string,
+  ) {
+    return this.packing.allocate(user.id, id, boxId, itemId);
+  }
+
+  @Delete(":id/items/:itemId/box")
+  unallocate(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @Param("itemId") itemId: string,
+  ) {
+    return this.packing.unallocate(user.id, id, itemId);
+  }
+
+  @Get(":id/boxes/:boxId/label")
+  label(@CurrentUser() user: AuthUser, @Param("id") id: string, @Param("boxId") boxId: string) {
+    return this.packing.label(user.id, id, boxId);
+  }
+
+  @Post(":id/pack")
+  pack(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.packing.pack(user.id, id);
   }
 }

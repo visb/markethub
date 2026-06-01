@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { PackingService } from "./packing.service";
 import { PickingController } from "./picking.controller";
 import { PickingEvents } from "./picking.events";
 import { PickingSessionService } from "./picking-session.service";
@@ -14,6 +15,7 @@ import { SubstitutionService } from "./substitution.service";
     PickingSessionService,
     SubstitutionService,
     SubstitutionScheduler,
+    PackingService,
     PickingEvents,
   ],
   exports: [PickingService],
