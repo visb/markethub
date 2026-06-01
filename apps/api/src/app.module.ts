@@ -15,6 +15,7 @@ import { MarketplaceModule } from "./marketplace/marketplace.module";
 import { PaymentModule } from "./payment/payment.module";
 import { PickingModule } from "./picking/picking.module";
 import { MerchantModule } from "./merchant/merchant.module";
+import { DriverModule } from "./driver/driver.module";
 import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
 import { RolesGuard } from "./auth/guards/roles.guard";
 
@@ -34,6 +35,7 @@ import { RolesGuard } from "./auth/guards/roles.guard";
     PaymentModule,
     PickingModule,
     MerchantModule,
+    DriverModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
