@@ -13,6 +13,7 @@ import { CatalogModule } from "./catalog/catalog.module";
 import { UsersModule } from "./users/users.module";
 import { MarketplaceModule } from "./marketplace/marketplace.module";
 import { PaymentModule } from "./payment/payment.module";
+import { PickingModule } from "./picking/picking.module";
 import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
 import { RolesGuard } from "./auth/guards/roles.guard";
 
@@ -30,6 +31,7 @@ import { RolesGuard } from "./auth/guards/roles.guard";
     UsersModule,
     MarketplaceModule,
     PaymentModule,
+    PickingModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import type { DeliveryMethod, Prisma } from "@prisma/client";
 import { ErpService } from "../erp/erp.service";
+import { PickingService } from "../picking/picking.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { CartService } from "./cart.service";
 
@@ -17,6 +18,7 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly cart: CartService,
     private readonly erp: ErpService,
+    private readonly picking: PickingService,
   ) {}
 
   /** Calcula o total final sem criar pedido (preview do checkout). */
@@ -166,6 +168,9 @@ export class OrdersService {
       data: { status: "preparing" },
     });
     for (const g of order.groups) await this.erp.pushOrderGroup(g.id);
+
+    // gera tarefas de separação (queued) p/ os separadores assumirem (S3.2)
+    await this.picking.generateForOrder(orderId);
   }
 
   async cancel(userId: string, id: string) {
