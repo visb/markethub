@@ -480,6 +480,7 @@ model Order {
   updatedAt DateTime @updatedAt
   groups    OrderGroup[]
   payment   Payment?
+  refund    Refund?
 
   @@index([userId, createdAt])
   @@index([status])
@@ -506,6 +507,7 @@ model OrderGroup {
   erpPushedAt     DateTime?
   items      OrderItem[]
   pickTask   PickTask?
+  refundComponents RefundComponent[]
 
   @@index([orderId])
   @@index([storeId])
@@ -551,6 +553,50 @@ model Payment {
 
   @@index([providerChargeId])
   @@map("payments")
+}
+
+enum RefundStatus {
+  pending // criado, ainda não processado no gateway
+  processed // estorno confirmado pelo provider
+  failed // gateway recusou o estorno
+}
+
+enum RefundReason {
+  weight_shortfall // separou menos gramas que o pedido (item de peso)
+  refused // item recusado/sem estoque (valor integral)
+}
+
+// Reembolso único por Order (SF.3): consolida faltas de peso e itens recusados de
+// todos os grupos. amountCents = max(0, pago − total ajustado). Breakdown por grupo
+// em RefundComponent (contábil/repasse ao merchant).
+model Refund {
+  id               String       @id @default(cuid())
+  order            Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId          String       @unique
+  amountCents      Int
+  status           RefundStatus @default(pending)
+  provider         String // "pagarme" | "mock"
+  providerRefundId String?
+  reason           String // resumo legível (ex.: "weight_shortfall+refused")
+  createdAt        DateTime     @default(now())
+  processedAt      DateTime?
+  components       RefundComponent[]
+
+  @@map("refunds")
+}
+
+model RefundComponent {
+  id           String       @id @default(cuid())
+  refund       Refund       @relation(fields: [refundId], references: [id], onDelete: Cascade)
+  refundId     String
+  orderGroup   OrderGroup   @relation(fields: [orderGroupId], references: [id], onDelete: Cascade)
+  orderGroupId String
+  amountCents  Int
+  reason       RefundReason
+
+  @@index([refundId])
+  @@index([orderGroupId])
+  @@map("refund_components")
 }
 
 // ─────────────────────────────────────────────────────────────

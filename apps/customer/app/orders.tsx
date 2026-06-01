@@ -61,6 +61,11 @@ export default function OrdersScreen() {
                 <Text variant="caption" muted>
                   {new Date(item.createdAt).toLocaleString("pt-BR")}
                 </Text>
+                {item.refund && item.refund.amountCents > 0 && (
+                  <Text variant="caption" style={{ color: colors.success }}>
+                    Reembolso: {brl(item.refund.amountCents)} (falta na separação)
+                  </Text>
+                )}
               </View>
               {item.status === "created" ? (
                 <Button title="Pagar" size="sm" onPress={() => router.push(`/payment/${item.id}`)} />

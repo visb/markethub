@@ -2,7 +2,7 @@
 
 - **Fase:** fix (pré-fase-4)
 - **Epic:** Correções de domínio
-- **Status:** todo
+- **Status:** done
 - **Depende de:** [S3.3, S2.6, S2.7]
 
 ## Objetivo

@@ -127,6 +127,7 @@ export class OrdersService {
           addressSnapshot: true,
           _count: { select: { groups: true } },
           payment: { select: { status: true } },
+          refund: { select: { amountCents: true, status: true } },
         },
       })
       .then((items) => ({ items, page, pageSize }));
@@ -145,6 +146,7 @@ export class OrdersService {
         },
         payment: true,
         address: true,
+        refund: { include: { components: true } },
       },
     });
     if (!order || order.userId !== userId) {

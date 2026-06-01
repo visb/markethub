@@ -2,9 +2,11 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import { computeItemTotal } from "../marketplace/pricing";
+import { RefundService } from "../payment/refund.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { PickingEvents } from "./picking.events";
 import { PICK_TASK_INCLUDE, toPickItemDto, toPickTaskDto } from "./picking.mapper";
@@ -26,9 +28,12 @@ export interface UpdatePickItemInput {
  */
 @Injectable()
 export class PickingSessionService {
+  private readonly logger = new Logger(PickingSessionService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly events: PickingEvents,
+    private readonly refunds: RefundService,
   ) {}
 
   /** assigned → picking. Só o dono inicia. */
@@ -145,6 +150,20 @@ export class PickingSessionService {
       where: { id: taskId },
       data: { status: "packed", packedAt: new Date() },
     });
+
+    // Reembolso único por pedido (SF.3): dispara quando todas as separações do
+    // pedido concluem. Idempotente; não falha a conclusão se o estorno falhar.
+    const group = await this.prisma.orderGroup.findUnique({
+      where: { id: task.orderGroupId },
+      select: { orderId: true },
+    });
+    if (group) {
+      try {
+        await this.refunds.maybeIssueRefundForOrder(group.orderId);
+      } catch (e) {
+        this.logger.error(`Estorno do pedido ${group.orderId} falhou: ${String(e)}`);
+      }
+    }
     return this.afterChange(taskId);
   }
 
@@ -169,12 +188,13 @@ export class PickingSessionService {
       } else if (pi.status === "substituted" && pi.substitution) {
         subtotal += pi.substitution.unitPriceCents * oi.quantity;
       } else {
-        // picked
+        // picked — cobra no máximo o pedido: over-delivery (peso/un acima) mantém o
+        // valor original; under-delivery cobra menos (gera reembolso em SF.3).
         subtotal += computeItemTotal({
           saleType: oi.saleType,
           unitPriceCents: oi.unitPriceCents,
-          quantity: pi.quantityPicked ?? oi.quantity,
-          weightGrams: pi.weightGramsPicked ?? oi.weightGrams,
+          quantity: Math.min(pi.quantityPicked ?? oi.quantity, oi.quantity),
+          weightGrams: Math.min(pi.weightGramsPicked ?? oi.weightGrams ?? 0, oi.weightGrams ?? 0),
         });
       }
     }

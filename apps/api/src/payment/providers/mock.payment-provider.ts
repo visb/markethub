@@ -3,6 +3,8 @@ import type {
   CreatePixChargeInput,
   PaymentProvider,
   PixCharge,
+  RefundInput,
+  RefundResult,
   WebhookEvent,
 } from "../payment-provider.interface";
 
@@ -30,5 +32,13 @@ export class MockPaymentProvider implements PaymentProvider {
     if (!p?.chargeId || !p?.status) return null;
     if (!["paid", "failed", "expired"].includes(p.status)) return null;
     return { chargeId: p.chargeId, status: p.status as WebhookEvent["status"], raw: payload };
+  }
+
+  /** Estorno fake: sempre sucesso. */
+  refund(input: RefundInput): Promise<RefundResult> {
+    return Promise.resolve({
+      refundId: `mock_refund_${randomUUID()}`,
+      raw: { mock: true, ...input },
+    });
   }
 }

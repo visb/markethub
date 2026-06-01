@@ -3,6 +3,8 @@ import type {
   CreatePixChargeInput,
   PaymentProvider,
   PixCharge,
+  RefundInput,
+  RefundResult,
   WebhookEvent,
 } from "../payment-provider.interface";
 
@@ -79,6 +81,28 @@ export class PagarmePaymentProvider implements PaymentProvider {
       expiresAt: tx.expires_at ? new Date(tx.expires_at) : new Date(Date.now() + input.expiresInSeconds * 1000),
       raw: data,
     };
+  }
+
+  /**
+   * Estorno PIX (parcial ou total): DELETE /charges/{id} com `amount` em centavos.
+   * Docs: https://docs.pagar.me/reference/estornar-uma-cobran%C3%A7a
+   */
+  async refund(input: RefundInput): Promise<RefundResult> {
+    const res = await fetch(`${this.baseUrl}/charges/${input.chargeId}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Basic ${this.basicAuth()}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ amount: input.amountCents }),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`Pagar.me refund error ${res.status}: ${text.slice(0, 300)}`);
+    }
+    const data = (await res.json()) as { id?: string; last_transaction?: { id?: string } };
+    const refundId = data.last_transaction?.id ?? data.id ?? input.chargeId;
+    return { refundId, raw: data };
   }
 
   parseWebhook(payload: unknown): WebhookEvent | null {

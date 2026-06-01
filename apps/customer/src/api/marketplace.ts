@@ -76,6 +76,7 @@ export interface OrderSummary {
   totalCents: number;
   createdAt: string;
   payment: { status: string } | null;
+  refund: { amountCents: number; status: string } | null;
 }
 
 export interface FeedItem extends ProductView {
