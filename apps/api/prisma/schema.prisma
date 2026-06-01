@@ -753,6 +753,8 @@ model DeliveryRoute {
   status                DeliveryRouteStatus @default(offered)
   estimatedEarningsCents Int                @default(0)
   distanceMeters        Int                 @default(0)
+  // entregador a quem a oferta está direcionada no momento (S4.4)
+  offeredToDriverId     String?
   // entregadores que recusaram esta rota (não reofertar) — lista de userIds
   rejectedBy            String[]            @default([])
   offeredAt             DateTime?
@@ -765,6 +767,7 @@ model DeliveryRoute {
 
   @@index([driverId, status])
   @@index([status])
+  @@index([offeredToDriverId, status])
   @@map("delivery_routes")
 }
 
