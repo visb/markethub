@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
-import { IsIn, IsNumber, IsOptional, Max, Min } from "class-validator";
+import { IsIn, IsNumber, IsOptional, IsString, Max, Min, MinLength } from "class-validator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import type { AuthUser } from "../auth/auth.types";
@@ -16,6 +16,10 @@ class SetStatusDto {
 class LocationDto {
   @IsNumber() @Min(-90) @Max(90) lat!: number;
   @IsNumber() @Min(-180) @Max(180) lng!: number;
+}
+
+class ConfirmDeliveryDto {
+  @IsString() @MinLength(1) deliveryCode!: string;
 }
 
 @Roles("driver")
@@ -77,5 +81,24 @@ export class DriverController {
   @Post("routes/:id/stops/:stopId/leave")
   leave(@CurrentUser() user: AuthUser, @Param("id") id: string, @Param("stopId") stopId: string) {
     return this.execution.leavePickup(user.id, id, stopId);
+  }
+
+  // ── Execução: entrega (S4.6) ──
+
+  /** Confirma a entrega validando o deliveryCode do cliente. */
+  @Post("routes/:id/stops/:stopId/confirm")
+  confirm(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @Param("stopId") stopId: string,
+    @Body() dto: ConfirmDeliveryDto,
+  ) {
+    return this.execution.confirmDropoff(user.id, id, stopId, dto.deliveryCode);
+  }
+
+  /** "Finalizar Entrega": fecha a parada e, sendo a última, conclui a rota. */
+  @Post("routes/:id/stops/:stopId/complete")
+  complete(@CurrentUser() user: AuthUser, @Param("id") id: string, @Param("stopId") stopId: string) {
+    return this.execution.completeDropoff(user.id, id, stopId);
   }
 }
