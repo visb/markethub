@@ -33,16 +33,7 @@ export interface PickItemDTO {
   quantityPicked?: number;
   weightGramsPicked?: number;
   refusalReason?: string;
-  boxId?: string;
   substitution?: SubstitutionDTO;
-}
-
-export interface BoxDTO {
-  id: string;
-  serial: string;
-  passcode: string;
-  sealedAt?: string;
-  itemIds: string[];
 }
 
 export interface PickTaskDTO {
@@ -57,5 +48,4 @@ export interface PickTaskDTO {
   readyAt?: string;
   createdAt: string;
   items: PickItemDTO[];
-  boxes: BoxDTO[];
 }

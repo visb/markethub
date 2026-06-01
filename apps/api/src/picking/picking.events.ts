@@ -74,7 +74,6 @@ export class PickingEvents {
     pickTaskId: string;
     storeId: string;
     orderGroupId: string;
-    boxCount: number;
   }): void {
     const body = {
       pickTaskId: payload.pickTaskId,
@@ -84,7 +83,7 @@ export class PickingEvents {
     };
     this.gateway.emitToStore(payload.storeId, "pick_task.ready_for_pickup", body);
     this.gateway.emitToGroup(payload.orderGroupId, "pick_task.ready_for_pickup", body);
-    this.push(`Pedido pronto para coleta (${payload.boxCount} caixa(s))`);
+    this.push("Pedido pronto para coleta");
   }
 
   /** Stub de push: integração real (FCM/APNs) fica para fase posterior. */

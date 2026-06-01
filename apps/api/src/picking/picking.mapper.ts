@@ -1,5 +1,4 @@
 import type {
-  Box,
   PickItem,
   PickTask,
   OrderItem,
@@ -16,7 +15,6 @@ type PickItemWithRels = PickItem & {
 
 type PickTaskWithRels = PickTask & {
   items: PickItemWithRels[];
-  boxes: (Box & { items: { id: string }[] })[];
 };
 
 const iso = (d: Date | null | undefined) => (d ? d.toISOString() : undefined);
@@ -34,7 +32,6 @@ export function toPickItemDto(pi: PickItemWithRels) {
     quantityPicked: pi.quantityPicked ?? undefined,
     weightGramsPicked: pi.weightGramsPicked ?? undefined,
     refusalReason: pi.refusalReason ?? undefined,
-    boxId: pi.boxId ?? undefined,
     substitution: pi.substitution
       ? {
           id: pi.substitution.id,
@@ -63,17 +60,9 @@ export function toPickTaskDto(task: PickTaskWithRels) {
     readyAt: iso(task.readyAt),
     createdAt: task.createdAt.toISOString(),
     items: task.items.map(toPickItemDto),
-    boxes: task.boxes.map((b) => ({
-      id: b.id,
-      serial: b.serial,
-      passcode: b.passcode,
-      sealedAt: iso(b.sealedAt),
-      itemIds: b.items.map((i) => i.id),
-    })),
   };
 }
 
 export const PICK_TASK_INCLUDE = {
   items: { include: { orderItem: true, substitution: true } },
-  boxes: { include: { items: { select: { id: true } } } },
 } as const;

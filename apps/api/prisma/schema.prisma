@@ -475,6 +475,8 @@ model Order {
   discountCents    Int @default(0)
   totalCents       Int @default(0)
   couponCode       String?
+  // código de entrega (entregador→cliente): exibido ao cliente; o entregador digita p/ confirmar (SF.1)
+  deliveryCode     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   groups    OrderGroup[]
@@ -498,6 +500,8 @@ model OrderGroup {
   deliveryCents    Int @default(0)
   prepCents        Int @default(0)
   platformFeeCents Int @default(0)
+  // código de coleta (loja→entregador): exibido ao entregador; o picker/merchant digita p/ liberar (SF.1)
+  pickupCode      String?
   // push ao ERP (S2.7)
   externalOrderId String?
   erpPushedAt     DateTime?
@@ -553,14 +557,14 @@ model Payment {
 // ─────────────────────────────────────────────────────────────
 // Picking / Separação (Fase 3 — S3.1)
 // Uma PickTask por OrderGroup (sub-pedido de uma loja). O separador (picker)
-// resolve item a item, empacota em caixas e libera p/ coleta do entregador.
+// resolve item a item, ensacola e libera p/ coleta do entregador via pickupCode.
 // ─────────────────────────────────────────────────────────────
 
 enum PickTaskStatus {
   queued // gerada, aguardando separador assumir
   assigned // separador assumiu
   picking // separação em andamento
-  packed // itens empacotados em caixas
+  packed // itens ensacolados/prontos
   ready_for_pickup // pronta p/ coleta do entregador
 }
 
@@ -592,7 +596,6 @@ model PickTask {
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
   items        PickItem[]
-  boxes        Box[]
 
   @@index([storeId, status])
   @@index([pickerId])
@@ -609,8 +612,6 @@ model PickItem {
   quantityPicked    Int? // saleType=unit: unidades efetivamente separadas
   weightGramsPicked Int? // saleType=weight: gramas efetivamente separadas
   refusalReason     String? // motivo quando refused
-  box               Box?           @relation(fields: [boxId], references: [id])
-  boxId             String?
   pickedById        String? // auditoria: quem resolveu
   pickedAt          DateTime?
   createdAt         DateTime       @default(now())
@@ -618,7 +619,6 @@ model PickItem {
   substitution      Substitution?
 
   @@index([pickTaskId])
-  @@index([boxId])
   @@map("pick_items")
 }
 
@@ -641,18 +641,3 @@ model Substitution {
   @@map("substitutions")
 }
 
-// Caixa física do pedido. serial + QR p/ conferência na entrega; passcode (senha)
-// exibido ao cliente como alternativa ao scan (ref: Receive.jpg).
-model Box {
-  id         String     @id @default(cuid())
-  pickTask   PickTask   @relation(fields: [pickTaskId], references: [id], onDelete: Cascade)
-  pickTaskId String
-  serial     String     @unique
-  passcode   String // senha numérica exibida ao cliente
-  sealedAt   DateTime?
-  createdAt  DateTime   @default(now())
-  items      PickItem[]
-
-  @@index([pickTaskId])
-  @@map("boxes")
-}

@@ -1,7 +1,6 @@
 import { Module } from "@nestjs/common";
 import { JwtModule } from "@nestjs/jwt";
 import { HandoffService } from "./handoff.service";
-import { PackingService } from "./packing.service";
 import { PickingController } from "./picking.controller";
 import { PickingEvents } from "./picking.events";
 import { PickingGateway } from "./picking.gateway";
@@ -20,7 +19,6 @@ import { SubstitutionService } from "./substitution.service";
     PickingSessionService,
     SubstitutionService,
     SubstitutionScheduler,
-    PackingService,
     HandoffService,
     PickingGateway,
     PickingEvents,

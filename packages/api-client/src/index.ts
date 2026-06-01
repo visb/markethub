@@ -11,7 +11,6 @@ export type {
   RoleName,
   PickTaskDTO,
   PickItemDTO,
-  BoxDTO,
   SubstitutionDTO,
   PickTaskStatusDTO,
   PickItemStatusDTO,

@@ -22,16 +22,6 @@ export interface PickItemActionInput {
   refusalReason?: string;
 }
 
-export interface BoxLabel {
-  boxId: string;
-  serial: string;
-  passcode: string;
-  qrPayload: string;
-  orderId: string;
-  storeName: string;
-  itemCount: number;
-}
-
 export interface MerchantOffer {
   id: string;
   storeId: string;
@@ -182,24 +172,17 @@ export class ApiClient {
     return this.request(`/pick-tasks/${id}/complete-picking`, { method: "POST", auth: true });
   }
 
-  pickCreateBox(id: string): Promise<{ id: string; serial: string; passcode: string; qrPayload: string }> {
-    return this.request(`/pick-tasks/${id}/boxes`, { method: "POST", auth: true });
-  }
-
-  pickAllocate(id: string, boxId: string, itemId: string): Promise<unknown> {
-    return this.request(`/pick-tasks/${id}/boxes/${boxId}/items/${itemId}`, { method: "POST", auth: true });
-  }
-
-  pickBoxLabel(id: string, boxId: string): Promise<BoxLabel> {
-    return this.request(`/pick-tasks/${id}/boxes/${boxId}/label`, { auth: true });
-  }
-
-  pickPack(id: string): Promise<PickTaskDTO> {
-    return this.request(`/pick-tasks/${id}/pack`, { method: "POST", auth: true });
-  }
-
   pickReady(id: string): Promise<PickTaskDTO> {
     return this.request(`/pick-tasks/${id}/ready`, { method: "POST", auth: true });
+  }
+
+  /** Loja/picker libera a coleta digitando o pickupCode apresentado pelo entregador (SF.1). */
+  pickReleasePickup(id: string, pickupCode: string): Promise<PickTaskDTO> {
+    return this.request(`/pick-tasks/${id}/release-pickup`, {
+      method: "POST",
+      body: { pickupCode },
+      auth: true,
+    });
   }
 
   // ─── Merchant / gestão de catálogo (S3.11) ───────────

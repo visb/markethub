@@ -5,8 +5,8 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import type { OrderStatus } from "@prisma/client";
+import { shortCode } from "../common/codes";
 import { PrismaService } from "../prisma/prisma.service";
-import { boxQrPayload } from "./packing.service";
 import { PickingEvents } from "./picking.events";
 import { PICK_TASK_INCLUDE, toPickTaskDto } from "./picking.mapper";
 
@@ -30,14 +30,14 @@ export class HandoffService {
   ) {}
 
   /**
-   * Handoff (S3.6): packed → ready_for_pickup quando todas as caixas estão
-   * fechadas. Transiciona OrderGroup → ready_for_pickup e expõe a tarefa na
-   * fila de coleta. Idempotente.
+   * Handoff (S3.6): packed → ready_for_pickup. Transiciona OrderGroup →
+   * ready_for_pickup, gera o pickupCode (exibido ao entregador) e expõe a tarefa
+   * na fila de coleta. Idempotente — não regenera o código se já existir.
    */
   async markReady(userId: string, taskId: string) {
     const task = await this.prisma.pickTask.findUnique({
       where: { id: taskId },
-      include: { boxes: { select: { id: true, sealedAt: true } } },
+      include: { orderGroup: { select: { pickupCode: true } } },
     });
     if (!task) throw new NotFoundException({ code: "PICK_TASK_NOT_FOUND", message: "Tarefa não encontrada" });
     if (task.pickerId !== userId) {
@@ -47,13 +47,7 @@ export class HandoffService {
     if (task.status !== "packed") {
       throw new BadRequestException({
         code: "PICK_TASK_NOT_PACKED",
-        message: "Empacote a tarefa antes de marcá-la pronta",
-      });
-    }
-    if (task.boxes.length === 0 || task.boxes.some((b) => !b.sealedAt)) {
-      throw new BadRequestException({
-        code: "BOXES_NOT_SEALED",
-        message: "Todas as caixas precisam estar fechadas",
+        message: "Conclua a separação antes de marcá-la pronta",
       });
     }
 
@@ -64,7 +58,10 @@ export class HandoffService {
       }),
       this.prisma.orderGroup.update({
         where: { id: task.orderGroupId },
-        data: { status: "ready_for_pickup" },
+        data: {
+          status: "ready_for_pickup",
+          pickupCode: task.orderGroup.pickupCode ?? shortCode(),
+        },
       }),
     ]);
     await this.recomputeOrderStatus(task.orderGroupId);
@@ -73,22 +70,22 @@ export class HandoffService {
       pickTaskId: task.id,
       storeId: task.storeId,
       orderGroupId: task.orderGroupId,
-      boxCount: task.boxes.length,
     });
     return this.detail(taskId);
   }
 
   /**
    * Fila de coleta (contrato p/ a Fase 4): tarefas prontas de uma loja, com
-   * caixas e endereço de coleta (= endereço da Store). Derivada do status →
-   * idempotente, sem duplicação.
+   * endereço de coleta (= endereço da Store) e contagem de itens. Derivada do
+   * status → idempotente, sem duplicação. O pickupCode NÃO é exposto aqui (vai
+   * ao app do entregador na oferta de rota); a loja valida o código informado.
    */
   async listReadyForPickup(storeId: string) {
     const tasks = await this.prisma.pickTask.findMany({
       where: { storeId, status: "ready_for_pickup" },
       orderBy: { readyAt: "asc" },
       include: {
-        boxes: { include: { items: { select: { id: true } } } },
+        _count: { select: { items: true } },
         orderGroup: {
           select: {
             orderId: true,
@@ -117,25 +114,19 @@ export class HandoffService {
       orderId: t.orderGroup.orderId,
       readyAt: t.readyAt?.toISOString(),
       pickupAddress: t.orderGroup.store,
-      boxes: t.boxes.map((b) => ({
-        id: b.id,
-        serial: b.serial,
-        passcode: b.passcode,
-        qrPayload: boxQrPayload(b.id),
-        itemCount: b.items.length,
-      })),
+      itemCount: t._count.items,
     }));
   }
 
   /**
-   * Coleta confirmada (chamado pelo fluxo da Fase 4): OrderGroup
-   * ready_for_pickup → on_the_way. Idempotente. PickTask permanece
-   * ready_for_pickup (terminal do picking).
+   * Coleta confirmada: valida o pickupCode (apresentado pelo entregador, digitado
+   * por quem libera) e avança OrderGroup ready_for_pickup → on_the_way. Idempotente.
+   * PickTask permanece ready_for_pickup (terminal do picking).
    */
-  async confirmPickup(taskId: string) {
+  async confirmPickup(taskId: string, pickupCode: string) {
     const task = await this.prisma.pickTask.findUnique({
       where: { id: taskId },
-      include: { orderGroup: { select: { id: true, status: true } } },
+      include: { orderGroup: { select: { id: true, status: true, pickupCode: true } } },
     });
     if (!task) throw new NotFoundException({ code: "PICK_TASK_NOT_FOUND", message: "Tarefa não encontrada" });
     if (task.orderGroup.status === "on_the_way") return this.detail(taskId); // idempotente
@@ -143,6 +134,13 @@ export class HandoffService {
       throw new BadRequestException({
         code: "NOT_READY_FOR_PICKUP",
         message: "Tarefa não está pronta para coleta",
+      });
+    }
+    const expected = task.orderGroup.pickupCode;
+    if (!expected || pickupCode.trim() !== expected) {
+      throw new BadRequestException({
+        code: "INVALID_PICKUP_CODE",
+        message: "Código de coleta inválido",
       });
     }
 

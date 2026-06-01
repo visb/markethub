@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import type { PickItemDTO, PickTaskDTO } from "@markethub/api-client";
 import { Button, Text, colors, radius, spacing } from "@markethub/ui";
@@ -20,6 +20,7 @@ export default function TaskScreen() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pickupCode, setPickupCode] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -91,8 +92,6 @@ export default function TaskScreen() {
   }
 
   const allResolved = task.items.every((i) => i.status !== "pending");
-  const positives = task.items.filter((i) => i.status === "picked" || i.status === "substituted");
-  const unboxed = positives.filter((i) => !i.boxId).length;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ padding: spacing.md, paddingBottom: spacing.xxl }}>
@@ -131,7 +130,6 @@ export default function TaskScreen() {
             </View>
             <Text muted variant="caption">
               Pedido: {qtyLabel}
-              {item.boxId ? " · em caixa" : ""}
             </Text>
             {task.status === "picking" && item.status === "pending" && (
               <View style={styles.actions}>
@@ -154,67 +152,46 @@ export default function TaskScreen() {
         />
       )}
 
-      {/* Empacotamento */}
-      {(task.status === "picking" || task.status === "packed") && positives.length > 0 && (
-        <View style={{ marginTop: spacing.lg }}>
-          <Text variant="title" style={{ marginBottom: spacing.sm }}>
-            Caixas
-          </Text>
-          {task.boxes.map((b, idx) => (
-            <View key={b.id} style={styles.box}>
-              <Text>
-                Caixa {idx + 1} · {b.serial}
-              </Text>
-              <Text muted variant="caption">
-                Senha: {b.passcode} · {b.itemIds.length} item(ns)
-              </Text>
-              {unboxed > 0 && (
-                <Action
-                  label={`Alocar ${unboxed} separado(s) aqui`}
-                  disabled={busy}
-                  onPress={() =>
-                    void run(async () => {
-                      for (const it of positives.filter((p) => !p.boxId)) {
-                        await client.pickAllocate(id, b.id, it.id);
-                      }
-                    })
-                  }
-                />
-              )}
-            </View>
-          ))}
-          <Button
-            title="Criar caixa"
-            variant="secondary"
-            disabled={busy}
-            onPress={() => void run(() => client.pickCreateBox(id))}
-            style={{ marginTop: spacing.sm }}
-          />
-        </View>
-      )}
-
-      {task.status === "picking" && allResolved && task.boxes.length > 0 && unboxed === 0 && (
-        <Button
-          title="Empacotar"
-          disabled={busy}
-          onPress={() => void run(() => client.pickPack(id))}
-          style={{ marginTop: spacing.md }}
-        />
-      )}
-
+      {/* Ensacolado/pronto → liberar para coleta (gera o código) */}
       {task.status === "packed" && (
         <Button
           title="Pronto para coleta"
           disabled={busy}
-          onPress={() =>
-            void run(async () => {
-              await client.pickReady(id);
-              Alert.alert("Pronto", "Tarefa liberada para coleta.");
-              router.back();
-            })
-          }
+          onPress={() => void run(() => client.pickReady(id))}
           style={{ marginTop: spacing.md }}
         />
+      )}
+
+      {/* Liberação de coleta: o entregador apresenta o código; a loja digita aqui (SF.1) */}
+      {task.status === "ready_for_pickup" && (
+        <View style={{ marginTop: spacing.lg }}>
+          <Text variant="title" style={{ marginBottom: spacing.sm }}>
+            Liberar coleta
+          </Text>
+          <Text muted variant="caption" style={{ marginBottom: spacing.sm }}>
+            Peça o código de coleta ao entregador e digite-o para liberar o pedido.
+          </Text>
+          <TextInput
+            value={pickupCode}
+            onChangeText={setPickupCode}
+            placeholder="Código de coleta"
+            placeholderTextColor={colors.textMuted}
+            keyboardType="number-pad"
+            style={styles.codeInput}
+          />
+          <Button
+            title="Liberar para o entregador"
+            disabled={busy || pickupCode.trim().length === 0}
+            onPress={() =>
+              void run(async () => {
+                await client.pickReleasePickup(id, pickupCode.trim());
+                Alert.alert("Liberado", "Pedido liberado para o entregador.");
+                router.back();
+              })
+            }
+            style={{ marginTop: spacing.sm }}
+          />
+        </View>
       )}
     </ScrollView>
   );
@@ -256,5 +233,15 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   actionDanger: { borderColor: colors.danger },
-  box: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm },
+  codeInput: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: 20,
+    letterSpacing: 4,
+    color: colors.text,
+  },
 });

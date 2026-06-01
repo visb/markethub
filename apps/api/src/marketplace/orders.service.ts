@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import type { DeliveryMethod, Prisma } from "@prisma/client";
+import { shortCode } from "../common/codes";
 import { ErpService } from "../erp/erp.service";
 import { PickingService } from "../picking/picking.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -65,6 +66,8 @@ export class OrdersService {
           discountCents: view.totals.discountCents,
           totalCents: view.totals.totalCents,
           couponCode: view.couponCode,
+          // código de entrega exibido ao cliente; entregador digita p/ confirmar (SF.1)
+          deliveryCode: shortCode(),
         },
       });
 

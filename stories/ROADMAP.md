@@ -70,8 +70,8 @@ Ordem de construção: **Base → catálogo/ERP/enriquecimento → cliente → p
 - S3.2 Atribuição de tarefa ao separador
 - S3.3 Sessão de separação item a item — selecionado / recusado / substituído (ref: `Picking.jpg`)
 - S3.4 Substituição de item e ruptura de estoque
-- S3.5 Empacotamento em caixas com QR/serial (ref: `Receive.jpg`)
-- S3.6 Handoff para entregador
+- S3.5 Empacotamento (ensacolado/pronto) — sem caixa lacrada (ajustado em SF.1)
+- S3.6 Handoff para entregador (liberação por `pickupCode`)
 - S3.7 App separador (picker)
 - S3.8 Eventos e tempo real da separação
 - S3.9 Gestão de ofertas e estoque pelo merchant (API)
@@ -83,8 +83,8 @@ Ordem de construção: **Base → catálogo/ERP/enriquecimento → cliente → p
 - S4.2 Disponibilidade e localização do entregador (ref: `Home - Pressing Status toggle.jpg`)
 - S4.3 Motor de rotas + matching multi-stop coleta+entrega (ref: `Home - Route found.jpg`)
 - S4.4 Oferta de rota e aceite/recusa com timer
-- S4.5 Coleta: chegada + retirada por QR (ref: `Coleta*.jpg`)
-- S4.6 Entrega: chegada + confirmação por QR/senha de caixa (ref: `Entrega*.jpg`)
+- S4.5 Coleta: chegada + liberação por `pickupCode` (ref: `Coleta*.jpg`)
+- S4.6 Entrega: chegada + confirmação por `deliveryCode` (ref: `Entrega*.jpg`)
 - S4.7 Ganhos do dia / rotas finalizadas (ref: `Home.jpg`)
 - S4.8 App entregador (driver)
 
