@@ -8,6 +8,11 @@
   },
   "scripts": {
     "dev": "turbo run dev",
+    "dev:api": "pnpm --filter @markethub/api dev",
+    "dev:customer": "pnpm --filter @markethub/customer dev",
+    "dev:picker": "pnpm --filter @markethub/picker dev",
+    "dev:driver": "pnpm --filter @markethub/driver dev",
+    "dev:admin": "pnpm --filter @markethub/admin dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
