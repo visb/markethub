@@ -26,6 +26,14 @@ export const envSchema = z.object({
   PAGARME_WEBHOOK_SECRET: z.string().optional(),
   PIX_EXPIRES_SECONDS: z.coerce.number().int().positive().default(1800),
 
+  // Storage de imagens (S3.10). Compatível com S3/MinIO via presigned PUT (SigV4).
+  STORAGE_ENDPOINT: z.string().default("http://localhost:9002"),
+  STORAGE_REGION: z.string().default("us-east-1"),
+  STORAGE_BUCKET: z.string().default("markethub"),
+  STORAGE_ACCESS_KEY: z.string().default("markethub"),
+  STORAGE_SECRET_KEY: z.string().default("markethub123"),
+  STORAGE_PUBLIC_URL: z.string().optional(), // base pública (CDN/proxy); default endpoint/bucket
+
   JWT_ACCESS_SECRET: z.string().min(16),
   JWT_REFRESH_SECRET: z.string().min(16),
   JWT_ACCESS_TTL: z.string().default("15m"),

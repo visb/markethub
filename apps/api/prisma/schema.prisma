@@ -214,6 +214,9 @@ model Product {
   categoryId       String?
   enrichmentStatus EnrichmentStatus @default(pending)
   completenessScore Int             @default(0) // 0-100
+  // Origem do produto: erp | cosmos | merchant (cadastrado pelo manager — S3.10).
+  source           String           @default("erp")
+  createdById      String? // manager que cadastrou (produto local — S3.10)
   // Campos editados manualmente (S1.7) que o pipeline NÃO sobrescreve.
   lockedFields     String[]         @default([])
   createdAt        DateTime         @default(now())
