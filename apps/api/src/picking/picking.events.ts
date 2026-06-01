@@ -34,4 +34,15 @@ export class PickingEvents {
   }): void {
     this.logger.log(`substitution ${sub.id} → ${sub.approvalStatus} (item=${sub.pickItemId})`);
   }
+
+  readyForPickup(payload: {
+    pickTaskId: string;
+    storeId: string;
+    orderGroupId: string;
+    boxCount: number;
+  }): void {
+    this.logger.log(
+      `pick-task ${payload.pickTaskId} pronta p/ coleta (store=${payload.storeId} caixas=${payload.boxCount})`,
+    );
+  }
 }

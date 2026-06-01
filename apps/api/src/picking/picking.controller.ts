@@ -13,6 +13,7 @@ import { IsIn, IsInt, IsOptional, IsString, Min, MinLength } from "class-validat
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import type { AuthUser } from "../auth/auth.types";
+import { HandoffService } from "./handoff.service";
 import { PackingService } from "./packing.service";
 import { PickingSessionService } from "./picking-session.service";
 import { PickingService } from "./picking.service";
@@ -37,6 +38,7 @@ export class PickingController {
     private readonly session: PickingSessionService,
     private readonly substitution: SubstitutionService,
     private readonly packing: PackingService,
+    private readonly handoff: HandoffService,
   ) {}
 
   /** Lojas em que o usuário atua como separador. */
@@ -136,5 +138,11 @@ export class PickingController {
   @Post(":id/pack")
   pack(@CurrentUser() user: AuthUser, @Param("id") id: string) {
     return this.packing.pack(user.id, id);
+  }
+
+  /** Handoff: marca a tarefa empacotada como pronta para coleta (S3.6). */
+  @Post(":id/ready")
+  ready(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.handoff.markReady(user.id, id);
   }
 }
