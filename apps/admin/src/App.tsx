@@ -1,5 +1,5 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { AuthProvider } from "@/auth/auth-context";
+import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
+import { AuthProvider, useAuth } from "@/auth/auth-context";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Layout } from "@/components/Layout";
 import { Login } from "@/pages/Login";
@@ -9,6 +9,9 @@ import { ProductDetail } from "@/pages/ProductDetail";
 import { ErpRuns } from "@/pages/ErpRuns";
 import { Users } from "@/pages/Users";
 import { MarketplaceCategories } from "@/pages/MarketplaceCategories";
+import { Offers } from "@/pages/merchant/Offers";
+import { Stock } from "@/pages/merchant/Stock";
+import { Products } from "@/pages/merchant/Products";
 
 function Placeholder({ title }: { title: string }) {
   return (
@@ -19,6 +22,20 @@ function Placeholder({ title }: { title: string }) {
   );
 }
 
+/** Tela inicial conforme papel: admin vê o dashboard; manager vai p/ ofertas. */
+function RoleHome() {
+  const { user } = useAuth();
+  if (user && !user.roles.includes("admin")) return <Navigate to="/merchant/offers" replace />;
+  return <Dashboard />;
+}
+
+/** Só admin entra nas telas globais; managers são redirecionados. */
+function AdminOnly() {
+  const { user } = useAuth();
+  if (user && !user.roles.includes("admin")) return <Navigate to="/merchant/offers" replace />;
+  return <Outlet />;
+}
+
 export function App() {
   return (
     <BrowserRouter>
@@ -27,13 +44,20 @@ export function App() {
           <Route path="/login" element={<Login />} />
           <Route element={<ProtectedRoute />}>
             <Route element={<Layout />}>
-              <Route index element={<Dashboard />} />
-              <Route path="catalog" element={<Catalog />} />
-              <Route path="catalog/:id" element={<ProductDetail />} />
-              <Route path="categories" element={<MarketplaceCategories />} />
-              <Route path="users" element={<Users />} />
-              <Route path="orders" element={<Placeholder title="Pedidos" />} />
-              <Route path="erp" element={<ErpRuns />} />
+              <Route index element={<RoleHome />} />
+              {/* Área do manager (S3.11) */}
+              <Route path="merchant/offers" element={<Offers />} />
+              <Route path="merchant/stock" element={<Stock />} />
+              <Route path="merchant/products" element={<Products />} />
+              {/* Telas globais — só admin */}
+              <Route element={<AdminOnly />}>
+                <Route path="catalog" element={<Catalog />} />
+                <Route path="catalog/:id" element={<ProductDetail />} />
+                <Route path="categories" element={<MarketplaceCategories />} />
+                <Route path="users" element={<Users />} />
+                <Route path="orders" element={<Placeholder title="Pedidos" />} />
+                <Route path="erp" element={<ErpRuns />} />
+              </Route>
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

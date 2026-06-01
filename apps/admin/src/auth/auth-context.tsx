@@ -13,6 +13,11 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
+/** Admin global ou manager de merchant podem entrar no painel (S3.11). */
+export function hasPanelAccess(user: { roles: string[] }): boolean {
+  return user.roles.includes("admin") || user.roles.includes("merchant");
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -32,7 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     void (async () => {
       try {
         const me = await client.me();
-        if (active && me.roles.includes("admin")) setUser(me);
+        if (active && hasPanelAccess(me)) setUser(me);
         else if (active) await client.logout();
       } catch {
         // sem sessão
@@ -49,11 +54,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (email: string, password: string) => {
       await client.login({ email, password });
       const me = await client.me();
-      if (!me.roles.includes("admin")) {
+      if (!hasPanelAccess(me)) {
         await client.logout();
         throw new ApiClientError(403, {
-          code: "NOT_ADMIN",
-          message: "Esta conta não tem acesso de administrador.",
+          code: "NO_PANEL_ACCESS",
+          message: "Esta conta não tem acesso ao painel.",
         });
       }
       setUser(me);

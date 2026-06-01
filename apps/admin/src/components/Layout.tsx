@@ -1,7 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "@/auth/auth-context";
 
-const NAV = [
+const ADMIN_NAV = [
   { to: "/", label: "Visão geral", end: true },
   { to: "/catalog", label: "Catálogo" },
   { to: "/categories", label: "Categorias" },
@@ -10,15 +10,23 @@ const NAV = [
   { to: "/erp", label: "Integração ERP" },
 ];
 
+const MERCHANT_NAV = [
+  { to: "/merchant/offers", label: "Ofertas" },
+  { to: "/merchant/stock", label: "Estoque" },
+  { to: "/merchant/products", label: "Produtos" },
+];
+
 export function Layout() {
   const { user, logout } = useAuth();
+  const isAdmin = user?.roles.includes("admin");
+  const nav = isAdmin ? ADMIN_NAV : MERCHANT_NAV;
 
   return (
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">MarketHub</div>
         <nav>
-          {NAV.map((item) => (
+          {nav.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

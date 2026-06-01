@@ -290,3 +290,26 @@ body {
   width: 64px;
   height: 32px;
 }
+/* Merchant area (S3.11) */
+.input-sm {
+  width: 90px;
+  height: 32px;
+}
+.lockwrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+  min-width: 180px;
+  flex: 1;
+}
+.form-grid label .input {
+  flex: none;
+  width: 100%;
+}
