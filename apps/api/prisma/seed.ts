@@ -34,13 +34,13 @@ async function main(): Promise<void> {
   await seedExampleUsers(passwordHash);
 }
 
-// Departamentos curados (aparecem no marketplace) — nome, ícone, ordem.
+// Departamentos curados (aparecem no marketplace) — nome, ordem.
 const CURATED = [
-  { name: "Hortifruti", icon: "🥬", order: 1 },
-  { name: "Padaria", icon: "🥖", order: 2 },
-  { name: "Açougue", icon: "🥩", order: 3 },
-  { name: "Bebidas", icon: "🥤", order: 4 },
-  { name: "Mercearia", icon: "🛒", order: 5 },
+  { name: "Hortifruti", order: 1 },
+  { name: "Padaria", order: 2 },
+  { name: "Açougue", order: 3 },
+  { name: "Bebidas", order: 4 },
+  { name: "Mercearia", order: 5 },
 ] as const;
 
 // Categorias canônicas (departamentos dos screenshots).
@@ -103,8 +103,8 @@ async function seedMarketplaceCategories(): Promise<void> {
     const slug = slugify(c.name);
     const mkt = await prisma.marketplaceCategory.upsert({
       where: { slug },
-      update: { icon: c.icon, displayOrder: c.order },
-      create: { name: c.name, slug, icon: c.icon, displayOrder: c.order, visible: true },
+      update: { displayOrder: c.order },
+      create: { name: c.name, slug, displayOrder: c.order, visible: true },
     });
     // Liga a categoria crua homônima (se existir) à curada.
     await prisma.category.updateMany({

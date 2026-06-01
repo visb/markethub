@@ -5,7 +5,6 @@ interface Curated {
   id: string;
   name: string;
   slug: string;
-  icon: string | null;
   displayOrder: number;
   visible: boolean;
   _count: { rawCategories: number };
@@ -22,7 +21,7 @@ export function MarketplaceCategories() {
   const { api } = useAuth();
   const [curated, setCurated] = useState<Curated[]>([]);
   const [raw, setRaw] = useState<RawCat[]>([]);
-  const [form, setForm] = useState({ name: "", icon: "", displayOrder: 0 });
+  const [form, setForm] = useState({ name: "", displayOrder: 0 });
 
   const load = useCallback(async () => {
     setCurated(await api.request<Curated[]>("/admin/marketplace-categories", { auth: true }));
@@ -36,7 +35,7 @@ export function MarketplaceCategories() {
   async function create() {
     if (!form.name.trim()) return;
     await api.request("/admin/marketplace-categories", { method: "POST", auth: true, body: form });
-    setForm({ name: "", icon: "", displayOrder: 0 });
+    setForm({ name: "", displayOrder: 0 });
     await load();
   }
   async function patch(id: string, body: Record<string, unknown>) {
@@ -73,12 +72,6 @@ export function MarketplaceCategories() {
           />
           <input
             className="input"
-            placeholder="Ícone (emoji)"
-            value={form.icon}
-            onChange={(e) => setForm({ ...form, icon: e.target.value })}
-          />
-          <input
-            className="input"
             type="number"
             placeholder="Ordem"
             value={form.displayOrder}
@@ -94,7 +87,6 @@ export function MarketplaceCategories() {
         <thead>
           <tr>
             <th>Ordem</th>
-            <th>Ícone</th>
             <th>Nome</th>
             <th>Cruas vinculadas</th>
             <th>Visível</th>
@@ -112,7 +104,6 @@ export function MarketplaceCategories() {
                   onBlur={(e) => patch(c.id, { displayOrder: Number(e.target.value) })}
                 />
               </td>
-              <td>{c.icon}</td>
               <td>{c.name}</td>
               <td>{c._count.rawCategories}</td>
               <td>
@@ -158,7 +149,7 @@ export function MarketplaceCategories() {
                   <option value="">— sem vínculo —</option>
                   {curated.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.icon} {c.name}
+                      {c.name}
                     </option>
                   ))}
                 </select>

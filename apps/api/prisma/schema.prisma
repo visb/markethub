@@ -185,7 +185,6 @@ model MarketplaceCategory {
   id           String                @id @default(cuid())
   name         String
   slug         String                @unique
-  icon         String? // emoji ou URL de ícone
   displayOrder Int                   @default(0)
   visible      Boolean               @default(true)
   parent       MarketplaceCategory?  @relation("MktCatTree", fields: [parentId], references: [id])

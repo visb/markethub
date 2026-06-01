@@ -86,7 +86,7 @@ export interface FeedItem extends ProductView {
   distanceKm: number | null;
 }
 export interface FeedSection {
-  category: { id: string; name: string; slug: string; icon: string | null };
+  category: { id: string; name: string; slug: string };
   items: FeedItem[];
 }
 
@@ -145,7 +145,7 @@ export function marketplace(api: ApiClient) {
         recommended: ProductView[];
       }>(`/stores/${storeId}/sections`),
     categories: () =>
-      api.request<{ id: string; name: string; slug: string; icon: string | null }[]>(
+      api.request<{ id: string; name: string; slug: string }[]>(
         "/marketplace-categories",
       ),
 

@@ -12,7 +12,6 @@ import { MarketplaceCategoryService } from "./marketplace-category.service";
 
 class CreateMktCategoryDto {
   @IsString() @MinLength(1) name!: string;
-  @IsOptional() @IsString() icon?: string | null;
   @IsOptional() @IsInt() displayOrder?: number;
   @IsOptional() @IsBoolean() visible?: boolean;
   @IsOptional() @IsString() parentId?: string | null;
@@ -20,7 +19,6 @@ class CreateMktCategoryDto {
 
 class UpdateMktCategoryDto {
   @IsOptional() @IsString() name?: string;
-  @IsOptional() @IsString() icon?: string | null;
   @IsOptional() @IsInt() displayOrder?: number;
   @IsOptional() @IsBoolean() visible?: boolean;
   @IsOptional() @IsString() parentId?: string | null;

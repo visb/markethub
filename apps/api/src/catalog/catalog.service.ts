@@ -193,7 +193,7 @@ export class CatalogService {
     const cats = await this.prisma.marketplaceCategory.findMany({
       where: { visible: true },
       orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
-      select: { id: true, name: true, slug: true, icon: true },
+      select: { id: true, name: true, slug: true },
     });
 
     const sections = await Promise.all(
@@ -213,7 +213,7 @@ export class CatalogService {
   ) {
     const cat = await this.prisma.marketplaceCategory.findUnique({
       where: { id: marketplaceCategoryId },
-      select: { id: true, name: true, slug: true, icon: true },
+      select: { id: true, name: true, slug: true },
     });
     if (!cat) throw this.notFound("CATEGORY_NOT_FOUND", "Categoria não encontrada");
     const { page, pageSize, skip, take } = this.paginate(opts.page, opts.pageSize);

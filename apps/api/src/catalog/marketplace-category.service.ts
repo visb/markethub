@@ -4,7 +4,6 @@ import { PrismaService } from "../prisma/prisma.service";
 
 export interface MktCategoryInput {
   name?: string;
-  icon?: string | null;
   displayOrder?: number;
   visible?: boolean;
   parentId?: string | null;
@@ -27,7 +26,7 @@ export class MarketplaceCategoryService {
     return this.prisma.marketplaceCategory.findMany({
       where: { visible: true },
       orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
-      select: { id: true, name: true, slug: true, icon: true, parentId: true },
+      select: { id: true, name: true, slug: true, parentId: true },
     });
   }
 
@@ -38,7 +37,6 @@ export class MarketplaceCategoryService {
       data: {
         name,
         slug: slugify(name),
-        icon: input.icon ?? null,
         displayOrder: input.displayOrder ?? 0,
         visible: input.visible ?? true,
         parentId: input.parentId ?? null,
@@ -52,7 +50,6 @@ export class MarketplaceCategoryService {
       where: { id },
       data: {
         ...(input.name ? { name: input.name.trim(), slug: slugify(input.name) } : {}),
-        ...(input.icon !== undefined ? { icon: input.icon } : {}),
         ...(input.displayOrder !== undefined ? { displayOrder: input.displayOrder } : {}),
         ...(input.visible !== undefined ? { visible: input.visible } : {}),
         ...(input.parentId !== undefined ? { parentId: input.parentId } : {}),

@@ -74,9 +74,7 @@ export default function MarketplaceHome() {
         <ScrollView contentContainerStyle={{ paddingBottom: spacing.xxl }}>
           {sections.map((sec) => (
             <View key={sec.category.id}>
-              <Text style={styles.section}>
-                {sec.category.icon} {sec.category.name}
-              </Text>
+              <Text style={styles.section}>{sec.category.name}</Text>
               <FlatList
                 horizontal
                 showsHorizontalScrollIndicator={false}
