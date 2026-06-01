@@ -78,12 +78,15 @@ Ordem de construção: **Base → catálogo/ERP/enriquecimento → cliente → p
 - S3.10 Cadastro de produto canônico pelo merchant (API)
 - S3.11 Admin SPA: área do merchant (manager)
 
-### Fase 4 — Delivery (entregador) _(epics, detalhar ao iniciar)_
-- Disponibilidade / toggle de status (ref: `delivery/Home*.jpg`)
-- Motor de rotas + matching multi-stop coleta+entrega (ref: `Home - Route found.jpg`)
-- Coleta: chegada + retirada de pedidos (ref: `Coleta*.jpg`)
-- Entrega: chegada + confirmação por QR de caixa (ref: `Entrega*.jpg`)
-- Ganhos do dia / rotas finalizadas
+### Fase 4 — Delivery (entregador)
+- S4.1 Modelo de domínio de entrega (rota multi-stop, paradas, perfil do entregador)
+- S4.2 Disponibilidade e localização do entregador (ref: `Home - Pressing Status toggle.jpg`)
+- S4.3 Motor de rotas + matching multi-stop coleta+entrega (ref: `Home - Route found.jpg`)
+- S4.4 Oferta de rota e aceite/recusa com timer
+- S4.5 Coleta: chegada + retirada por QR (ref: `Coleta*.jpg`)
+- S4.6 Entrega: chegada + confirmação por QR/senha de caixa (ref: `Entrega*.jpg`)
+- S4.7 Ganhos do dia / rotas finalizadas (ref: `Home.jpg`)
+- S4.8 App entregador (driver)
 
 ### Fase 5 — Rastreio, avaliações, admin, polish _(epics, detalhar ao iniciar)_
 - Rastreio em tempo real do pedido (cliente) — confirmado/comprando/a caminho
