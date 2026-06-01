@@ -9,4 +9,10 @@ export type {
   RegisterInput,
   RefreshInput,
   RoleName,
+  PickTaskDTO,
+  PickItemDTO,
+  BoxDTO,
+  SubstitutionDTO,
+  PickTaskStatusDTO,
+  PickItemStatusDTO,
 } from "@markethub/types";

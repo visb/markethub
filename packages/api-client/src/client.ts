@@ -3,10 +3,63 @@ import type {
   AuthTokens,
   AuthUser,
   LoginInput,
+  PickTaskDTO,
   RefreshInput,
   RegisterInput,
 } from "@markethub/types";
 import { MemoryTokenStore, type TokenStore } from "./token-store";
+
+export interface PickStore {
+  id: string;
+  name: string;
+  merchantId: string;
+}
+
+export interface PickItemActionInput {
+  action: "pick" | "refuse";
+  quantityPicked?: number;
+  weightGramsPicked?: number;
+  refusalReason?: string;
+}
+
+export interface BoxLabel {
+  boxId: string;
+  serial: string;
+  passcode: string;
+  qrPayload: string;
+  orderId: string;
+  storeName: string;
+  itemCount: number;
+}
+
+export interface MerchantOffer {
+  id: string;
+  storeId: string;
+  storeName: string;
+  product: { id: string; name: string; brand: string | null; imageUrl: string | null; saleType: "unit" | "weight"; categoryId: string | null };
+  priceCents: number;
+  promoPriceCents: number | null;
+  available: boolean;
+  lockedFields: string[];
+  stock: { quantity: number | null; available: boolean; lockedFields: string[] } | null;
+}
+
+export interface MerchantStock {
+  id: string;
+  storeId: string;
+  storeName: string;
+  product: { id: string; name: string; brand: string | null; saleType: "unit" | "weight" };
+  quantity: number | null;
+  available: boolean;
+  lockedFields: string[];
+}
+
+export interface PresignedUpload {
+  uploadUrl: string;
+  publicUrl: string;
+  headers: Record<string, string>;
+  expiresInSeconds: number;
+}
 
 export class ApiClientError extends Error {
   constructor(
@@ -86,6 +139,118 @@ export class ApiClient {
 
   health(): Promise<{ status: string; checks: Record<string, string> }> {
     return this.request("/health", { auth: false });
+  }
+
+  // ─── Picking / separador (S3.7) ──────────────────────
+  pickStores(): Promise<PickStore[]> {
+    return this.request("/pick-tasks/stores", { auth: true });
+  }
+
+  pickQueue(storeId: string): Promise<PickTaskDTO[]> {
+    return this.request(`/pick-tasks?storeId=${encodeURIComponent(storeId)}`, { auth: true });
+  }
+
+  pickTask(id: string): Promise<PickTaskDTO> {
+    return this.request(`/pick-tasks/${id}`, { auth: true });
+  }
+
+  pickAssign(id: string): Promise<PickTaskDTO> {
+    return this.request(`/pick-tasks/${id}/assign`, { method: "POST", auth: true });
+  }
+
+  pickRelease(id: string): Promise<PickTaskDTO> {
+    return this.request(`/pick-tasks/${id}/release`, { method: "POST", auth: true });
+  }
+
+  pickStart(id: string): Promise<PickTaskDTO> {
+    return this.request(`/pick-tasks/${id}/start`, { method: "POST", auth: true });
+  }
+
+  pickUpdateItem(id: string, itemId: string, input: PickItemActionInput): Promise<unknown> {
+    return this.request(`/pick-tasks/${id}/items/${itemId}`, { method: "PATCH", body: input, auth: true });
+  }
+
+  pickSubstitute(id: string, itemId: string, substituteOfferId: string): Promise<unknown> {
+    return this.request(`/pick-tasks/${id}/items/${itemId}/substitute`, {
+      method: "POST",
+      body: { substituteOfferId },
+      auth: true,
+    });
+  }
+
+  pickCompletePicking(id: string): Promise<PickTaskDTO> {
+    return this.request(`/pick-tasks/${id}/complete-picking`, { method: "POST", auth: true });
+  }
+
+  pickCreateBox(id: string): Promise<{ id: string; serial: string; passcode: string; qrPayload: string }> {
+    return this.request(`/pick-tasks/${id}/boxes`, { method: "POST", auth: true });
+  }
+
+  pickAllocate(id: string, boxId: string, itemId: string): Promise<unknown> {
+    return this.request(`/pick-tasks/${id}/boxes/${boxId}/items/${itemId}`, { method: "POST", auth: true });
+  }
+
+  pickBoxLabel(id: string, boxId: string): Promise<BoxLabel> {
+    return this.request(`/pick-tasks/${id}/boxes/${boxId}/label`, { auth: true });
+  }
+
+  pickPack(id: string): Promise<PickTaskDTO> {
+    return this.request(`/pick-tasks/${id}/pack`, { method: "POST", auth: true });
+  }
+
+  pickReady(id: string): Promise<PickTaskDTO> {
+    return this.request(`/pick-tasks/${id}/ready`, { method: "POST", auth: true });
+  }
+
+  // ─── Merchant / gestão de catálogo (S3.11) ───────────
+  merchantStores(): Promise<PickStore[]> {
+    return this.request("/merchant/stores", { auth: true });
+  }
+
+  merchantOffers(params: { storeId?: string; search?: string; categoryId?: string; available?: boolean } = {}): Promise<MerchantOffer[]> {
+    const q = new URLSearchParams();
+    if (params.storeId) q.set("storeId", params.storeId);
+    if (params.search) q.set("search", params.search);
+    if (params.categoryId) q.set("categoryId", params.categoryId);
+    if (params.available !== undefined) q.set("available", String(params.available));
+    const qs = q.toString();
+    return this.request(`/merchant/offers${qs ? `?${qs}` : ""}`, { auth: true });
+  }
+
+  merchantUpdateOffer(id: string, patch: { priceCents?: number; promoPriceCents?: number | null; available?: boolean }): Promise<unknown> {
+    return this.request(`/merchant/offers/${id}`, { method: "PATCH", body: patch, auth: true });
+  }
+
+  merchantUnlockOffer(id: string, field: string): Promise<unknown> {
+    return this.request(`/merchant/offers/${id}/locks/${field}`, { method: "DELETE", auth: true });
+  }
+
+  merchantStocks(storeId?: string): Promise<MerchantStock[]> {
+    return this.request(`/merchant/stocks${storeId ? `?storeId=${encodeURIComponent(storeId)}` : ""}`, { auth: true });
+  }
+
+  merchantUpdateStock(id: string, patch: { quantity?: number | null; available?: boolean }): Promise<unknown> {
+    return this.request(`/merchant/stocks/${id}`, { method: "PATCH", body: patch, auth: true });
+  }
+
+  merchantUnlockStock(id: string, field: string): Promise<unknown> {
+    return this.request(`/merchant/stocks/${id}/locks/${field}`, { method: "DELETE", auth: true });
+  }
+
+  merchantUploadUrl(filename: string, contentType: string): Promise<PresignedUpload> {
+    return this.request("/merchant/products/upload-url", {
+      method: "POST",
+      body: { filename, contentType },
+      auth: true,
+    });
+  }
+
+  merchantCreateProduct(input: Record<string, unknown>): Promise<unknown> {
+    return this.request("/merchant/products", { method: "POST", body: input, auth: true });
+  }
+
+  merchantUpdateProduct(id: string, input: Record<string, unknown>): Promise<unknown> {
+    return this.request(`/merchant/products/${id}`, { method: "PATCH", body: input, auth: true });
   }
 
   // ─── Core request com refresh automático ─────────────
