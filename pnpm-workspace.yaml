@@ -3,7 +3,7 @@ packages:
   - "packages/*"
 
 allowBuilds:
-  msgpackr-extract: set this to true or false
+  '@nestjs/core': true
 
 onlyBuiltDependencies:
   - "@nestjs/core"

@@ -1,14 +1,17 @@
 import { Injectable, Logger } from "@nestjs/common";
 import type { PickTaskStatus } from "@prisma/client";
+import { PickingGateway } from "./picking.gateway";
 
 /**
- * Publica eventos de mudança de status de PickTask. Stub baseado em log nesta
- * fase; o transporte realtime (WebSocket/SSE) é implementado em S3.8 trocando
- * esta implementação por uma que faça broadcast.
+ * Publica eventos de separação no gateway Socket.IO (S3.8) e dispara push em
+ * eventos-chave. Canais: store:<storeId> (separadores/manager/admin) e
+ * group:<orderGroupId> (cliente dono / staff).
  */
 @Injectable()
 export class PickingEvents {
   private readonly logger = new Logger(PickingEvents.name);
+
+  constructor(private readonly gateway: PickingGateway) {}
 
   taskStatusChanged(task: {
     id: string;
@@ -17,22 +20,54 @@ export class PickingEvents {
     pickerId: string | null;
     status: PickTaskStatus;
   }): void {
-    this.logger.log(
-      `pick-task ${task.id} → ${task.status} (store=${task.storeId} picker=${task.pickerId ?? "-"})`,
-    );
+    const payload = {
+      pickTaskId: task.id,
+      orderGroupId: task.orderGroupId,
+      storeId: task.storeId,
+      status: task.status,
+      pickerId: task.pickerId,
+    };
+    this.gateway.emitToStore(task.storeId, "pick_task.updated", payload);
+    this.gateway.emitToGroup(task.orderGroupId, "pick_task.updated", payload);
+    if (task.status === "assigned") {
+      this.gateway.emitToStore(task.storeId, "pick_task.assigned", payload);
+    }
   }
 
-  substitutionProposed(sub: { id: string; pickItemId: string; orderId: string }): void {
-    this.logger.log(`substitution ${sub.id} proposed (item=${sub.pickItemId} order=${sub.orderId})`);
+  itemUpdated(item: { orderGroupId: string; pickItemId: string; status: string }): void {
+    this.gateway.emitToGroup(item.orderGroupId, "item.updated", {
+      orderGroupId: item.orderGroupId,
+      pickItemId: item.pickItemId,
+      status: item.status,
+    });
+  }
+
+  substitutionProposed(sub: {
+    id: string;
+    pickItemId: string;
+    orderGroupId: string;
+  }): void {
+    this.gateway.emitToGroup(sub.orderGroupId, "substitution.proposed", {
+      substitutionId: sub.id,
+      orderGroupId: sub.orderGroupId,
+      pickItemId: sub.pickItemId,
+      approvalStatus: "pending",
+    });
+    this.push(`Substituição pendente: aprove ou recuse um item (grupo ${sub.orderGroupId})`);
   }
 
   substitutionResolved(sub: {
     id: string;
     pickItemId: string;
-    orderId: string;
+    orderGroupId: string;
     approvalStatus: "approved" | "rejected";
   }): void {
-    this.logger.log(`substitution ${sub.id} → ${sub.approvalStatus} (item=${sub.pickItemId})`);
+    this.gateway.emitToGroup(sub.orderGroupId, "substitution.resolved", {
+      substitutionId: sub.id,
+      orderGroupId: sub.orderGroupId,
+      pickItemId: sub.pickItemId,
+      approvalStatus: sub.approvalStatus,
+    });
   }
 
   readyForPickup(payload: {
@@ -41,8 +76,19 @@ export class PickingEvents {
     orderGroupId: string;
     boxCount: number;
   }): void {
-    this.logger.log(
-      `pick-task ${payload.pickTaskId} pronta p/ coleta (store=${payload.storeId} caixas=${payload.boxCount})`,
-    );
+    const body = {
+      pickTaskId: payload.pickTaskId,
+      orderGroupId: payload.orderGroupId,
+      storeId: payload.storeId,
+      status: "ready_for_pickup",
+    };
+    this.gateway.emitToStore(payload.storeId, "pick_task.ready_for_pickup", body);
+    this.gateway.emitToGroup(payload.orderGroupId, "pick_task.ready_for_pickup", body);
+    this.push(`Pedido pronto para coleta (${payload.boxCount} caixa(s))`);
+  }
+
+  /** Stub de push: integração real (FCM/APNs) fica para fase posterior. */
+  private push(message: string): void {
+    this.logger.log(`[push] ${message}`);
   }
 }

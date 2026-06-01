@@ -111,7 +111,11 @@ export class PickingSessionService {
       where: { id: itemId },
       include: { orderItem: true, substitution: true },
     });
-    this.events.taskStatusChanged(task);
+    this.events.itemUpdated({
+      orderGroupId: task.orderGroupId,
+      pickItemId: itemId,
+      status: updated.status,
+    });
     return toPickItemDto(updated);
   }
 

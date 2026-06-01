@@ -89,8 +89,11 @@ export class SubstitutionService {
       },
     });
 
-    const order = await this.orderOf(itemId);
-    this.events.substitutionProposed({ id: sub.id, pickItemId: itemId, orderId: order.id });
+    this.events.substitutionProposed({
+      id: sub.id,
+      pickItemId: itemId,
+      orderGroupId: task.orderGroupId,
+    });
     return sub;
   }
 
@@ -119,13 +122,13 @@ export class SubstitutionService {
   /** Cliente aprova: item → substituted, recalcula totais. */
   async approve(userId: string, orderId: string, substitutionId: string) {
     await this.assertOrderOwner(userId, orderId);
-    return this.resolve(substitutionId, "approved", { orderId });
+    return this.resolve(substitutionId, "approved");
   }
 
   /** Cliente recusa: item → refused (removido), recalcula totais. */
   async reject(userId: string, orderId: string, substitutionId: string) {
     await this.assertOrderOwner(userId, orderId);
-    return this.resolve(substitutionId, "rejected", { orderId });
+    return this.resolve(substitutionId, "rejected");
   }
 
   /**
@@ -150,11 +153,7 @@ export class SubstitutionService {
     return expired.length;
   }
 
-  private async resolve(
-    substitutionId: string,
-    decision: "approved" | "rejected",
-    scope?: { orderId: string },
-  ) {
+  private async resolve(substitutionId: string, decision: "approved" | "rejected") {
     const sub = await this.prisma.substitution.findUnique({
       where: { id: substitutionId },
       include: { pickItem: true },
@@ -185,22 +184,13 @@ export class SubstitutionService {
 
     await this.session.recalcTotals(orderGroupId);
 
-    const order = await this.orderOf(sub.pickItemId);
     this.events.substitutionResolved({
       id: sub.id,
       pickItemId: sub.pickItemId,
-      orderId: scope?.orderId ?? order.id,
+      orderGroupId,
       approvalStatus: decision,
     });
     return this.prisma.substitution.findUniqueOrThrow({ where: { id: substitutionId } });
-  }
-
-  private async orderOf(pickItemId: string) {
-    const item = await this.prisma.pickItem.findUniqueOrThrow({
-      where: { id: pickItemId },
-      select: { pickTask: { select: { orderGroup: { select: { order: { select: { id: true } } } } } } },
-    });
-    return item.pickTask.orderGroup.order;
   }
 
   private async assertOrderOwner(userId: string, orderId: string) {
