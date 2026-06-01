@@ -14,6 +14,7 @@ import { Roles } from "../auth/decorators/roles.decorator";
 import type { AuthUser } from "../auth/auth.types";
 import { PickingSessionService } from "./picking-session.service";
 import { PickingService } from "./picking.service";
+import { SubstitutionService } from "./substitution.service";
 
 class UpdatePickItemDto {
   @IsIn(["pick", "refuse"]) action!: "pick" | "refuse";
@@ -22,12 +23,17 @@ class UpdatePickItemDto {
   @IsOptional() @IsString() @MinLength(1) refusalReason?: string;
 }
 
+class ProposeSubstitutionDto {
+  @IsString() @MinLength(1) substituteOfferId!: string;
+}
+
 @Roles("picker")
 @Controller("pick-tasks")
 export class PickingController {
   constructor(
     private readonly picking: PickingService,
     private readonly session: PickingSessionService,
+    private readonly substitution: SubstitutionService,
   ) {}
 
   /** Lojas em que o usuário atua como separador. */
@@ -80,5 +86,16 @@ export class PickingController {
   @Post(":id/complete-picking")
   completePicking(@CurrentUser() user: AuthUser, @Param("id") id: string) {
     return this.session.completePicking(user.id, id);
+  }
+
+  /** Propõe um substituto (Offer da mesma loja) para um item sem estoque (S3.4). */
+  @Post(":id/items/:itemId/substitute")
+  substitute(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @Param("itemId") itemId: string,
+    @Body() dto: ProposeSubstitutionDto,
+  ) {
+    return this.substitution.propose(user.id, id, itemId, dto.substituteOfferId);
   }
 }

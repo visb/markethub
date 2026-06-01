@@ -21,4 +21,17 @@ export class PickingEvents {
       `pick-task ${task.id} → ${task.status} (store=${task.storeId} picker=${task.pickerId ?? "-"})`,
     );
   }
+
+  substitutionProposed(sub: { id: string; pickItemId: string; orderId: string }): void {
+    this.logger.log(`substitution ${sub.id} proposed (item=${sub.pickItemId} order=${sub.orderId})`);
+  }
+
+  substitutionResolved(sub: {
+    id: string;
+    pickItemId: string;
+    orderId: string;
+    approvalStatus: "approved" | "rejected";
+  }): void {
+    this.logger.log(`substitution ${sub.id} → ${sub.approvalStatus} (item=${sub.pickItemId})`);
+  }
 }
