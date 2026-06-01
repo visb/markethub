@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { IsIn, IsNumber, IsOptional, IsString, Max, Min, MinLength } from "class-validator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
@@ -47,6 +47,20 @@ export class DriverController {
   @Post("location")
   location(@CurrentUser() user: AuthUser, @Body() dto: LocationDto) {
     return this.driver.heartbeat(user.id, dto.lat, dto.lng);
+  }
+
+  // ── Ganhos e histórico (S4.7) ──
+
+  /** Ganhos do dia: total, rotas finalizadas e aceitas. */
+  @Get("earnings")
+  earnings(@CurrentUser() user: AuthUser, @Query("date") date?: string) {
+    return this.driver.earnings(user.id, date);
+  }
+
+  /** Histórico de rotas (filtra por status, ex.: completed). */
+  @Get("routes")
+  routes(@CurrentUser() user: AuthUser, @Query("status") status?: string) {
+    return this.driver.listRoutes(user.id, status);
   }
 
   // ── Oferta de rota (S4.4) ──
