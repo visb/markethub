@@ -10,6 +10,7 @@ import { OfferService } from "./offer.service";
 import { GoogleRouteProvider } from "./providers/google.route-provider";
 import { HaversineRouteProvider } from "./providers/haversine.route-provider";
 import { ROUTE_PROVIDER } from "./route-provider.interface";
+import { RouteExecutionService } from "./route-execution.service";
 import { RoutingScheduler } from "./routing.scheduler";
 import { RoutingService } from "./routing.service";
 
@@ -21,6 +22,7 @@ import { RoutingService } from "./routing.service";
     RoutingService,
     RoutingScheduler,
     OfferService,
+    RouteExecutionService,
     DeliveryEvents,
     {
       provide: ROUTE_PROVIDER,

@@ -5,6 +5,7 @@ import { Roles } from "../auth/decorators/roles.decorator";
 import type { AuthUser } from "../auth/auth.types";
 import { DriverService } from "./driver.service";
 import { OfferService } from "./offer.service";
+import { RouteExecutionService } from "./route-execution.service";
 
 class SetStatusDto {
   @IsIn(["offline", "available"]) status!: "offline" | "available";
@@ -23,6 +24,7 @@ export class DriverController {
   constructor(
     private readonly driver: DriverService,
     private readonly offers: OfferService,
+    private readonly execution: RouteExecutionService,
   ) {}
 
   /** Perfil + status + rota ativa. */
@@ -61,5 +63,19 @@ export class DriverController {
   @Post("routes/:id/reject")
   reject(@CurrentUser() user: AuthUser, @Param("id") id: string) {
     return this.offers.reject(user.id, id);
+  }
+
+  // ── Execução: coleta (S4.5) ──
+
+  /** Chega na parada (coleta ou entrega). */
+  @Post("routes/:id/stops/:stopId/arrive")
+  arrive(@CurrentUser() user: AuthUser, @Param("id") id: string, @Param("stopId") stopId: string) {
+    return this.execution.arrive(user.id, id, stopId);
+  }
+
+  /** "Saí da coleta": fecha a parada de coleta (exige loja ter liberado). */
+  @Post("routes/:id/stops/:stopId/leave")
+  leave(@CurrentUser() user: AuthUser, @Param("id") id: string, @Param("stopId") stopId: string) {
+    return this.execution.leavePickup(user.id, id, stopId);
   }
 }
