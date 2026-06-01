@@ -29,6 +29,7 @@ model User {
   addresses    Address[]
   cart         Cart?
   orders       Order[]
+  pickTasks    PickTask[]   @relation("PickerTasks")
 
   @@map("users")
 }
@@ -354,6 +355,7 @@ enum OrderStatus {
   paid
   preparing
   picking
+  ready_for_pickup // separado e empacotado, aguardando coleta do entregador (S3.1)
   on_the_way
   delivered
   canceled
@@ -491,6 +493,7 @@ model OrderGroup {
   externalOrderId String?
   erpPushedAt     DateTime?
   items      OrderItem[]
+  pickTask   PickTask?
 
   @@index([orderId])
   @@index([storeId])
@@ -511,6 +514,7 @@ model OrderItem {
   quantity      Int      @default(1)
   weightGrams   Int?
   lineTotalCents Int
+  pickItem      PickItem?
 
   @@index([groupId])
   @@map("order_items")
@@ -535,4 +539,111 @@ model Payment {
 
   @@index([providerChargeId])
   @@map("payments")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Picking / Separação (Fase 3 — S3.1)
+// Uma PickTask por OrderGroup (sub-pedido de uma loja). O separador (picker)
+// resolve item a item, empacota em caixas e libera p/ coleta do entregador.
+// ─────────────────────────────────────────────────────────────
+
+enum PickTaskStatus {
+  queued // gerada, aguardando separador assumir
+  assigned // separador assumiu
+  picking // separação em andamento
+  packed // itens empacotados em caixas
+  ready_for_pickup // pronta p/ coleta do entregador
+}
+
+enum PickItemStatus {
+  pending // ainda não resolvido ("a selecionar")
+  picked // separado ("selecionado")
+  refused // sem estoque/avariado, removido ("reembolsado")
+  substituted // substituído por outro produto
+}
+
+enum SubstitutionStatus {
+  pending // aguardando aprovação do cliente
+  approved
+  rejected
+}
+
+model PickTask {
+  id           String         @id @default(cuid())
+  orderGroup   OrderGroup     @relation(fields: [orderGroupId], references: [id], onDelete: Cascade)
+  orderGroupId String         @unique
+  storeId      String // denormalizado p/ fila/índice por loja (== orderGroup.storeId)
+  picker       User?          @relation("PickerTasks", fields: [pickerId], references: [id])
+  pickerId     String?
+  status       PickTaskStatus @default(queued)
+  assignedAt   DateTime?
+  startedAt    DateTime?
+  packedAt     DateTime?
+  readyAt      DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  items        PickItem[]
+  boxes        Box[]
+
+  @@index([storeId, status])
+  @@index([pickerId])
+  @@map("pick_tasks")
+}
+
+model PickItem {
+  id                String         @id @default(cuid())
+  pickTask          PickTask       @relation(fields: [pickTaskId], references: [id], onDelete: Cascade)
+  pickTaskId        String
+  orderItem         OrderItem      @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  orderItemId       String         @unique
+  status            PickItemStatus @default(pending)
+  quantityPicked    Int? // saleType=unit: unidades efetivamente separadas
+  weightGramsPicked Int? // saleType=weight: gramas efetivamente separadas
+  refusalReason     String? // motivo quando refused
+  box               Box?           @relation(fields: [boxId], references: [id])
+  boxId             String?
+  pickedById        String? // auditoria: quem resolveu
+  pickedAt          DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  substitution      Substitution?
+
+  @@index([pickTaskId])
+  @@index([boxId])
+  @@map("pick_items")
+}
+
+// Proposta de substituto para um item sem estoque. Snapshot de preço (não referência
+// viva à Offer) p/ congelar o valor mostrado/aprovado pelo cliente.
+model Substitution {
+  id                  String             @id @default(cuid())
+  pickItem            PickItem           @relation(fields: [pickItemId], references: [id], onDelete: Cascade)
+  pickItemId          String             @unique
+  substituteOfferId   String? // Offer proposta (referência fraca; sem FK p/ preservar histórico)
+  substituteProductId String?
+  nameSnapshot        String // nome do substituto no momento da proposta
+  unitPriceCents      Int // preço do substituto no momento
+  priceDiffCents      Int // substituto - original (pode ser negativo)
+  approvalStatus      SubstitutionStatus @default(pending)
+  resolvedAt          DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@map("substitutions")
+}
+
+// Caixa física do pedido. serial + QR p/ conferência na entrega; passcode (senha)
+// exibido ao cliente como alternativa ao scan (ref: Receive.jpg).
+model Box {
+  id         String     @id @default(cuid())
+  pickTask   PickTask   @relation(fields: [pickTaskId], references: [id], onDelete: Cascade)
+  pickTaskId String
+  serial     String     @unique
+  passcode   String // senha numérica exibida ao cliente
+  sealedAt   DateTime?
+  createdAt  DateTime   @default(now())
+  items      PickItem[]
+
+  @@index([pickTaskId])
+  @@map("boxes")
 }

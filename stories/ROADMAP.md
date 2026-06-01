@@ -29,7 +29,7 @@ briefing/    screenshots de referência
 | 0 | Fundação | `phase-0-foundation/` |
 | 1 | Catálogo + ERP + Enriquecimento | `phase-1-catalog-erp-enrichment/` |
 | 2 | Marketplace (cliente) | `phase-2-marketplace-customer/` |
-| 3 | Picking (separador) | _detalhar ao iniciar_ |
+| 3 | Picking (separador) + gestão merchant | `phase-3-picking/` |
 | 4 | Delivery (entregador) | _detalhar ao iniciar_ |
 | 5 | Rastreio, avaliações, admin, polish | _detalhar ao iniciar_ |
 
@@ -65,11 +65,18 @@ Ordem de construção: **Base → catálogo/ERP/enriquecimento → cliente → p
 - S2.8 App cliente: vitrine, busca e carrinho
 - S2.9 App cliente: checkout, PIX e pedidos
 
-### Fase 3 — Picking (separador) _(epics, detalhar ao iniciar)_
-- Atribuição de pedido ao separador
-- Fluxo de separação item a item: selecionado / recusado / substituído (ref: `Picking.jpg`)
-- Empacotamento em caixas com QR/serial (ref: `Receive.jpg`)
-- Handoff para entregador
+### Fase 3 — Picking (separador)
+- S3.1 Modelo de domínio de picking
+- S3.2 Atribuição de tarefa ao separador
+- S3.3 Sessão de separação item a item — selecionado / recusado / substituído (ref: `Picking.jpg`)
+- S3.4 Substituição de item e ruptura de estoque
+- S3.5 Empacotamento em caixas com QR/serial (ref: `Receive.jpg`)
+- S3.6 Handoff para entregador
+- S3.7 App separador (picker)
+- S3.8 Eventos e tempo real da separação
+- S3.9 Gestão de ofertas e estoque pelo merchant (API)
+- S3.10 Cadastro de produto canônico pelo merchant (API)
+- S3.11 Admin SPA: área do merchant (manager)
 
 ### Fase 4 — Delivery (entregador) _(epics, detalhar ao iniciar)_
 - Disponibilidade / toggle de status (ref: `delivery/Home*.jpg`)
