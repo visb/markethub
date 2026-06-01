@@ -30,6 +30,8 @@ model User {
   cart         Cart?
   orders       Order[]
   pickTasks    PickTask[]   @relation("PickerTasks")
+  driverProfile  DriverProfile?
+  deliveryRoutes DeliveryRoute[]
 
   @@map("users")
 }
@@ -154,6 +156,7 @@ model Store {
   stocks     Stock[]
   staff      StoreStaff[]
   orderGroups OrderGroup[]
+  pickupStops RouteStop[] @relation("StopPickupStore")
 
   @@unique([merchantId, externalId])
   @@index([merchantId])
@@ -481,6 +484,7 @@ model Order {
   groups    OrderGroup[]
   payment   Payment?
   refund    Refund?
+  dropoffStops RouteStop[] @relation("StopDropoffOrder")
 
   @@index([userId, createdAt])
   @@index([status])
@@ -508,9 +512,13 @@ model OrderGroup {
   items      OrderItem[]
   pickTask   PickTask?
   refundComponents RefundComponent[]
+  // parada de coleta da rota de entrega (S4.1): grupos de uma loja na mesma parada
+  pickupStop   RouteStop? @relation("StopPickupGroups", fields: [pickupStopId], references: [id])
+  pickupStopId String?
 
   @@index([orderId])
   @@index([storeId])
+  @@index([pickupStopId])
   @@map("order_groups")
 }
 
@@ -684,5 +692,102 @@ model Substitution {
   updatedAt           DateTime           @updatedAt
 
   @@map("substitutions")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Delivery / Entrega (Fase 4 — S4.1)
+// Perfil do entregador, rotas multi-stop (coleta + entrega) e suas paradas.
+// Coleta liberada por pickupCode (OrderGroup); entrega confirmada por
+// deliveryCode (Order) — sem caixa/QR (SF.1).
+// ─────────────────────────────────────────────────────────────
+
+enum DriverStatus {
+  offline // indisponível
+  available // disponível p/ ofertas
+  on_route // em rota ativa
+}
+
+enum DeliveryRouteStatus {
+  offered // ofertada a um entregador, aguardando aceite
+  accepted // aceita, ainda não iniciada
+  in_progress // em execução (coletando/entregando)
+  completed // concluída
+  canceled // cancelada
+  expired // oferta expirou sem aceite
+}
+
+enum RouteStopType {
+  pickup // coleta na loja
+  dropoff // entrega ao cliente
+}
+
+enum RouteStopStatus {
+  pending // ainda não chegou
+  arrived // entregador chegou
+  done // parada concluída
+}
+
+// Perfil 1:1 do entregador (User com role driver). Disponibilidade + última posição.
+model DriverProfile {
+  id          String       @id @default(cuid())
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String       @unique
+  vehicleType String       @default("moto")
+  status      DriverStatus @default(offline)
+  currentLat  Float?
+  currentLng  Float?
+  lastSeenAt  DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([status])
+  @@map("driver_profiles")
+}
+
+// Rota multi-stop ofertada/atribuída a um entregador. Ganho/distância snapshotados
+// na criação (não recalcular após o aceite).
+model DeliveryRoute {
+  id                    String              @id @default(cuid())
+  driver                User?               @relation(fields: [driverId], references: [id])
+  driverId              String?
+  status                DeliveryRouteStatus @default(offered)
+  estimatedEarningsCents Int                @default(0)
+  distanceMeters        Int                 @default(0)
+  // entregadores que recusaram esta rota (não reofertar) — lista de userIds
+  rejectedBy            String[]            @default([])
+  offeredAt             DateTime?
+  acceptedAt            DateTime?
+  completedAt           DateTime?
+  offerExpiresAt        DateTime?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  stops                 RouteStop[]
+
+  @@index([driverId, status])
+  @@index([status])
+  @@map("delivery_routes")
+}
+
+// Parada da rota. pickup → Store (1+ OrderGroup prontas); dropoff → Order.
+model RouteStop {
+  id        String          @id @default(cuid())
+  route     DeliveryRoute   @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  routeId   String
+  sequence  Int
+  type      RouteStopType
+  status    RouteStopStatus @default(pending)
+  // pickup
+  store     Store?          @relation("StopPickupStore", fields: [storeId], references: [id])
+  storeId   String?
+  groups    OrderGroup[]    @relation("StopPickupGroups")
+  // dropoff
+  order     Order?          @relation("StopDropoffOrder", fields: [orderId], references: [id])
+  orderId   String?
+  arrivedAt DateTime?
+  doneAt    DateTime?
+  createdAt DateTime        @default(now())
+
+  @@index([routeId])
+  @@map("route_stops")
 }
 
