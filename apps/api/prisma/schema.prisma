@@ -240,6 +240,9 @@ model Offer {
   priceCents   Int
   promoPriceCents Int?
   available    Boolean  @default(true)
+  // Campos editados manualmente pelo manager (S3.9) que o sync ERP NÃO sobrescreve.
+  lockedFields String[] @default([])
+  updatedById  String? // auditoria: último editor manual (User)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   cartItems    CartItem[]
@@ -259,6 +262,9 @@ model Stock {
   productId String
   quantity  Int?
   available Boolean  @default(true)
+  // Campos editados manualmente pelo manager (S3.9) que o sync ERP NÃO sobrescreve.
+  lockedFields String[] @default([])
+  updatedById  String? // auditoria: último editor manual (User)
   updatedAt DateTime @updatedAt
 
   @@unique([storeId, productId])

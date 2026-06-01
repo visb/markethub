@@ -7,6 +7,19 @@ import { ConnectorRegistry } from "./connector-registry";
 import type { ErpConnector } from "./connector.interface";
 import type { ConnectorContext, RawProduct, SyncCounters } from "./erp.types";
 
+/** Remove de um patch de update os campos travados manualmente (S3.9). */
+export function stripLocked<T extends Record<string, unknown>>(
+  data: T,
+  lockedFields: string[],
+): Partial<T> {
+  if (lockedFields.length === 0) return data;
+  const out: Partial<T> = {};
+  for (const key of Object.keys(data) as (keyof T)[]) {
+    if (!lockedFields.includes(key as string)) out[key] = data[key];
+  }
+  return out;
+}
+
 @Injectable()
 export class ErpService {
   private readonly logger = new Logger(ErpService.name);
@@ -80,16 +93,27 @@ export class ErpService {
         const prices = await connector.fetchPrices({ ...ctx, since });
         for (const p of prices) {
           counters.processed++;
-          const updated = await this.prisma.offer.updateMany({
-            where: { storeId: ctx.store.id, externalId: p.externalId },
-            data: {
+          const offer = await this.prisma.offer.findUnique({
+            where: { storeId_externalId: { storeId: ctx.store.id, externalId: p.externalId } },
+            select: { id: true, lockedFields: true },
+          });
+          if (!offer) {
+            counters.failed++;
+            continue;
+          }
+          // não sobrescreve campos travados manualmente pelo manager (S3.9)
+          const data = stripLocked(
+            {
               priceCents: p.priceCents,
               promoPriceCents: p.promoPriceCents ?? null,
               available: p.available ?? true,
             },
-          });
-          if (updated.count > 0) counters.updated++;
-          else counters.failed++;
+            offer.lockedFields,
+          );
+          if (Object.keys(data).length > 0) {
+            await this.prisma.offer.update({ where: { id: offer.id }, data });
+          }
+          counters.updated++;
         }
       },
       since,
@@ -112,9 +136,17 @@ export class ErpService {
             counters.failed++;
             continue;
           }
+          const existing = await this.prisma.stock.findUnique({
+            where: { storeId_productId: { storeId: ctx.store.id, productId: offer.productId } },
+            select: { lockedFields: true },
+          });
+          const update = stripLocked(
+            { quantity: s.quantity ?? null, available: s.available },
+            existing?.lockedFields ?? [],
+          );
           await this.prisma.stock.upsert({
             where: { storeId_productId: { storeId: ctx.store.id, productId: offer.productId } },
-            update: { quantity: s.quantity ?? null, available: s.available },
+            update,
             create: {
               storeId: ctx.store.id,
               productId: offer.productId,
@@ -198,14 +230,22 @@ export class ErpService {
 
     const productId = await this.resolveCanonicalProduct(storeId, raw, gtin, categoryId);
 
+    // não sobrescreve campos travados manualmente pelo manager (S3.9)
+    const existingOffer = await this.prisma.offer.findUnique({
+      where: { storeId_externalId: { storeId, externalId: raw.externalId } },
+      select: { lockedFields: true },
+    });
     await this.prisma.offer.upsert({
       where: { storeId_externalId: { storeId, externalId: raw.externalId } },
-      update: {
-        productId,
-        priceCents: raw.priceCents,
-        promoPriceCents: raw.promoPriceCents ?? null,
-        available: raw.available ?? true,
-      },
+      update: stripLocked(
+        {
+          productId,
+          priceCents: raw.priceCents,
+          promoPriceCents: raw.promoPriceCents ?? null,
+          available: raw.available ?? true,
+        },
+        existingOffer?.lockedFields ?? [],
+      ),
       create: {
         storeId,
         productId,
@@ -216,9 +256,16 @@ export class ErpService {
       },
     });
 
+    const existingStock = await this.prisma.stock.findUnique({
+      where: { storeId_productId: { storeId, productId } },
+      select: { lockedFields: true },
+    });
     await this.prisma.stock.upsert({
       where: { storeId_productId: { storeId, productId } },
-      update: { quantity: raw.stockQuantity ?? null, available: raw.available ?? true },
+      update: stripLocked(
+        { quantity: raw.stockQuantity ?? null, available: raw.available ?? true },
+        existingStock?.lockedFields ?? [],
+      ),
       create: {
         storeId,
         productId,
