@@ -30,8 +30,9 @@ briefing/    screenshots de referência
 | 1 | Catálogo + ERP + Enriquecimento | `phase-1-catalog-erp-enrichment/` |
 | 2 | Marketplace (cliente) | `phase-2-marketplace-customer/` |
 | 3 | Picking (separador) + gestão merchant | `phase-3-picking/` |
-| 4 | Delivery (entregador) | _detalhar ao iniciar_ |
-| 5 | Rastreio, avaliações, admin, polish | _detalhar ao iniciar_ |
+| fix | Correções de domínio (pré-fase-4) | `phase-fix-corrections/` |
+| 4 | Delivery (entregador) | `phase-4-delivery/` |
+| 5 | Rastreio, avaliações, admin, polish | `phase-5-tracking-reviews-admin/` |
 
 Ordem de construção: **Base → catálogo/ERP/enriquecimento → cliente → picking → delivery → polish**.
 
@@ -88,12 +89,18 @@ Ordem de construção: **Base → catálogo/ERP/enriquecimento → cliente → p
 - S4.7 Ganhos do dia / rotas finalizadas (ref: `Home.jpg`)
 - S4.8 App entregador (driver)
 
-### Fase 5 — Rastreio, avaliações, admin, polish _(epics, detalhar ao iniciar)_
-- Rastreio em tempo real do pedido (cliente) — confirmado/comprando/a caminho
-- Avaliações multi-eixo (plataforma, entrega, merchant) + gorjeta (ref: `Order Completed.jpg`)
-- Agendamento de entrega
-- Dashboard admin (pedidos, operações, financeiro)
-- Enriquecimento avançado + métricas de qualidade de catálogo
+### Fase fix — Correções de domínio (pré-fase-4) _(done)_
+- SF.1 Remover caixa lacrada; coleta/entrega por código (`pickupCode`/`deliveryCode`)
+- SF.2 Remover ícones (emoji) de categoria
+- SF.3 Reembolso único por pedido na falta de peso / itens recusados
+
+### Fase 5 — Rastreio, avaliações, admin, polish
+- S5.1 Rastreio em tempo real do pedido (cliente) — confirmado/comprando/a caminho + posição do entregador
+- S5.2 Avaliações multi-eixo (plataforma, entrega, merchant) + gorjeta (ref: `Order Completed.jpg`)
+- S5.3 Agendamento de entrega com capacidade (slots)
+- S5.4 Dashboard admin (pedidos, operações, financeiro)
+- S5.5 Enriquecimento avançado + métricas de qualidade de catálogo
+- S5.6 Notificações push (FCM/APNs)
 
 ## Convenção de status
 
