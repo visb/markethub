@@ -11,9 +11,25 @@
       "resizeMode": "contain",
       "backgroundColor": "#00A859"
     },
-    "ios": { "supportsTablet": true, "bundleIdentifier": "com.markethub.driver" },
-    "android": { "package": "com.markethub.driver" },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.markethub.driver",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Usamos sua localização para oferecer rotas próximas e rastrear a entrega."
+      }
+    },
+    "android": {
+      "package": "com.markethub.driver",
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
+    },
     "web": { "bundler": "metro", "output": "single" },
-    "plugins": ["expo-router", "expo-secure-store"]
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-location",
+        { "locationWhenInUsePermission": "Usamos sua localização para oferecer rotas próximas e rastrear a entrega." }
+      ]
+    ]
   }
 }

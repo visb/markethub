@@ -2,6 +2,9 @@ import type {
   ApiError,
   AuthTokens,
   AuthUser,
+  DeliveryRouteDTO,
+  DriverEarningsDTO,
+  DriverProfileDTO,
   LoginInput,
   PickTaskDTO,
   RefreshInput,
@@ -20,6 +23,17 @@ export interface PickItemActionInput {
   quantityPicked?: number;
   weightGramsPicked?: number;
   refusalReason?: string;
+}
+
+export interface DeliveryRouteSummary {
+  id: string;
+  status: string;
+  estimatedEarningsCents: number;
+  distanceMeters: number;
+  stopCount: number;
+  completedAt?: string;
+  acceptedAt?: string;
+  createdAt: string;
 }
 
 export interface MerchantOffer {
@@ -234,6 +248,59 @@ export class ApiClient {
 
   merchantUpdateProduct(id: string, input: Record<string, unknown>): Promise<unknown> {
     return this.request(`/merchant/products/${id}`, { method: "PATCH", body: input, auth: true });
+  }
+
+  // ─── Entregador / driver (S4.2–S4.8) ─────────────────
+  driverMe(): Promise<{ profile: DriverProfileDTO; activeRoute: DeliveryRouteDTO | null }> {
+    return this.request("/driver/me", { auth: true });
+  }
+
+  driverSetStatus(status: "offline" | "available", lat?: number, lng?: number): Promise<DriverProfileDTO> {
+    return this.request("/driver/status", { method: "PATCH", body: { status, lat, lng }, auth: true });
+  }
+
+  driverLocation(lat: number, lng: number): Promise<DriverProfileDTO> {
+    return this.request("/driver/location", { method: "POST", body: { lat, lng }, auth: true });
+  }
+
+  driverOffer(): Promise<DeliveryRouteDTO | null> {
+    return this.request("/driver/routes/offer", { auth: true });
+  }
+
+  driverAcceptRoute(id: string): Promise<DeliveryRouteDTO> {
+    return this.request(`/driver/routes/${id}/accept`, { method: "POST", auth: true });
+  }
+
+  driverRejectRoute(id: string): Promise<{ rejected: boolean }> {
+    return this.request(`/driver/routes/${id}/reject`, { method: "POST", auth: true });
+  }
+
+  driverArrive(routeId: string, stopId: string): Promise<DeliveryRouteDTO> {
+    return this.request(`/driver/routes/${routeId}/stops/${stopId}/arrive`, { method: "POST", auth: true });
+  }
+
+  driverLeavePickup(routeId: string, stopId: string): Promise<DeliveryRouteDTO> {
+    return this.request(`/driver/routes/${routeId}/stops/${stopId}/leave`, { method: "POST", auth: true });
+  }
+
+  driverConfirmDelivery(routeId: string, stopId: string, deliveryCode: string): Promise<DeliveryRouteDTO> {
+    return this.request(`/driver/routes/${routeId}/stops/${stopId}/confirm`, {
+      method: "POST",
+      body: { deliveryCode },
+      auth: true,
+    });
+  }
+
+  driverCompleteDelivery(routeId: string, stopId: string): Promise<DeliveryRouteDTO> {
+    return this.request(`/driver/routes/${routeId}/stops/${stopId}/complete`, { method: "POST", auth: true });
+  }
+
+  driverEarnings(date?: string): Promise<DriverEarningsDTO> {
+    return this.request(`/driver/earnings${date ? `?date=${encodeURIComponent(date)}` : ""}`, { auth: true });
+  }
+
+  driverRoutes(status?: string): Promise<DeliveryRouteSummary[]> {
+    return this.request(`/driver/routes${status ? `?status=${encodeURIComponent(status)}` : ""}`, { auth: true });
   }
 
   // ─── Core request com refresh automático ─────────────
