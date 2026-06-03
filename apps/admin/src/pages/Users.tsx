@@ -154,7 +154,7 @@ function StaffForm({ stores, onCreated }: { stores: Store[]; onCreated: () => vo
     email: "",
     name: "",
     password: "",
-    staffRole: "picker" as "picker" | "manager",
+    staffRole: "picker" as "picker" | "manager" | "driver",
     storeId: "",
   });
   const [msg, setMsg] = useState<string | null>(null);
@@ -177,7 +177,7 @@ function StaffForm({ stores, onCreated }: { stores: Store[]; onCreated: () => vo
 
   return (
     <section className="card" style={{ marginBottom: 16 }}>
-      <h2>Novo funcionário (merchant ou separador)</h2>
+      <h2>Novo funcionário (gerente, separador ou entregador)</h2>
       <div className="form-grid">
         <input
           className="input"
@@ -201,10 +201,13 @@ function StaffForm({ stores, onCreated }: { stores: Store[]; onCreated: () => vo
         <select
           className="input"
           value={form.staffRole}
-          onChange={(e) => setForm({ ...form, staffRole: e.target.value as "picker" | "manager" })}
+          onChange={(e) =>
+            setForm({ ...form, staffRole: e.target.value as "picker" | "manager" | "driver" })
+          }
         >
           <option value="picker">Separador (picking)</option>
           <option value="manager">Gerente (merchant)</option>
+          <option value="driver">Entregador (entrega própria)</option>
         </select>
         <select
           className="input"

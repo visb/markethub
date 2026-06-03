@@ -4,6 +4,10 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Layout } from "@/components/Layout";
 import { Login } from "@/pages/Login";
 import { Dashboard } from "@/pages/Dashboard";
+import { Orders } from "@/pages/Orders";
+import { Operations } from "@/pages/Operations";
+import { Finance } from "@/pages/Finance";
+import { CatalogQuality } from "@/pages/CatalogQuality";
 import { Catalog } from "@/pages/Catalog";
 import { ProductDetail } from "@/pages/ProductDetail";
 import { ErpRuns } from "@/pages/ErpRuns";
@@ -12,15 +16,6 @@ import { MarketplaceCategories } from "@/pages/MarketplaceCategories";
 import { Offers } from "@/pages/merchant/Offers";
 import { Stock } from "@/pages/merchant/Stock";
 import { Products } from "@/pages/merchant/Products";
-
-function Placeholder({ title }: { title: string }) {
-  return (
-    <div>
-      <h1>{title}</h1>
-      <p className="muted">Em breve.</p>
-    </div>
-  );
-}
 
 /** Tela inicial conforme papel: admin vê o dashboard; manager vai p/ ofertas. */
 function RoleHome() {
@@ -53,9 +48,12 @@ export function App() {
               <Route element={<AdminOnly />}>
                 <Route path="catalog" element={<Catalog />} />
                 <Route path="catalog/:id" element={<ProductDetail />} />
+                <Route path="catalog-quality" element={<CatalogQuality />} />
                 <Route path="categories" element={<MarketplaceCategories />} />
                 <Route path="users" element={<Users />} />
-                <Route path="orders" element={<Placeholder title="Pedidos" />} />
+                <Route path="orders" element={<Orders />} />
+                <Route path="operations" element={<Operations />} />
+                <Route path="finance" element={<Finance />} />
                 <Route path="erp" element={<ErpRuns />} />
               </Route>
             </Route>

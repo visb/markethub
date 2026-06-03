@@ -1,16 +1,25 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "@/auth/auth-context";
 
-const ADMIN_NAV = [
+interface NavItem {
+  to: string;
+  label: string;
+  end?: boolean;
+}
+
+const ADMIN_NAV: NavItem[] = [
   { to: "/", label: "Visão geral", end: true },
+  { to: "/orders", label: "Pedidos" },
+  { to: "/operations", label: "Operação" },
+  { to: "/finance", label: "Financeiro" },
   { to: "/catalog", label: "Catálogo" },
+  { to: "/catalog-quality", label: "Qualidade" },
   { to: "/categories", label: "Categorias" },
   { to: "/users", label: "Usuários" },
-  { to: "/orders", label: "Pedidos" },
   { to: "/erp", label: "Integração ERP" },
 ];
 
-const MERCHANT_NAV = [
+const MERCHANT_NAV: NavItem[] = [
   { to: "/merchant/offers", label: "Ofertas" },
   { to: "/merchant/stock", label: "Estoque" },
   { to: "/merchant/products", label: "Produtos" },
