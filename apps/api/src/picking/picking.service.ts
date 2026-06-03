@@ -58,10 +58,7 @@ export class PickingService {
         storeId,
         OR: [{ status: "queued" }, { pickerId: userId }],
       },
-      include: {
-        ...PICK_TASK_INCLUDE,
-        orderGroup: { select: { order: { select: { scheduledFrom: true } } } },
-      },
+      include: PICK_TASK_INCLUDE,
     });
 
     // FIFO por tempo efetivo: agendados respeitam a janela (scheduledFrom),

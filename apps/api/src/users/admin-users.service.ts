@@ -7,7 +7,7 @@ export interface CreateStaffInput {
   email: string;
   name: string;
   password: string;
-  staffRole: StaffRole; // manager | picker
+  staffRole: StaffRole; // manager | picker | driver
   storeId: string;
 }
 
@@ -15,6 +15,7 @@ export interface CreateStaffInput {
 const STAFF_TO_ROLE: Record<StaffRole, RoleName> = {
   manager: "merchant",
   picker: "picker",
+  driver: "driver",
 };
 
 @Injectable()

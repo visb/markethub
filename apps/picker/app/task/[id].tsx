@@ -162,30 +162,51 @@ export default function TaskScreen() {
         />
       )}
 
-      {/* Liberação de coleta: o entregador apresenta o código; a loja digita aqui (SF.1) */}
-      {task.status === "ready_for_pickup" && (
+      {/* Pronto — entrega própria: informe o código de coleta ao entregador da loja */}
+      {task.status === "ready_for_pickup" && task.fulfillment === "delivery" && (
         <View style={{ marginTop: spacing.lg }}>
           <Text variant="title" style={{ marginBottom: spacing.sm }}>
-            Liberar coleta
+            Coleta pelo entregador
           </Text>
           <Text muted variant="caption" style={{ marginBottom: spacing.sm }}>
-            Peça o código de coleta ao entregador e digite-o para liberar o pedido.
+            Entregue o pedido ao entregador e informe o código de coleta abaixo. Ele confirma a
+            coleta no app dele. (A atribuição do entregador é feita na tela de Entregas.)
+          </Text>
+          <View style={styles.codeBox}>
+            <Text muted variant="caption">
+              Código de coleta
+            </Text>
+            <Text variant="h1" style={{ color: colors.primary, letterSpacing: 6 }}>
+              {task.pickupCode ?? "----"}
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* Pronto — retirada na loja: o cliente apresenta o código; a loja confirma a entrega */}
+      {task.status === "ready_for_pickup" && task.fulfillment === "pickup" && (
+        <View style={{ marginTop: spacing.lg }}>
+          <Text variant="title" style={{ marginBottom: spacing.sm }}>
+            Confirmar retirada
+          </Text>
+          <Text muted variant="caption" style={{ marginBottom: spacing.sm }}>
+            Peça o código de retirada ao cliente e digite-o para concluir a entrega.
           </Text>
           <TextInput
             value={pickupCode}
             onChangeText={setPickupCode}
-            placeholder="Código de coleta"
+            placeholder="Código de retirada"
             placeholderTextColor={colors.textMuted}
-            keyboardType="number-pad"
+            autoCapitalize="characters"
             style={styles.codeInput}
           />
           <Button
-            title="Liberar para o entregador"
+            title="Confirmar retirada"
             disabled={busy || pickupCode.trim().length === 0}
             onPress={() =>
               void run(async () => {
-                await client.pickReleasePickup(id, pickupCode.trim());
-                Alert.alert("Liberado", "Pedido liberado para o entregador.");
+                await client.storeHandover(task.orderGroupId, pickupCode.trim());
+                Alert.alert("Retirada concluída", "Pedido entregue ao cliente.");
                 router.back();
               })
             }
@@ -233,6 +254,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   actionDanger: { borderColor: colors.danger },
+  codeBox: { alignItems: "center", paddingVertical: spacing.sm },
   codeInput: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,

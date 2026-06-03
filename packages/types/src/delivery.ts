@@ -1,71 +1,44 @@
-// Delivery / Entrega — Fase 4 (S4.1)
+// Delivery / Entrega própria pela loja (MVP)
 
-export type DriverStatusDTO = 'offline' | 'available' | 'on_route';
+/** Modalidade de cumprimento por loja (OrderGroup). */
+export type FulfillmentTypeDTO = "delivery" | "pickup";
 
-export type DeliveryRouteStatusDTO =
-  | 'offered'
-  | 'accepted'
-  | 'in_progress'
-  | 'completed'
-  | 'canceled'
-  | 'expired';
+export type DeliveryStatusDTO =
+  | "unassigned"
+  | "assigned"
+  | "picked_up"
+  | "delivered"
+  | "canceled";
 
-export type RouteStopTypeDTO = 'pickup' | 'dropoff';
-
-export type RouteStopStatusDTO = 'pending' | 'arrived' | 'done';
-
-export interface DriverProfileDTO {
+/** Entrega de uma OrderGroup feita por um entregador da própria loja. */
+export interface DeliveryDTO {
   id: string;
-  vehicleType: string;
-  status: DriverStatusDTO;
-  currentLat?: number;
-  currentLng?: number;
-  lastSeenAt?: string;
-}
-
-export interface RouteStopGroupDTO {
   orderGroupId: string;
   orderId: string;
-  /** Código de coleta a apresentar na loja (visível ao entregador). */
-  pickupCode?: string;
-  itemCount: number;
-}
-
-export interface RouteStopDTO {
-  id: string;
-  sequence: number;
-  type: RouteStopTypeDTO;
-  status: RouteStopStatusDTO;
-  // pickup
-  storeId?: string;
-  storeName?: string;
-  lat?: number;
-  lng?: number;
+  status: DeliveryStatusDTO;
+  storeId: string;
+  storeName: string;
+  customerName: string;
+  /** Endereço formatado do cliente (snapshot do pedido). */
   address?: string;
-  groups?: RouteStopGroupDTO[];
-  // dropoff
-  orderId?: string;
-  customerName?: string;
-  arrivedAt?: string;
-  doneAt?: string;
+  itemCount: number;
+  driverId?: string;
+  driverName?: string;
+  /** Código de coleta a apresentar/validar na loja (visível ao entregador). */
+  pickupCode?: string;
+  /** Código que o cliente informa na entrega (visível ao entregador). */
+  deliveryCode?: string;
+  assignedAt?: string;
+  pickedUpAt?: string;
+  deliveredAt?: string;
+  createdAt?: string;
 }
 
-export interface DeliveryRouteDTO {
+/** Entregador vinculado a uma loja (StoreStaff role driver), p/ atribuição. */
+export interface StoreDriverDTO {
+  /** userId do entregador. */
   id: string;
-  status: DeliveryRouteStatusDTO;
-  estimatedEarningsCents: number;
-  distanceMeters: number;
-  offerExpiresAt?: string;
-  offeredAt?: string;
-  acceptedAt?: string;
-  completedAt?: string;
-  stops: RouteStopDTO[];
-}
-
-export interface DriverEarningsDTO {
-  /** Janela do dia (ISO local). */
-  date: string;
-  totalCents: number;
-  routesCompleted: number;
-  routesAccepted: number;
+  name: string;
+  /** Entregas em aberto atribuídas a ele (carga atual). */
+  activeDeliveries: number;
 }

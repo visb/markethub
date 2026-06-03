@@ -24,9 +24,16 @@ export class CartService {
     });
   }
 
-  async getCart(userId: string, opts: { doorSurchargeCents?: number } = {}) {
+  async getCart(
+    userId: string,
+    opts: { doorSurchargeCents?: number; fulfillment?: "delivery" | "pickup" } = {},
+  ) {
     const cart = await this.ensureCart(userId);
-    return this.buildView(cart.id, cart.couponCode, opts.doorSurchargeCents ?? 0);
+    const pickup = opts.fulfillment === "pickup";
+    // retirada na loja: sem frete nem surcharge de porta
+    return this.buildView(cart.id, cart.couponCode, pickup ? 0 : (opts.doorSurchargeCents ?? 0), {
+      pickup,
+    });
   }
 
   async addItem(userId: string, input: AddItemInput) {
@@ -103,7 +110,12 @@ export class CartService {
   }
 
   // ─── montagem da visão + totais ───
-  async buildView(cartId: string, couponCode: string | null, doorSurchargeCents: number) {
+  async buildView(
+    cartId: string,
+    couponCode: string | null,
+    doorSurchargeCents: number,
+    opts: { pickup?: boolean } = {},
+  ) {
     const items = await this.prisma.cartItem.findMany({
       where: { cartId },
       include: {
@@ -139,7 +151,8 @@ export class CartService {
       const merchant = its[0]!.offer.store.merchant;
       calcGroups.push({
         merchantId: mid,
-        deliveryFeeCents: merchant.deliveryFeeCents,
+        // retirada na loja não cobra frete
+        deliveryFeeCents: opts.pickup ? 0 : merchant.deliveryFeeCents,
         prepFeeCents: merchant.prepFeeCents,
         platformFeeBps: merchant.platformFeeBps,
         items: its.map((it) => ({

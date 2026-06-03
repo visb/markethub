@@ -9,7 +9,6 @@ import { marketplace, type Address } from "@/api/marketplace";
 import { Header } from "@/components/Header";
 
 type Mode = "deliver" | "pickup";
-const DISTANCES = [5, 10, 13, 15, 20, 25];
 
 export default function DeliveryConfig() {
   const { api } = useAuth();
@@ -18,7 +17,6 @@ export default function DeliveryConfig() {
   const [mode, setMode] = useState<Mode>("deliver");
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
-  const [radius_, setRadius] = useState(13);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ label: "Casa", street: "", number: "", city: "", state: "", zipCode: "" });
 
@@ -100,24 +98,10 @@ export default function DeliveryConfig() {
           </View>
         )}
 
-        {/* Distância */}
-        {mode === "deliver" && (
-          <View style={{ gap: spacing.sm }}>
-            <Text variant="caption" muted>
-              Mercados nesta área
-            </Text>
-            <View style={styles.chips}>
-              {DISTANCES.map((d) => (
-                <Pressable
-                  key={d}
-                  style={[styles.chip, radius_ === d && styles.chipOn]}
-                  onPress={() => setRadius(d)}
-                >
-                  <Text style={radius_ === d ? styles.chipOnText : undefined}>{d}km</Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
+        {mode === "pickup" && (
+          <Text variant="caption" muted>
+            Você retira o pedido na loja, sem taxa de entrega.
+          </Text>
         )}
       </ScrollView>
 
@@ -161,15 +145,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     color: colors.text,
   },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.full,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  chipOn: { borderColor: colors.primary, backgroundColor: colors.primary },
-  chipOnText: { color: colors.white, fontWeight: "700" },
   footer: { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
 });

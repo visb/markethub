@@ -1,143 +1,120 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
-import type { DriverStatus } from "@prisma/client";
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import type { DeliveryStatus } from "@prisma/client";
+import { HandoffService } from "../picking/handoff.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { ROUTE_INCLUDE, toDriverProfileDto, toRouteDto } from "./delivery.mapper";
+import { DELIVERY_INCLUDE, toDeliveryDto } from "./delivery.mapper";
 
-/** Janela de staleness: entregador só conta como online se visto nos últimos 2 min. */
-export const DRIVER_STALE_MS = 2 * 60 * 1000;
-
+/**
+ * Entrega própria — lado do entregador. O entregador é vinculado a uma loja
+ * (StoreStaff role driver) e só vê as entregas que a loja lhe atribuiu.
+ * Coleta: valida o pickupCode (reusa HandoffService). Entrega: valida o
+ * deliveryCode do cliente. Sem disponibilidade/geolocalização/ganhos.
+ */
 @Injectable()
 export class DriverService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly handoff: HandoffService,
+  ) {}
 
-  /** Garante o perfil 1:1 do entregador (cria lazy no primeiro acesso). */
-  private profile(userId: string) {
-    return this.prisma.driverProfile.upsert({
-      where: { userId },
-      create: { userId },
-      update: {},
+  /** Lojas em que o usuário atua como entregador (para o app escolher a fila). */
+  async myStores(userId: string) {
+    const staff = await this.prisma.storeStaff.findMany({
+      where: { userId, staffRole: "driver", active: true },
+      include: { store: { select: { id: true, name: true, merchantId: true } } },
     });
+    return staff.map((s) => s.store);
   }
 
-  /** Perfil + status + rota ativa (se houver). */
-  async me(userId: string) {
-    const profile = await this.profile(userId);
-    const activeRoute = await this.prisma.deliveryRoute.findFirst({
-      where: { driverId: userId, status: { in: ["accepted", "in_progress"] } },
-      orderBy: { acceptedAt: "desc" },
-      include: ROUTE_INCLUDE,
-    });
-    return {
-      profile: toDriverProfileDto(profile),
-      activeRoute: activeRoute ? toRouteDto(activeRoute) : null,
-    };
-  }
-
-  /** Alterna disponibilidade. `available` exige localização. `on_route` não pode ir offline. */
-  async setStatus(userId: string, status: "offline" | "available", lat?: number, lng?: number) {
-    const profile = await this.profile(userId);
-    if (profile.status === "on_route") {
-      throw new BadRequestException({
-        code: "DRIVER_ON_ROUTE",
-        message: "Conclua ou cancele a rota antes de mudar o status",
-      });
-    }
-    if (status === "available" && (lat == null || lng == null)) {
-      throw new BadRequestException({
-        code: "LOCATION_REQUIRED",
-        message: "Localização é obrigatória para ficar disponível",
-      });
-    }
-    const updated = await this.prisma.driverProfile.update({
-      where: { userId },
-      data: {
-        status: status as DriverStatus,
-        lastSeenAt: new Date(),
-        ...(status === "available" ? { currentLat: lat, currentLng: lng } : {}),
+  /** Entregas atribuídas ao entregador (em aberto por padrão). */
+  async listAssigned(userId: string, opts: { storeId?: string; status?: string } = {}) {
+    const status = opts.status
+      ? ([opts.status] as DeliveryStatus[])
+      : (["assigned", "picked_up"] as DeliveryStatus[]);
+    const deliveries = await this.prisma.delivery.findMany({
+      where: {
+        driverId: userId,
+        status: { in: status },
+        ...(opts.storeId ? { storeId: opts.storeId } : {}),
       },
+      orderBy: { assignedAt: "asc" },
+      include: DELIVERY_INCLUDE,
     });
-    return toDriverProfileDto(updated);
-  }
-
-  /** Heartbeat de localização (atualiza posição + lastSeenAt). */
-  async heartbeat(userId: string, lat: number, lng: number) {
-    await this.profile(userId);
-    const updated = await this.prisma.driverProfile.update({
-      where: { userId },
-      data: { currentLat: lat, currentLng: lng, lastSeenAt: new Date() },
-    });
-    return toDriverProfileDto(updated);
-  }
-
-  /** Pool de matching (S4.3/S4.4): disponíveis e vistos recentemente. */
-  listAvailable() {
-    const since = new Date(Date.now() - DRIVER_STALE_MS);
-    return this.prisma.driverProfile.findMany({
-      where: { status: "available", lastSeenAt: { gte: since } },
-    });
+    return deliveries.map(toDeliveryDto);
   }
 
   /**
-   * Ganhos do dia (S4.7): total creditado (snapshot estimatedEarningsCents das
-   * rotas concluídas no dia), nº de rotas finalizadas e aceitas no dia. `date`
-   * opcional (YYYY-MM-DD) — default = hoje (fuso do servidor).
+   * Coleta na loja: valida o pickupCode → OrderGroup on_the_way (via HandoffService)
+   * e Delivery → picked_up. Idempotente.
    */
-  async earnings(userId: string, date?: string) {
-    const { start, end } = dayWindow(date);
-    const completed = await this.prisma.deliveryRoute.findMany({
-      where: { driverId: userId, status: "completed", completedAt: { gte: start, lt: end } },
-      select: { estimatedEarningsCents: true },
+  async confirmPickup(userId: string, deliveryId: string, pickupCode: string) {
+    const delivery = await this.ownedDelivery(userId, deliveryId);
+    if (delivery.status === "picked_up") return this.detail(deliveryId); // idempotente
+    if (delivery.status !== "assigned") {
+      throw new BadRequestException({
+        code: "DELIVERY_NOT_ASSIGNED",
+        message: "Entrega não está atribuída a você",
+      });
+    }
+    const group = await this.prisma.orderGroup.findUniqueOrThrow({
+      where: { id: delivery.orderGroupId },
+      select: { pickTask: { select: { id: true } } },
     });
-    const routesAccepted = await this.prisma.deliveryRoute.count({
-      where: { driverId: userId, acceptedAt: { gte: start, lt: end } },
+    if (!group.pickTask) {
+      throw new BadRequestException({ code: "PICK_TASK_NOT_FOUND", message: "Separação não encontrada" });
+    }
+    // valida o código e avança OrderGroup ready_for_pickup → on_the_way
+    await this.handoff.confirmPickup(group.pickTask.id, pickupCode);
+    await this.prisma.delivery.update({
+      where: { id: deliveryId },
+      data: { status: "picked_up", pickedUpAt: new Date() },
     });
-    const totalCents = completed.reduce((s, r) => s + r.estimatedEarningsCents, 0);
-    return {
-      date: start.toISOString().slice(0, 10),
-      totalCents,
-      routesCompleted: completed.length,
-      routesAccepted,
-    };
+    return this.detail(deliveryId);
   }
 
-  /** Histórico de rotas do entregador (opcionalmente por status). */
-  async listRoutes(userId: string, status?: string) {
-    const routes = await this.prisma.deliveryRoute.findMany({
-      where: {
-        driverId: userId,
-        ...(status ? { status: status as never } : {}),
-      },
-      orderBy: { createdAt: "desc" },
-      take: 100,
-      select: {
-        id: true,
-        status: true,
-        estimatedEarningsCents: true,
-        distanceMeters: true,
-        completedAt: true,
-        acceptedAt: true,
-        createdAt: true,
-        _count: { select: { stops: true } },
-      },
+  /**
+   * Entrega ao cliente: valida o deliveryCode → OrderGroup delivered (via
+   * HandoffService) e Delivery → delivered. Idempotente.
+   */
+  async confirmDelivery(userId: string, deliveryId: string, deliveryCode: string) {
+    const delivery = await this.ownedDelivery(userId, deliveryId);
+    if (delivery.status === "delivered") return this.detail(deliveryId); // idempotente
+    if (delivery.status !== "picked_up") {
+      throw new BadRequestException({
+        code: "DELIVERY_NOT_PICKED_UP",
+        message: "Faça a coleta antes de entregar",
+      });
+    }
+    await this.handoff.confirmDelivered(delivery.orderGroupId, deliveryCode);
+    await this.prisma.delivery.update({
+      where: { id: deliveryId },
+      data: { status: "delivered", deliveredAt: new Date() },
     });
-    return routes.map((r) => ({
-      id: r.id,
-      status: r.status,
-      estimatedEarningsCents: r.estimatedEarningsCents,
-      distanceMeters: r.distanceMeters,
-      stopCount: r._count.stops,
-      completedAt: r.completedAt?.toISOString(),
-      acceptedAt: r.acceptedAt?.toISOString(),
-      createdAt: r.createdAt.toISOString(),
-    }));
+    return this.detail(deliveryId);
   }
-}
 
-/** Janela [start, end) de um dia local (default hoje). */
-function dayWindow(date?: string): { start: Date; end: Date } {
-  const base = date ? new Date(`${date}T00:00:00`) : new Date();
-  const start = new Date(base.getFullYear(), base.getMonth(), base.getDate());
-  const end = new Date(start.getTime());
-  end.setDate(end.getDate() + 1);
-  return { start, end };
+  /** Garante que a entrega pertence ao entregador. */
+  private async ownedDelivery(userId: string, deliveryId: string) {
+    const delivery = await this.prisma.delivery.findUnique({ where: { id: deliveryId } });
+    if (!delivery) {
+      throw new NotFoundException({ code: "DELIVERY_NOT_FOUND", message: "Entrega não encontrada" });
+    }
+    if (delivery.driverId !== userId) {
+      throw new ForbiddenException({ code: "NOT_DELIVERY_DRIVER", message: "Entrega não é sua" });
+    }
+    return delivery;
+  }
+
+  private async detail(deliveryId: string) {
+    const delivery = await this.prisma.delivery.findUniqueOrThrow({
+      where: { id: deliveryId },
+      include: DELIVERY_INCLUDE,
+    });
+    return toDeliveryDto(delivery);
+  }
 }

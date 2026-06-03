@@ -1,4 +1,5 @@
 import type {
+  FulfillmentType,
   PickItem,
   PickTask,
   OrderItem,
@@ -15,6 +16,11 @@ type PickItemWithRels = PickItem & {
 
 type PickTaskWithRels = PickTask & {
   items: PickItemWithRels[];
+  orderGroup: {
+    fulfillment: FulfillmentType;
+    pickupCode: string | null;
+    order: { scheduledFrom: Date | null };
+  };
 };
 
 const iso = (d: Date | null | undefined) => (d ? d.toISOString() : undefined);
@@ -59,10 +65,19 @@ export function toPickTaskDto(task: PickTaskWithRels) {
     packedAt: iso(task.packedAt),
     readyAt: iso(task.readyAt),
     createdAt: task.createdAt.toISOString(),
+    fulfillment: task.orderGroup.fulfillment,
+    pickupCode: task.orderGroup.pickupCode ?? undefined,
     items: task.items.map(toPickItemDto),
   };
 }
 
 export const PICK_TASK_INCLUDE = {
   items: { include: { orderItem: true, substitution: true } },
+  orderGroup: {
+    select: {
+      fulfillment: true,
+      pickupCode: true,
+      order: { select: { scheduledFrom: true } },
+    },
+  },
 } as const;

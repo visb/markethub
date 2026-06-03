@@ -42,6 +42,10 @@ export interface PickTaskDTO {
   storeId: string;
   pickerId?: string;
   status: PickTaskStatusDTO;
+  /** Modalidade do grupo: entrega própria ou retirada na loja. */
+  fulfillment: 'delivery' | 'pickup';
+  /** Código de coleta (gerado ao ficar pronto) — entregue ao entregador. */
+  pickupCode?: string;
   assignedAt?: string;
   startedAt?: string;
   packedAt?: string;

@@ -88,6 +88,15 @@ export default function HomeScreen() {
         </ScrollView>
       )}
 
+      {storeId && (
+        <Button
+          title="Entregas da loja"
+          variant="outline"
+          onPress={() => router.push(`/deliveries?storeId=${storeId}`)}
+          style={{ marginBottom: spacing.md }}
+        />
+      )}
+
       {error && <Text style={{ color: colors.danger, marginBottom: spacing.sm }}>{error}</Text>}
 
       {loading ? (
