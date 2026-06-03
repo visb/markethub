@@ -1,5 +1,5 @@
 import { Body, Controller, Post } from "@nestjs/common";
-import type { DeliveryMethod } from "@prisma/client";
+import type { DeliveryMethod, FulfillmentType } from "@prisma/client";
 import { IsIn, IsOptional, IsString } from "class-validator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
@@ -7,10 +7,14 @@ import type { AuthUser } from "../auth/auth.types";
 import { OrdersService } from "./orders.service";
 
 class CheckoutDto {
-  @IsString() addressId!: string;
-  @IsIn(["gate", "door"]) deliveryMethod!: DeliveryMethod;
+  // entrega: obrigatório; retirada na loja: ignorado
+  @IsOptional() @IsString() addressId?: string | null;
+  @IsIn(["delivery", "pickup"]) fulfillment!: FulfillmentType;
+  @IsOptional() @IsIn(["gate", "door"]) deliveryMethod?: DeliveryMethod;
   @IsOptional() @IsString() scheduledFrom?: string | null;
   @IsOptional() @IsString() scheduledTo?: string | null;
+  // slot de capacidade escolhido (S5.3)
+  @IsOptional() @IsString() deliverySlotId?: string | null;
 }
 
 @Roles("customer")

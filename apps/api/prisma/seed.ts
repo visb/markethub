@@ -32,6 +32,37 @@ async function main(): Promise<void> {
   await seedCatalog();
   await seedMarketplaceCategories();
   await seedExampleUsers(passwordHash);
+  await seedDeliverySlots();
+}
+
+/** Slots de capacidade por loja (S5.3): próximos 3 dias, 2 janelas/dia. */
+async function seedDeliverySlots(): Promise<void> {
+  const stores = await prisma.store.findMany({ select: { id: true } });
+  const windows = [
+    { h0: 9, h1: 12 },
+    { h0: 14, h1: 18 },
+  ];
+  const base = new Date();
+  base.setHours(0, 0, 0, 0);
+  let count = 0;
+  for (const store of stores) {
+    for (let day = 1; day <= 3; day++) {
+      for (const w of windows) {
+        const start = new Date(base);
+        start.setDate(start.getDate() + day);
+        start.setHours(w.h0);
+        const end = new Date(start);
+        end.setHours(w.h1);
+        await prisma.deliverySlot.upsert({
+          where: { storeId_start_end: { storeId: store.id, start, end } },
+          update: { capacity: 5 },
+          create: { storeId: store.id, start, end, capacity: 5 },
+        });
+        count++;
+      }
+    }
+  }
+  console.log(`Delivery slots ok (${count} slots).`);
 }
 
 // Departamentos curados (aparecem no marketplace) — nome, ordem.
@@ -134,7 +165,7 @@ async function seedExampleUsers(passwordHash: string): Promise<void> {
   };
 
   await upsertUser("cliente@markethub.local", "Cliente Exemplo", "customer");
-  await upsertUser("entregador@markethub.local", "Entregador Exemplo", "driver");
+  const driver = await upsertUser("entregador@markethub.local", "Entregador Exemplo", "driver");
   const manager = await upsertUser("gerente.europa@markethub.local", "Gerente Europa", "merchant");
   const picker = await upsertUser("separador.europa@markethub.local", "Separador Europa", "picker");
 
@@ -142,6 +173,7 @@ async function seedExampleUsers(passwordHash: string): Promise<void> {
     for (const [user, staffRole] of [
       [manager, "manager"],
       [picker, "picker"],
+      [driver, "driver"],
     ] as const) {
       await prisma.storeStaff.upsert({
         where: { userId_storeId_staffRole: { userId: user.id, storeId: store.id, staffRole } },
