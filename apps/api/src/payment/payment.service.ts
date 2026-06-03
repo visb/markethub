@@ -4,7 +4,11 @@ import { Prisma } from "@prisma/client";
 import type { Env } from "../config/env";
 import { OrdersService } from "../marketplace/orders.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { PAYMENT_PROVIDER, type PaymentProvider } from "./payment-provider.interface";
+import {
+  PAYMENT_PROVIDER,
+  type PaymentProvider,
+  type WebhookEvent,
+} from "./payment-provider.interface";
 
 @Injectable()
 export class PaymentService {
@@ -99,8 +103,12 @@ export class PaymentService {
       where: { providerChargeId: event.chargeId },
     });
     if (!payment) {
-      this.logger.warn(`webhook: payment não encontrado p/ charge ${event.chargeId}`);
-      return { handled: false };
+      // pode ser cobrança de gorjeta (S5.2): resolve o Tip pelo mesmo chargeId
+      const handledTip = await this.settleTipWebhook(event.chargeId, event.status);
+      if (!handledTip) {
+        this.logger.warn(`webhook: cobrança não encontrada p/ charge ${event.chargeId}`);
+      }
+      return { handled: handledTip };
     }
 
     if (event.status === "paid") {
@@ -118,6 +126,23 @@ export class PaymentService {
       });
     }
     return { handled: true };
+  }
+
+  /** Liquida a gorjeta (S5.2) cobrada pelo mesmo gateway. Idempotente. */
+  private async settleTipWebhook(chargeId: string, status: WebhookEvent["status"]): Promise<boolean> {
+    const tip = await this.prisma.tip.findFirst({ where: { providerChargeId: chargeId } });
+    if (!tip) return false;
+    if (status === "paid") {
+      if (tip.status !== "paid") {
+        await this.prisma.tip.update({
+          where: { id: tip.id },
+          data: { status: "paid", paidAt: new Date() },
+        });
+      }
+    } else {
+      await this.prisma.tip.update({ where: { id: tip.id }, data: { status: "failed" } });
+    }
+    return true;
   }
 
   /** Helper de dev: simula pagamento (apenas provider mock). */
