@@ -2,6 +2,8 @@ import { BullModule } from "@nestjs/bullmq";
 import { Logger, Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { Env } from "../config/env";
+import { CatalogQualityController } from "./catalog-quality.controller";
+import { CatalogQualityService } from "./catalog-quality.service";
 import { CATEGORY_MAPPER } from "./category-mapper.interface";
 import { EnrichmentController } from "./enrichment.controller";
 import { EnrichmentProcessor } from "./enrichment.processor";
@@ -14,11 +16,12 @@ import { MockEnrichmentProvider } from "./providers/mock.provider";
 
 @Module({
   imports: [BullModule.registerQueue({ name: ENRICHMENT_QUEUE })],
-  controllers: [EnrichmentController],
+  controllers: [EnrichmentController, CatalogQualityController],
   providers: [
     EnrichmentService,
     EnrichmentQueueService,
     EnrichmentProcessor,
+    CatalogQualityService,
     // Cosmos se houver COSMOS_TOKEN; senão Mock (dev/test).
     {
       provide: ENRICHMENT_PROVIDER,
