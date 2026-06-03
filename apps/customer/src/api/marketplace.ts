@@ -75,8 +75,64 @@ export interface OrderSummary {
   status: string;
   totalCents: number;
   createdAt: string;
+  deliveryCode: string | null;
+  groups: { fulfillment: "delivery" | "pickup" }[];
   payment: { status: string } | null;
   refund: { amountCents: number; status: string } | null;
+}
+
+// Rastreio por etapas do pedido (S5.1)
+export interface OrderTrackingGroup {
+  orderGroupId: string;
+  storeId: string;
+  storeName: string;
+  fulfillment: "delivery" | "pickup";
+  status: string;
+  delivery: { status: string; driverName: string | null } | null;
+}
+export interface OrderTracking {
+  orderId: string;
+  status: string;
+  deliveryCode: string | null;
+  hasPickup: boolean;
+  hasDelivery: boolean;
+  groups: OrderTrackingGroup[];
+  updatedAt: string;
+}
+
+// Agendamento por slot (S5.3)
+export interface SlotView {
+  id: string;
+  storeId: string;
+  start: string;
+  end: string;
+  capacity: number;
+  reserved: number;
+  remaining: number;
+}
+
+// Avaliações e gorjeta (S5.2)
+export type ReviewAxis = "platform" | "delivery" | "merchant";
+export interface Review {
+  id: string;
+  orderId: string;
+  axis: ReviewAxis;
+  rating: number;
+  comment: string | null;
+  targetMerchantId: string | null;
+  targetDriverId: string | null;
+  createdAt: string;
+}
+export interface TipView {
+  id: string;
+  orderId: string;
+  driverId: string;
+  amountCents: number;
+  status: "pending" | "paid" | "failed";
+  qrCode: string | null;
+  qrCodeUrl: string | null;
+  expiresAt: string | null;
+  paidAt: string | null;
 }
 
 export interface FeedItem extends ProductView {
@@ -166,10 +222,25 @@ export function marketplace(api: ApiClient) {
     setDefaultAddress: (id: string) =>
       api.request<Address>(`/addresses/${id}/default`, { method: "POST", auth: true }),
 
-    checkout: (body: { addressId: string; deliveryMethod: "gate" | "door" }) =>
-      api.request<{ id: string }>("/checkout", { method: "POST", auth: true, body }),
+    slots: (storeId: string) => api.request<SlotView[]>(`/stores/${storeId}/slots`),
+    checkout: (body: {
+      fulfillment: "delivery" | "pickup";
+      addressId?: string | null;
+      deliveryMethod?: "gate" | "door";
+      deliverySlotId?: string | null;
+    }) => api.request<{ id: string }>("/checkout", { method: "POST", auth: true, body }),
     orders: () => api.request<{ items: OrderSummary[] }>("/orders", { auth: true }),
     order: (id: string) => api.request<Record<string, unknown>>(`/orders/${id}`, { auth: true }),
+    tracking: (id: string) => api.request<OrderTracking>(`/orders/${id}/tracking`, { auth: true }),
+
+    reviews: (id: string) => api.request<Review[]>(`/orders/${id}/reviews`, { auth: true }),
+    createReview: (id: string, body: { axis: ReviewAxis; rating: number; comment?: string }) =>
+      api.request<Review>(`/orders/${id}/reviews`, { method: "POST", auth: true, body }),
+    tip: (id: string) => api.request<TipView>(`/orders/${id}/tip`, { auth: true }),
+    createTip: (id: string, amountCents: number) =>
+      api.request<TipView>(`/orders/${id}/tip`, { method: "POST", auth: true, body: { amountCents } }),
+    mockPayTip: (id: string) =>
+      api.request<{ handled: boolean }>(`/orders/${id}/tip/mock-pay`, { method: "POST", auth: true }),
 
     pay: (orderId: string) =>
       api.request<PaymentView>(`/orders/${orderId}/pay`, { method: "POST", auth: true }),

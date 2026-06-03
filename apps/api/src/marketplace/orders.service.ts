@@ -1,16 +1,23 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import type { DeliveryMethod, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import type { DeliveryMethod, FulfillmentType } from "@prisma/client";
 import { shortCode } from "../common/codes";
 import { ErpService } from "../erp/erp.service";
+import { OrderTrackingService } from "../picking/order-tracking.service";
 import { PickingService } from "../picking/picking.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { SchedulingService } from "../scheduling/scheduling.service";
 import { CartService } from "./cart.service";
 
 export interface CreateOrderInput {
-  addressId: string;
-  deliveryMethod: DeliveryMethod;
+  /** Entrega: obrigatório. Retirada na loja: ignorado. */
+  addressId?: string | null;
+  fulfillment: FulfillmentType;
+  deliveryMethod?: DeliveryMethod;
   scheduledFrom?: string | null;
   scheduledTo?: string | null;
+  /** Slot de capacidade escolhido no checkout (S5.3). Define scheduledFrom/To. */
+  deliverySlotId?: string | null;
 }
 
 @Injectable()
@@ -20,26 +27,36 @@ export class OrdersService {
     private readonly cart: CartService,
     private readonly erp: ErpService,
     private readonly picking: PickingService,
+    private readonly tracking: OrderTrackingService,
+    private readonly scheduling: SchedulingService,
   ) {}
+
+  /** Snapshot de rastreio do pedido por etapas (S5.1). Só o dono acessa. */
+  async getTracking(userId: string, id: string) {
+    await this.detail(userId, id); // valida posse (lança se não for dono)
+    return this.tracking.build(id);
+  }
 
   /** Calcula o total final sem criar pedido (preview do checkout). */
   async preview(userId: string, input: CreateOrderInput) {
-    await this.assertAddress(userId, input.addressId);
+    const pickup = input.fulfillment === "pickup";
+    if (!pickup) await this.assertAddress(userId, input.addressId);
     const doorSurchargeCents =
-      input.deliveryMethod === "door" ? CartService.DOOR_SURCHARGE_CENTS : 0;
-    const view = await this.cart.getCart(userId, { doorSurchargeCents });
+      !pickup && input.deliveryMethod === "door" ? CartService.DOOR_SURCHARGE_CENTS : 0;
+    const view = await this.cart.getCart(userId, { doorSurchargeCents, fulfillment: input.fulfillment });
     if (view.itemCount === 0) {
       throw new BadRequestException({ code: "CART_EMPTY", message: "Carrinho vazio" });
     }
-    return { ...view, deliveryMethod: input.deliveryMethod };
+    return { ...view, deliveryMethod: input.deliveryMethod, fulfillment: input.fulfillment };
   }
 
   /** Cria o pedido (status created) a partir do carrinho. Limpa o carrinho. */
   async checkout(userId: string, input: CreateOrderInput) {
-    const address = await this.assertAddress(userId, input.addressId);
+    const pickup = input.fulfillment === "pickup";
+    const address = pickup ? null : await this.assertAddress(userId, input.addressId);
     const doorSurchargeCents =
-      input.deliveryMethod === "door" ? CartService.DOOR_SURCHARGE_CENTS : 0;
-    const view = await this.cart.getCart(userId, { doorSurchargeCents });
+      !pickup && input.deliveryMethod === "door" ? CartService.DOOR_SURCHARGE_CENTS : 0;
+    const view = await this.cart.getCart(userId, { doorSurchargeCents, fulfillment: input.fulfillment });
     if (view.itemCount === 0) {
       throw new BadRequestException({ code: "CART_EMPTY", message: "Carrinho vazio" });
     }
@@ -48,17 +65,28 @@ export class OrdersService {
     }
 
     const totalsByMerchant = new Map(view.totals.groups.map((g) => [g.merchantId, g]));
+    const storeIds = view.groups.map((g) => g.storeId);
 
     const order = await this.prisma.$transaction(async (tx) => {
+      // reserva o slot (S5.3) atomicamente; a janela do slot define scheduledFrom/To
+      let scheduledFrom = input.scheduledFrom ? new Date(input.scheduledFrom) : null;
+      let scheduledTo = input.scheduledTo ? new Date(input.scheduledTo) : null;
+      if (input.deliverySlotId) {
+        const window = await this.scheduling.reserveInTx(tx, input.deliverySlotId, storeIds);
+        scheduledFrom = window.start;
+        scheduledTo = window.end;
+      }
+
       const created = await tx.order.create({
         data: {
           userId,
           status: "created",
-          addressId: address.id,
-          deliveryMethod: input.deliveryMethod,
-          scheduledFrom: input.scheduledFrom ? new Date(input.scheduledFrom) : null,
-          scheduledTo: input.scheduledTo ? new Date(input.scheduledTo) : null,
-          addressSnapshot: address as unknown as Prisma.InputJsonValue,
+          addressId: address?.id ?? null,
+          deliveryMethod: input.deliveryMethod ?? "gate",
+          deliverySlotId: input.deliverySlotId ?? null,
+          scheduledFrom,
+          scheduledTo,
+          addressSnapshot: address ? (address as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
           itemsCents: view.totals.itemsCents,
           deliveryCents: view.totals.deliveryCents + view.totals.doorSurchargeCents,
           prepCents: view.totals.prepCents,
@@ -79,6 +107,7 @@ export class OrdersService {
             merchantId: g.merchantId,
             storeId: g.storeId,
             status: "created",
+            fulfillment: input.fulfillment,
             subtotalCents: t.subtotalCents,
             deliveryCents: t.deliveryCents,
             prepCents: t.prepCents,
@@ -124,7 +153,9 @@ export class OrdersService {
           totalCents: true,
           createdAt: true,
           deliveryMethod: true,
+          deliveryCode: true,
           addressSnapshot: true,
+          groups: { select: { fulfillment: true } },
           _count: { select: { groups: true } },
           payment: { select: { status: true } },
           refund: { select: { amountCents: true, status: true } },
@@ -176,6 +207,8 @@ export class OrdersService {
 
     // gera tarefas de separação (queued) p/ os separadores assumirem (S3.2)
     await this.picking.generateForOrder(orderId);
+    // rastreio em tempo real (S5.1): pago → preparando
+    await this.tracking.emit(orderId);
   }
 
   async cancel(userId: string, id: string) {
@@ -186,10 +219,19 @@ export class OrdersService {
         message: "Só é possível cancelar antes do preparo",
       });
     }
-    return this.prisma.order.update({ where: { id }, data: { status: "canceled" } });
+    const canceled = await this.prisma.order.update({
+      where: { id },
+      data: { status: "canceled" },
+    });
+    // libera a vaga do slot reservado (S5.3)
+    if (order.deliverySlotId) await this.scheduling.release(order.deliverySlotId);
+    return canceled;
   }
 
-  private async assertAddress(userId: string, addressId: string) {
+  private async assertAddress(userId: string, addressId?: string | null) {
+    if (!addressId) {
+      throw new BadRequestException({ code: "ADDRESS_REQUIRED", message: "Endereço é obrigatório para entrega" });
+    }
     const address = await this.prisma.address.findUnique({ where: { id: addressId } });
     if (!address || address.userId !== userId) {
       throw new BadRequestException({ code: "ADDRESS_NOT_FOUND", message: "Endereço inválido" });

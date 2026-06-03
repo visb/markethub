@@ -73,6 +73,18 @@ export class PickingGateway implements OnGatewayConnection {
     return { ok: true };
   }
 
+  // Rastreio do pedido (S5.1): canal por Order, só o dono (ou admin) recebe.
+  @SubscribeMessage("subscribe:order")
+  async subscribeOrder(client: Socket, body: { orderId: string }) {
+    const user = client.data.user as SocketUser | undefined;
+    if (!user || !body?.orderId) return { ok: false, code: "BAD_REQUEST" };
+    if (!(await this.canAccessOrder(user, body.orderId))) {
+      return { ok: false, code: "FORBIDDEN" };
+    }
+    await client.join(orderRoom(body.orderId));
+    return { ok: true };
+  }
+
   // ── emit helpers (chamados por PickingEvents) ──
 
   emitToStore(storeId: string, event: string, payload: Record<string, unknown>): void {
@@ -81,6 +93,10 @@ export class PickingGateway implements OnGatewayConnection {
 
   emitToGroup(orderGroupId: string, event: string, payload: Record<string, unknown>): void {
     this.server?.to(groupRoom(orderGroupId)).emit(event, { v: EVENT_VERSION, ...payload });
+  }
+
+  emitToOrder(orderId: string, event: string, payload: Record<string, unknown>): void {
+    this.server?.to(orderRoom(orderId)).emit(event, { v: EVENT_VERSION, ...payload });
   }
 
   // ── autorização por canal ──
@@ -105,6 +121,15 @@ export class PickingGateway implements OnGatewayConnection {
     return this.canAccessStore(user, group.storeId); // staff da loja
   }
 
+  private async canAccessOrder(user: SocketUser, orderId: string): Promise<boolean> {
+    if (user.roles.includes("admin")) return true;
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { userId: true },
+    });
+    return !!order && order.userId === user.id; // só o dono
+  }
+
   private extractToken(client: Socket): string {
     const auth = (client.handshake.auth ?? {}) as { token?: string };
     if (auth.token) return auth.token;
@@ -116,3 +141,4 @@ export class PickingGateway implements OnGatewayConnection {
 
 const storeRoom = (storeId: string) => `store:${storeId}`;
 const groupRoom = (orderGroupId: string) => `group:${orderGroupId}`;
+const orderRoom = (orderId: string) => `order:${orderId}`;

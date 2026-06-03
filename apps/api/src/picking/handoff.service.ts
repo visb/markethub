@@ -6,7 +6,9 @@ import {
 } from "@nestjs/common";
 import type { OrderStatus } from "@prisma/client";
 import { shortCode } from "../common/codes";
+import { PushService } from "../notifications/push.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { OrderTrackingService } from "./order-tracking.service";
 import { PickingEvents } from "./picking.events";
 import { PICK_TASK_INCLUDE, toPickTaskDto } from "./picking.mapper";
 
@@ -27,6 +29,8 @@ export class HandoffService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly events: PickingEvents,
+    private readonly tracking: OrderTrackingService,
+    private readonly push: PushService,
   ) {}
 
   /**
@@ -37,7 +41,7 @@ export class HandoffService {
   async markReady(userId: string, taskId: string) {
     const task = await this.prisma.pickTask.findUnique({
       where: { id: taskId },
-      include: { orderGroup: { select: { pickupCode: true } } },
+      include: { orderGroup: { select: { pickupCode: true, fulfillment: true, storeId: true } } },
     });
     if (!task) throw new NotFoundException({ code: "PICK_TASK_NOT_FOUND", message: "Tarefa não encontrada" });
     if (task.pickerId !== userId) {
@@ -63,6 +67,17 @@ export class HandoffService {
           pickupCode: task.orderGroup.pickupCode ?? shortCode(),
         },
       }),
+      // entrega própria: cria a entrega (unassigned) p/ a loja atribuir um entregador.
+      // Retirada na loja (pickup) não gera entrega. Idempotente (orderGroupId @unique).
+      ...(task.orderGroup.fulfillment === "delivery"
+        ? [
+            this.prisma.delivery.upsert({
+              where: { orderGroupId: task.orderGroupId },
+              create: { orderGroupId: task.orderGroupId, storeId: task.orderGroup.storeId },
+              update: {},
+            }),
+          ]
+        : []),
     ]);
     await this.recomputeOrderStatus(task.orderGroupId);
 
@@ -71,6 +86,12 @@ export class HandoffService {
       storeId: task.storeId,
       orderGroupId: task.orderGroupId,
     });
+    await this.pushOwner(
+      task.orderGroupId,
+      task.orderGroup.fulfillment === "pickup"
+        ? { title: "Pedido pronto", body: "Seu pedido está pronto para retirada na loja." }
+        : { title: "Pedido pronto", body: "Seu pedido foi separado e aguarda coleta." },
+    );
     return this.detail(taskId);
   }
 
@@ -149,7 +170,64 @@ export class HandoffService {
       data: { status: "on_the_way" },
     });
     await this.recomputeOrderStatus(task.orderGroupId);
+    await this.pushOwner(task.orderGroupId, {
+      title: "A caminho",
+      body: "Seu pedido saiu para entrega.",
+    });
     return this.detail(taskId);
+  }
+
+  /**
+   * Entrega/retirada concluída: valida o deliveryCode (do Order, informado pelo
+   * cliente) e marca o OrderGroup como delivered. Aceita grupos a caminho
+   * (on_the_way, entrega própria) ou prontos (ready_for_pickup, retirada na loja).
+   * Idempotente. Recalcula o status agregado do pedido.
+   */
+  async confirmDelivered(orderGroupId: string, deliveryCode: string) {
+    const group = await this.prisma.orderGroup.findUnique({
+      where: { id: orderGroupId },
+      select: { id: true, status: true, order: { select: { deliveryCode: true } } },
+    });
+    if (!group) {
+      throw new NotFoundException({ code: "ORDER_GROUP_NOT_FOUND", message: "Pedido não encontrado" });
+    }
+    if (group.status === "delivered") return; // idempotente
+    if (group.status !== "on_the_way" && group.status !== "ready_for_pickup") {
+      throw new BadRequestException({
+        code: "NOT_DELIVERABLE",
+        message: "Pedido não está pronto para entrega/retirada",
+      });
+    }
+    const expected = group.order.deliveryCode;
+    if (!expected || deliveryCode.trim() !== expected) {
+      throw new BadRequestException({
+        code: "INVALID_DELIVERY_CODE",
+        message: "Código de entrega inválido",
+      });
+    }
+    await this.prisma.orderGroup.update({
+      where: { id: orderGroupId },
+      data: { status: "delivered" },
+    });
+    await this.recomputeOrderStatus(orderGroupId);
+    await this.pushOwner(orderGroupId, {
+      title: "Pedido entregue",
+      body: "Seu pedido foi concluído. Que tal avaliar?",
+    });
+  }
+
+  /** Push best-effort ao dono do pedido do grupo (S5.6). */
+  private async pushOwner(orderGroupId: string, message: { title: string; body: string }) {
+    const group = await this.prisma.orderGroup.findUnique({
+      where: { id: orderGroupId },
+      select: { orderId: true, order: { select: { userId: true } } },
+    });
+    if (group) {
+      await this.push.sendToUser(group.order.userId, {
+        ...message,
+        data: { orderId: group.orderId },
+      });
+    }
   }
 
   /** Status do Order = etapa menos avançada entre seus grupos. */
@@ -169,6 +247,8 @@ export class HandoffService {
     if (ranks.length === 0) return;
     const status = ORDER_STAGE[Math.min(...ranks)] ?? "preparing";
     await this.prisma.order.update({ where: { id: group.orderId }, data: { status } });
+    // rastreio em tempo real (S5.1): emite o snapshot atualizado ao dono do pedido
+    await this.tracking.emit(group.orderId);
   }
 
   private async detail(taskId: string) {

@@ -12,6 +12,7 @@ const STATUS_LABEL: Record<string, string> = {
   paid: "Pago",
   preparing: "Preparando",
   picking: "Em separação",
+  ready_for_pickup: "Pronto",
   on_the_way: "A caminho",
   delivered: "Entregue",
   canceled: "Cancelado",
@@ -53,7 +54,11 @@ export default function OrdersScreen() {
           renderItem={({ item }) => (
             <Pressable
               style={styles.row}
-              onPress={() => item.status === "created" && router.push(`/payment/${item.id}`)}
+              onPress={() =>
+                router.push(
+                  item.status === "created" ? `/payment/${item.id}` : `/track/${item.id}`,
+                )
+              }
             >
               <Text style={styles.id}>#{item.id.slice(0, 4)}</Text>
               <View style={{ flex: 1 }}>
@@ -66,9 +71,24 @@ export default function OrdersScreen() {
                     Reembolso: {brl(item.refund.amountCents)} (falta na separação)
                   </Text>
                 )}
+                {item.deliveryCode &&
+                  (item.status === "ready_for_pickup" || item.status === "on_the_way") && (
+                    <Text variant="caption" style={{ color: colors.primary, fontWeight: "700" }}>
+                      {item.groups?.some((g) => g.fulfillment === "pickup")
+                        ? `Código de retirada: ${item.deliveryCode}`
+                        : `Código de entrega: ${item.deliveryCode}`}
+                    </Text>
+                  )}
               </View>
               {item.status === "created" ? (
                 <Button title="Pagar" size="sm" onPress={() => router.push(`/payment/${item.id}`)} />
+              ) : item.status === "delivered" ? (
+                <Button
+                  title="Avaliar"
+                  size="sm"
+                  variant="outline"
+                  onPress={() => router.push(`/review/${item.id}`)}
+                />
               ) : (
                 <Text style={{ fontWeight: "700" }}>{brl(item.totalCents)}</Text>
               )}

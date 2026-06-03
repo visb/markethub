@@ -26,6 +26,12 @@ export class OrdersController {
     return this.orders.detail(user.id, id);
   }
 
+  /** Rastreio por etapas do pedido (S5.1) — snapshot inicial; updates via Socket.IO. */
+  @Get(":id/tracking")
+  tracking(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.orders.getTracking(user.id, id);
+  }
+
   @Post(":id/cancel")
   cancel(@CurrentUser() user: AuthUser, @Param("id") id: string) {
     return this.orders.cancel(user.id, id);

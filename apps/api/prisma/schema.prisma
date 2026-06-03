@@ -16,22 +16,23 @@ enum RoleName {
 }
 
 model User {
-  id           String       @id @default(cuid())
-  email        String       @unique
-  passwordHash String
-  name         String
-  active       Boolean      @default(true)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  roles        UserRole[]
-  sessions     Session[]
-  staffOf      StoreStaff[]
-  addresses    Address[]
-  cart         Cart?
-  orders       Order[]
-  pickTasks    PickTask[]   @relation("PickerTasks")
-  driverProfile  DriverProfile?
-  deliveryRoutes DeliveryRoute[]
+  id               String        @id @default(cuid())
+  email            String        @unique
+  passwordHash     String
+  name             String
+  active           Boolean       @default(true)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  roles            UserRole[]
+  sessions         Session[]
+  staffOf          StoreStaff[]
+  addresses        Address[]
+  cart             Cart?
+  orders           Order[]
+  pickTasks        PickTask[]    @relation("PickerTasks")
+  driverDeliveries Delivery[]    @relation("DriverDeliveries")
+  tipsReceived     Tip[]         @relation("DriverTips")
+  deviceTokens     DeviceToken[]
 
   @@map("users")
 }
@@ -56,15 +57,15 @@ model UserRole {
 
 // Refresh-token session. Suporta rotação e revogação (detecção de reuse).
 model Session {
-  id               String    @id @default(cuid())
-  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId           String
-  refreshTokenHash String
-  userAgent        String?
-  expiresAt        DateTime
-  revokedAt        DateTime?
+  id                  String    @id @default(cuid())
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId              String
+  refreshTokenHash    String
+  userAgent           String?
+  expiresAt           DateTime
+  revokedAt           DateTime?
   replacedBySessionId String?
-  createdAt        DateTime  @default(now())
+  createdAt           DateTime  @default(now())
 
   @@index([userId])
   @@map("sessions")
@@ -74,6 +75,7 @@ model Session {
 enum StaffRole {
   manager // usuário do merchant que gerencia a loja
   picker // separador (faz o picking)
+  driver // entregador da loja (entrega própria, SF-delivery)
 }
 
 // Vínculo de um usuário (funcionário) a uma loja específica, com papel operacional.
@@ -113,50 +115,50 @@ enum SaleType {
 
 // Rede/varejista (ex.: Supermercado Europa).
 model Merchant {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  active    Boolean  @default(true)
+  id               String       @id @default(cuid())
+  name             String
+  slug             String       @unique
+  active           Boolean      @default(true)
   // Integração ERP (S1.2): tipo de conector e config (ex.: { "dir": "..." } pro CSV).
-  connectorType   String?
-  connectorConfig Json?
+  connectorType    String?
+  connectorConfig  Json?
   // Tarifas (S2.4) — em centavos / basis points.
-  deliveryFeeCents Int @default(700)
-  prepFeeCents     Int @default(0)
-  platformFeeBps   Int @default(1000) // 1000 = 10%
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  stores    Store[]
-  orderGroups OrderGroup[]
-  coupons   Coupon[]
+  deliveryFeeCents Int          @default(700)
+  prepFeeCents     Int          @default(0)
+  platformFeeBps   Int          @default(1000) // 1000 = 10%
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  stores           Store[]
+  orderGroups      OrderGroup[]
+  coupons          Coupon[]
 
   @@map("merchants")
 }
 
 // Loja física de um merchant. Origem dos dados do ERP.
 model Store {
-  id         String   @id @default(cuid())
-  merchant   Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
-  merchantId String
-  name       String
-  externalId String? // id da loja no ERP do merchant
+  id            String         @id @default(cuid())
+  merchant      Merchant       @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  merchantId    String
+  name          String
+  externalId    String? // id da loja no ERP do merchant
   // endereço
-  street     String?
-  number     String?
-  district   String?
-  city       String?
-  state      String?
-  zipCode    String?
-  latitude   Float?
-  longitude  Float?
-  active     Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  offers     Offer[]
-  stocks     Stock[]
-  staff      StoreStaff[]
-  orderGroups OrderGroup[]
-  pickupStops RouteStop[] @relation("StopPickupStore")
+  street        String?
+  number        String?
+  district      String?
+  city          String?
+  state         String?
+  zipCode       String?
+  latitude      Float?
+  longitude     Float?
+  active        Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  offers        Offer[]
+  stocks        Stock[]
+  staff         StoreStaff[]
+  orderGroups   OrderGroup[]
+  deliverySlots DeliverySlot[]
 
   @@unique([merchantId, externalId])
   @@index([merchantId])
@@ -166,14 +168,14 @@ model Store {
 // Categoria CRUA (origem ERP/Cosmos, criada automaticamente). Mapeia para uma categoria
 // CURADA (MarketplaceCategory) que é o que aparece no marketplace.
 model Category {
-  id       String     @id @default(cuid())
-  name     String
-  slug     String     @unique
-  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
-  parentId String?
-  children Category[] @relation("CategoryTree")
-  products Product[]
-  mappings CategoryMapping[]
+  id                    String               @id @default(cuid())
+  name                  String
+  slug                  String               @unique
+  parent                Category?            @relation("CategoryTree", fields: [parentId], references: [id])
+  parentId              String?
+  children              Category[]           @relation("CategoryTree")
+  products              Product[]
+  mappings              CategoryMapping[]
   // Curadoria: categoria do marketplace que agrupa esta categoria crua.
   marketplaceCategory   MarketplaceCategory? @relation(fields: [marketplaceCategoryId], references: [id])
   marketplaceCategoryId String?
@@ -185,17 +187,17 @@ model Category {
 
 // Categoria CURADA, gerida pelo admin — é o que aparece no marketplace (app cliente).
 model MarketplaceCategory {
-  id           String                @id @default(cuid())
-  name         String
-  slug         String                @unique
-  displayOrder Int                   @default(0)
-  visible      Boolean               @default(true)
-  parent       MarketplaceCategory?  @relation("MktCatTree", fields: [parentId], references: [id])
-  parentId     String?
-  children     MarketplaceCategory[] @relation("MktCatTree")
+  id            String                @id @default(cuid())
+  name          String
+  slug          String                @unique
+  displayOrder  Int                   @default(0)
+  visible       Boolean               @default(true)
+  parent        MarketplaceCategory?  @relation("MktCatTree", fields: [parentId], references: [id])
+  parentId      String?
+  children      MarketplaceCategory[] @relation("MktCatTree")
   rawCategories Category[]
-  createdAt    DateTime              @default(now())
-  updatedAt    DateTime              @updatedAt
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
 
   @@index([parentId])
   @@index([visible, displayOrder])
@@ -204,28 +206,28 @@ model MarketplaceCategory {
 
 // Produto canônico (global, cross-loja). Enriquecido pelo pipeline (S1.5).
 model Product {
-  id               String           @id @default(cuid())
-  gtin             String?          @unique // EAN/GTIN normalizado quando houver
-  name             String
-  brand            String?
-  packageSize      String? // rótulo descritivo da embalagem: "2L", "380g", "1kg"
-  saleType         SaleType @default(unit) // un|weight — dirige input de quantidade no carrinho
-  imageUrl         String?
-  description      String?
-  category         Category?        @relation(fields: [categoryId], references: [id])
-  categoryId       String?
-  enrichmentStatus EnrichmentStatus @default(pending)
-  completenessScore Int             @default(0) // 0-100
+  id                String             @id @default(cuid())
+  gtin              String?            @unique // EAN/GTIN normalizado quando houver
+  name              String
+  brand             String?
+  packageSize       String? // rótulo descritivo da embalagem: "2L", "380g", "1kg"
+  saleType          SaleType           @default(unit) // un|weight — dirige input de quantidade no carrinho
+  imageUrl          String?
+  description       String?
+  category          Category?          @relation(fields: [categoryId], references: [id])
+  categoryId        String?
+  enrichmentStatus  EnrichmentStatus   @default(pending)
+  completenessScore Int                @default(0) // 0-100
   // Origem do produto: erp | cosmos | merchant (cadastrado pelo manager — S3.10).
-  source           String           @default("erp")
-  createdById      String? // manager que cadastrou (produto local — S3.10)
+  source            String             @default("erp")
+  createdById       String? // manager que cadastrou (produto local — S3.10)
   // Campos editados manualmente (S1.7) que o pipeline NÃO sobrescreve.
-  lockedFields     String[]         @default([])
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  offers           Offer[]
-  stocks           Stock[]
-  enrichment       ProductEnrichment?
+  lockedFields      String[]           @default([])
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  offers            Offer[]
+  stocks            Stock[]
+  enrichment        ProductEnrichment?
 
   @@index([name])
   @@index([brand])
@@ -236,21 +238,21 @@ model Product {
 
 // Oferta de um produto numa loja: preço + disponibilidade. Reconcilia ERP via externalId.
 model Offer {
-  id           String   @id @default(cuid())
-  store        Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  storeId      String
-  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  productId    String
-  externalId   String? // id do produto no ERP daquela loja
-  priceCents   Int
+  id              String     @id @default(cuid())
+  store           Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  storeId         String
+  product         Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId       String
+  externalId      String? // id do produto no ERP daquela loja
+  priceCents      Int
   promoPriceCents Int?
-  available    Boolean  @default(true)
+  available       Boolean    @default(true)
   // Campos editados manualmente pelo manager (S3.9) que o sync ERP NÃO sobrescreve.
-  lockedFields String[] @default([])
-  updatedById  String? // auditoria: último editor manual (User)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  cartItems    CartItem[]
+  lockedFields    String[]   @default([])
+  updatedById     String? // auditoria: último editor manual (User)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  cartItems       CartItem[]
 
   @@unique([storeId, productId])
   @@unique([storeId, externalId])
@@ -260,17 +262,17 @@ model Offer {
 
 // Estoque por loja/produto (quantidade opcional; alguns ERPs só dão flag).
 model Stock {
-  id        String   @id @default(cuid())
-  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  storeId   String
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  productId String
-  quantity  Int?
-  available Boolean  @default(true)
+  id           String   @id @default(cuid())
+  store        Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  storeId      String
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId    String
+  quantity     Int?
+  available    Boolean  @default(true)
   // Campos editados manualmente pelo manager (S3.9) que o sync ERP NÃO sobrescreve.
   lockedFields String[] @default([])
   updatedById  String? // auditoria: último editor manual (User)
-  updatedAt DateTime @updatedAt
+  updatedAt    DateTime @updatedAt
 
   @@unique([storeId, productId])
   @@index([productId])
@@ -361,6 +363,13 @@ enum DeliveryMethod {
   door // entregar na porta (+taxa)
 }
 
+// Modalidade de cumprimento por loja (OrderGroup). Única operação do MVP:
+// delivery = entrega feita pelo próprio mercado; pickup = cliente retira na loja.
+enum FulfillmentType {
+  delivery
+  pickup
+}
+
 enum OrderStatus {
   created
   paid
@@ -439,125 +448,130 @@ model CartItem {
 }
 
 model Coupon {
-  id          String     @id @default(cuid())
-  code        String     @unique
-  type        CouponType
-  value       Int        @default(0) // fixed: centavos; percent: %
-  merchant    Merchant?  @relation(fields: [merchantId], references: [id])
-  merchantId  String? // null = global
+  id            String     @id @default(cuid())
+  code          String     @unique
+  type          CouponType
+  value         Int        @default(0) // fixed: centavos; percent: %
+  merchant      Merchant?  @relation(fields: [merchantId], references: [id])
+  merchantId    String? // null = global
   minOrderCents Int?
-  validFrom   DateTime?
-  validTo     DateTime?
-  maxUses     Int?
-  usedCount   Int        @default(0)
-  active      Boolean    @default(true)
-  createdAt   DateTime   @default(now())
+  validFrom     DateTime?
+  validTo       DateTime?
+  maxUses       Int?
+  usedCount     Int        @default(0)
+  active        Boolean    @default(true)
+  createdAt     DateTime   @default(now())
 
   @@map("coupons")
 }
 
 model Order {
-  id        String      @id @default(cuid())
-  user      User        @relation(fields: [userId], references: [id])
-  userId    String
-  status    OrderStatus @default(created)
+  id               String         @id @default(cuid())
+  user             User           @relation(fields: [userId], references: [id])
+  userId           String
+  status           OrderStatus    @default(created)
   // entrega
-  address        Address?      @relation(fields: [addressId], references: [id])
-  addressId      String?
-  deliveryMethod DeliveryMethod @default(gate)
-  scheduledFrom  DateTime?
-  scheduledTo    DateTime?
+  address          Address?       @relation(fields: [addressId], references: [id])
+  addressId        String?
+  deliveryMethod   DeliveryMethod @default(gate)
+  scheduledFrom    DateTime?
+  scheduledTo      DateTime?
+  // slot de capacidade reservado no checkout (S5.3); libera ao cancelar
+  deliverySlot     DeliverySlot?  @relation(fields: [deliverySlotId], references: [id])
+  deliverySlotId   String?
   // snapshot do endereço (caso o Address mude/seja apagado)
-  addressSnapshot Json?
+  addressSnapshot  Json?
   // totais (centavos)
-  itemsCents       Int @default(0)
-  deliveryCents    Int @default(0)
-  prepCents        Int @default(0)
-  platformFeeCents Int @default(0)
-  discountCents    Int @default(0)
-  totalCents       Int @default(0)
+  itemsCents       Int            @default(0)
+  deliveryCents    Int            @default(0)
+  prepCents        Int            @default(0)
+  platformFeeCents Int            @default(0)
+  discountCents    Int            @default(0)
+  totalCents       Int            @default(0)
   couponCode       String?
   // código de entrega (entregador→cliente): exibido ao cliente; o entregador digita p/ confirmar (SF.1)
   deliveryCode     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  groups    OrderGroup[]
-  payment   Payment?
-  refund    Refund?
-  dropoffStops RouteStop[] @relation("StopDropoffOrder")
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  groups           OrderGroup[]
+  payment          Payment?
+  refund           Refund?
+  reviews          Review[]
+  tip              Tip?
 
   @@index([userId, createdAt])
   @@index([status])
+  @@index([deliverySlotId])
   @@map("orders")
 }
 
 model OrderGroup {
-  id         String   @id @default(cuid())
-  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  orderId    String
-  merchant   Merchant @relation(fields: [merchantId], references: [id])
-  merchantId String
-  store      Store    @relation(fields: [storeId], references: [id])
-  storeId    String
-  status     OrderStatus @default(created)
-  subtotalCents    Int @default(0)
-  deliveryCents    Int @default(0)
-  prepCents        Int @default(0)
-  platformFeeCents Int @default(0)
+  id               String            @id @default(cuid())
+  order            Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId          String
+  merchant         Merchant          @relation(fields: [merchantId], references: [id])
+  merchantId       String
+  store            Store             @relation(fields: [storeId], references: [id])
+  storeId          String
+  status           OrderStatus       @default(created)
+  // modalidade de cumprimento desta loja (entrega própria ou retirada)
+  fulfillment      FulfillmentType   @default(delivery)
+  subtotalCents    Int               @default(0)
+  deliveryCents    Int               @default(0)
+  prepCents        Int               @default(0)
+  platformFeeCents Int               @default(0)
   // código de coleta (loja→entregador): exibido ao entregador; o picker/merchant digita p/ liberar (SF.1)
-  pickupCode      String?
+  pickupCode       String?
   // push ao ERP (S2.7)
-  externalOrderId String?
-  erpPushedAt     DateTime?
-  items      OrderItem[]
-  pickTask   PickTask?
+  externalOrderId  String?
+  erpPushedAt      DateTime?
+  items            OrderItem[]
+  pickTask         PickTask?
   refundComponents RefundComponent[]
-  // parada de coleta da rota de entrega (S4.1): grupos de uma loja na mesma parada
-  pickupStop   RouteStop? @relation("StopPickupGroups", fields: [pickupStopId], references: [id])
-  pickupStopId String?
+  // entrega própria desta loja (só existe quando fulfillment = delivery)
+  delivery         Delivery?
 
   @@index([orderId])
   @@index([storeId])
-  @@index([pickupStopId])
   @@map("order_groups")
 }
 
 model OrderItem {
-  id            String   @id @default(cuid())
-  group         OrderGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  groupId       String
+  id             String     @id @default(cuid())
+  group          OrderGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId        String
   // snapshot (catálogo pode mudar depois)
-  productId     String?
-  offerId       String?
-  nameSnapshot  String
-  gtinSnapshot  String?
-  saleType      SaleType @default(unit)
+  productId      String?
+  offerId        String?
+  nameSnapshot   String
+  gtinSnapshot   String?
+  saleType       SaleType   @default(unit)
   unitPriceCents Int // unit: preço/un; weight: preço/kg
-  quantity      Int      @default(1)
-  weightGrams   Int?
+  quantity       Int        @default(1)
+  weightGrams    Int?
   lineTotalCents Int
-  pickItem      PickItem?
+  pickItem       PickItem?
 
   @@index([groupId])
   @@map("order_items")
 }
 
 model Payment {
-  id              String        @id @default(cuid())
-  order           Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  orderId         String        @unique
-  provider        String // "pagarme" | "mock"
+  id               String        @id @default(cuid())
+  order            Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId          String        @unique
+  provider         String // "pagarme" | "mock"
   providerChargeId String?
-  method          String        @default("pix")
-  status          PaymentStatus @default(pending)
-  amountCents     Int
-  pixQrCode       String?
-  pixQrCodeUrl    String?
-  expiresAt       DateTime?
-  paidAt          DateTime?
-  raw             Json?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  method           String        @default("pix")
+  status           PaymentStatus @default(pending)
+  amountCents      Int
+  pixQrCode        String?
+  pixQrCodeUrl     String?
+  expiresAt        DateTime?
+  paidAt           DateTime?
+  raw              Json?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
   @@index([providerChargeId])
   @@map("payments")
@@ -578,15 +592,15 @@ enum RefundReason {
 // todos os grupos. amountCents = max(0, pago − total ajustado). Breakdown por grupo
 // em RefundComponent (contábil/repasse ao merchant).
 model Refund {
-  id               String       @id @default(cuid())
-  order            Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  orderId          String       @unique
+  id               String            @id @default(cuid())
+  order            Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId          String            @unique
   amountCents      Int
-  status           RefundStatus @default(pending)
+  status           RefundStatus      @default(pending)
   provider         String // "pagarme" | "mock"
   providerRefundId String?
   reason           String // resumo legível (ex.: "weight_shortfall+refused")
-  createdAt        DateTime     @default(now())
+  createdAt        DateTime          @default(now())
   processedAt      DateTime?
   components       RefundComponent[]
 
@@ -695,102 +709,155 @@ model Substitution {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Delivery / Entrega (Fase 4 — S4.1)
-// Perfil do entregador, rotas multi-stop (coleta + entrega) e suas paradas.
-// Coleta liberada por pickupCode (OrderGroup); entrega confirmada por
-// deliveryCode (Order) — sem caixa/QR (SF.1).
+// Delivery / Entrega própria pela loja (MVP)
+// Entrega feita pelo próprio mercado: 1 Delivery por OrderGroup (entrega),
+// atribuída manualmente pela loja a um entregador vinculado (StoreStaff role driver).
+// Coleta liberada por pickupCode (OrderGroup); entrega confirmada por deliveryCode (Order).
 // ─────────────────────────────────────────────────────────────
 
-enum DriverStatus {
-  offline // indisponível
-  available // disponível p/ ofertas
-  on_route // em rota ativa
-}
-
-enum DeliveryRouteStatus {
-  offered // ofertada a um entregador, aguardando aceite
-  accepted // aceita, ainda não iniciada
-  in_progress // em execução (coletando/entregando)
-  completed // concluída
+enum DeliveryStatus {
+  unassigned // pronta, aguardando a loja atribuir um entregador
+  assigned // atribuída a um entregador, ainda não coletada
+  picked_up // entregador coletou na loja (a caminho)
+  delivered // entregue ao cliente
   canceled // cancelada
-  expired // oferta expirou sem aceite
 }
 
-enum RouteStopType {
-  pickup // coleta na loja
-  dropoff // entrega ao cliente
+// Entrega de uma OrderGroup feita por um entregador da própria loja.
+model Delivery {
+  id           String         @id @default(cuid())
+  orderGroup   OrderGroup     @relation(fields: [orderGroupId], references: [id], onDelete: Cascade)
+  orderGroupId String         @unique
+  storeId      String // denormalizado p/ fila por loja
+  driver       User?          @relation("DriverDeliveries", fields: [driverId], references: [id])
+  driverId     String?
+  status       DeliveryStatus @default(unassigned)
+  assignedAt   DateTime?
+  pickedUpAt   DateTime?
+  deliveredAt  DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([storeId, status])
+  @@index([driverId, status])
+  @@map("deliveries")
 }
 
-enum RouteStopStatus {
-  pending // ainda não chegou
-  arrived // entregador chegou
-  done // parada concluída
+// ─────────────────────────────────────────────────────────────
+// Avaliações multi-eixo e gorjeta (S5.2)
+// Após delivered, o cliente avalia em eixos (plataforma/entrega/merchant) e pode
+// dar gorjeta ao entregador (entrega própria → driverId vem da Delivery do grupo).
+// ─────────────────────────────────────────────────────────────
+
+enum ReviewAxis {
+  platform // experiência da plataforma
+  delivery // entrega/entregador (só quando houve entrega)
+  merchant // a loja/merchant
 }
 
-// Perfil 1:1 do entregador (User com role driver). Disponibilidade + última posição.
-model DriverProfile {
-  id          String       @id @default(cuid())
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId      String       @unique
-  vehicleType String       @default("moto")
-  status      DriverStatus @default(offline)
-  currentLat  Float?
-  currentLng  Float?
-  lastSeenAt  DateTime?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-
-  @@index([status])
-  @@map("driver_profiles")
+enum TipStatus {
+  pending // gorjeta criada, cobrança PIX pendente
+  paid // confirmada via webhook
+  failed // cobrança falhou/expirou
 }
 
-// Rota multi-stop ofertada/atribuída a um entregador. Ganho/distância snapshotados
-// na criação (não recalcular após o aceite).
-model DeliveryRoute {
-  id                    String              @id @default(cuid())
-  driver                User?               @relation(fields: [driverId], references: [id])
-  driverId              String?
-  status                DeliveryRouteStatus @default(offered)
-  estimatedEarningsCents Int                @default(0)
-  distanceMeters        Int                 @default(0)
-  // entregador a quem a oferta está direcionada no momento (S4.4)
-  offeredToDriverId     String?
-  // entregadores que recusaram esta rota (não reofertar) — lista de userIds
-  rejectedBy            String[]            @default([])
-  offeredAt             DateTime?
-  acceptedAt            DateTime?
-  completedAt           DateTime?
-  offerExpiresAt        DateTime?
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
-  stops                 RouteStop[]
+model Review {
+  id               String     @id @default(cuid())
+  order            Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId          String
+  axis             ReviewAxis
+  rating           Int // 1..5
+  comment          String?
+  // alvos (weak ref, sem FK p/ preservar histórico) — usados nas agregações
+  targetMerchantId String?
+  targetDriverId   String?
+  createdAt        DateTime   @default(now())
+
+  @@unique([orderId, axis])
+  @@index([targetMerchantId])
+  @@index([targetDriverId])
+  @@map("reviews")
+}
+
+model Tip {
+  id               String    @id @default(cuid())
+  order            Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId          String    @unique
+  driver           User      @relation("DriverTips", fields: [driverId], references: [id])
+  driverId         String
+  amountCents      Int
+  status           TipStatus @default(pending)
+  provider         String // "pagarme" | "mock"
+  providerChargeId String?
+  pixQrCode        String?
+  pixQrCodeUrl     String?
+  expiresAt        DateTime?
+  paidAt           DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@index([driverId, status])
-  @@index([status])
-  @@index([offeredToDriverId, status])
-  @@map("delivery_routes")
+  @@index([providerChargeId])
+  @@map("tips")
 }
 
-// Parada da rota. pickup → Store (1+ OrderGroup prontas); dropoff → Order.
-model RouteStop {
-  id        String          @id @default(cuid())
-  route     DeliveryRoute   @relation(fields: [routeId], references: [id], onDelete: Cascade)
-  routeId   String
-  sequence  Int
-  type      RouteStopType
-  status    RouteStopStatus @default(pending)
-  // pickup
-  store     Store?          @relation("StopPickupStore", fields: [storeId], references: [id])
-  storeId   String?
-  groups    OrderGroup[]    @relation("StopPickupGroups")
-  // dropoff
-  order     Order?          @relation("StopDropoffOrder", fields: [orderId], references: [id])
-  orderId   String?
-  arrivedAt DateTime?
-  doneAt    DateTime?
-  createdAt DateTime        @default(now())
+// ─────────────────────────────────────────────────────────────
+// Agendamento por capacidade / slots por loja (S5.3)
+// Cada loja entrega o próprio pedido; a capacidade limita pedidos por janela.
+// Aplica-se a entrega e retirada. Reserva decrementa ao criar, libera ao cancelar.
+// ─────────────────────────────────────────────────────────────
 
-  @@index([routeId])
-  @@map("route_stops")
+model DeliverySlot {
+  id        String   @id @default(cuid())
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  storeId   String
+  start     DateTime
+  end       DateTime
+  capacity  Int      @default(0)
+  reserved  Int      @default(0)
+  createdAt DateTime @default(now())
+  orders    Order[]
+
+  @@unique([storeId, start, end])
+  @@index([storeId, start])
+  @@map("delivery_slots")
 }
 
+// ─────────────────────────────────────────────────────────────
+// Notificações push (S5.6) — token de device por usuário
+// ─────────────────────────────────────────────────────────────
+
+enum DevicePlatform {
+  ios
+  android
+  web
+}
+
+model DeviceToken {
+  id         String         @id @default(cuid())
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  platform   DevicePlatform
+  token      String         @unique
+  createdAt  DateTime       @default(now())
+  lastSeenAt DateTime       @default(now())
+
+  @@index([userId])
+  @@map("device_tokens")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Qualidade de catálogo (S5.5) — snapshot de cobertura ao longo do tempo
+// ─────────────────────────────────────────────────────────────
+
+model CatalogQualitySnapshot {
+  id            String   @id @default(cuid())
+  capturedAt    DateTime @default(now())
+  totalProducts Int
+  avgScore      Int // média do completenessScore (0-100)
+  distribution  Json // histograma por faixa de score
+  byStatus      Json // contagem por enrichmentStatus
+
+  @@index([capturedAt])
+  @@map("catalog_quality_snapshots")
+}

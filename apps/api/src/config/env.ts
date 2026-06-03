@@ -26,6 +26,14 @@ export const envSchema = z.object({
   PAGARME_WEBHOOK_SECRET: z.string().optional(),
   PIX_EXPIRES_SECONDS: z.coerce.number().int().positive().default(1800),
 
+  // Avaliações (S5.2): janela p/ avaliar após a entrega (dias) e teto da gorjeta.
+  REVIEW_WINDOW_DAYS: z.coerce.number().int().positive().default(30),
+  TIP_MAX_CENTS: z.coerce.number().int().positive().default(20000),
+
+  // Notificações push (S5.6). mock = log; fcm = Firebase Cloud Messaging.
+  PUSH_PROVIDER: z.enum(["mock", "fcm"]).default("mock"),
+  FCM_SERVER_KEY: z.string().optional(),
+
   // Rotas/entrega (Fase 4). mock = haversine local (sem token Google).
   ROUTING_PROVIDER: z.enum(["mock", "google"]).default("mock"),
   GOOGLE_MAPS_API_KEY: z.string().optional(),
