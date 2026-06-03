@@ -5,6 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
+import { PushService } from "../notifications/push.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { PickingSessionService } from "./picking-session.service";
 import { PickingEvents } from "./picking.events";
@@ -27,6 +28,7 @@ export class SubstitutionService {
     private readonly prisma: PrismaService,
     private readonly session: PickingSessionService,
     private readonly events: PickingEvents,
+    private readonly push: PushService,
   ) {}
 
   /** Separador propõe um substituto (Offer da mesma loja) para um PickItem. */
@@ -94,6 +96,18 @@ export class SubstitutionService {
       pickItemId: itemId,
       orderGroupId: task.orderGroupId,
     });
+    // push ao cliente p/ aprovar/recusar (S5.6)
+    const group = await this.prisma.orderGroup.findUnique({
+      where: { id: task.orderGroupId },
+      select: { orderId: true, order: { select: { userId: true } } },
+    });
+    if (group) {
+      await this.push.sendToUser(group.order.userId, {
+        title: "Substituição pendente",
+        body: `Um item foi substituído por ${offer.product.name}. Aprove ou recuse.`,
+        data: { orderId: group.orderId },
+      });
+    }
     return sub;
   }
 

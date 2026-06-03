@@ -2,13 +2,12 @@ import type {
   ApiError,
   AuthTokens,
   AuthUser,
-  DeliveryRouteDTO,
-  DriverEarningsDTO,
-  DriverProfileDTO,
+  DeliveryDTO,
   LoginInput,
   PickTaskDTO,
   RefreshInput,
   RegisterInput,
+  StoreDriverDTO,
 } from "@markethub/types";
 import { MemoryTokenStore, type TokenStore } from "./token-store";
 
@@ -23,17 +22,6 @@ export interface PickItemActionInput {
   quantityPicked?: number;
   weightGramsPicked?: number;
   refusalReason?: string;
-}
-
-export interface DeliveryRouteSummary {
-  id: string;
-  status: string;
-  estimatedEarningsCents: number;
-  distanceMeters: number;
-  stopCount: number;
-  completedAt?: string;
-  acceptedAt?: string;
-  createdAt: string;
 }
 
 export interface MerchantOffer {
@@ -250,57 +238,76 @@ export class ApiClient {
     return this.request(`/merchant/products/${id}`, { method: "PATCH", body: input, auth: true });
   }
 
-  // ─── Entregador / driver (S4.2–S4.8) ─────────────────
-  driverMe(): Promise<{ profile: DriverProfileDTO; activeRoute: DeliveryRouteDTO | null }> {
-    return this.request("/driver/me", { auth: true });
+  // ─── Entregador / driver (entrega própria) ───────────
+  /** Lojas às quais o entregador está vinculado (StoreStaff role driver). */
+  driverMyStores(): Promise<PickStore[]> {
+    return this.request("/driver/stores", { auth: true });
   }
 
-  driverSetStatus(status: "offline" | "available", lat?: number, lng?: number): Promise<DriverProfileDTO> {
-    return this.request("/driver/status", { method: "PATCH", body: { status, lat, lng }, auth: true });
+  /** Entregas atribuídas ao entregador (default: em aberto). */
+  driverDeliveries(params: { storeId?: string; status?: string } = {}): Promise<DeliveryDTO[]> {
+    const q = new URLSearchParams();
+    if (params.storeId) q.set("storeId", params.storeId);
+    if (params.status) q.set("status", params.status);
+    const qs = q.toString();
+    return this.request(`/driver/deliveries${qs ? `?${qs}` : ""}`, { auth: true });
   }
 
-  driverLocation(lat: number, lng: number): Promise<DriverProfileDTO> {
-    return this.request("/driver/location", { method: "POST", body: { lat, lng }, auth: true });
+  /** Coleta na loja: valida o pickupCode → entrega segue a caminho. */
+  driverConfirmPickup(id: string, pickupCode: string): Promise<DeliveryDTO> {
+    return this.request(`/driver/deliveries/${id}/pickup`, { method: "POST", body: { pickupCode }, auth: true });
   }
 
-  driverOffer(): Promise<DeliveryRouteDTO | null> {
-    return this.request("/driver/routes/offer", { auth: true });
+  /** Entrega ao cliente: valida o deliveryCode → entregue. */
+  driverConfirmDelivery(id: string, deliveryCode: string): Promise<DeliveryDTO> {
+    return this.request(`/driver/deliveries/${id}/deliver`, { method: "POST", body: { deliveryCode }, auth: true });
   }
 
-  driverAcceptRoute(id: string): Promise<DeliveryRouteDTO> {
-    return this.request(`/driver/routes/${id}/accept`, { method: "POST", auth: true });
+  // ─── Loja: despacho de entregas (manager/picker) ─────
+  storeDeliveries(storeId: string, status?: string): Promise<DeliveryDTO[]> {
+    const q = new URLSearchParams({ storeId });
+    if (status) q.set("status", status);
+    return this.request(`/store/deliveries?${q.toString()}`, { auth: true });
   }
 
-  driverRejectRoute(id: string): Promise<{ rejected: boolean }> {
-    return this.request(`/driver/routes/${id}/reject`, { method: "POST", auth: true });
+  storeDrivers(storeId: string): Promise<StoreDriverDTO[]> {
+    return this.request(`/store/drivers?storeId=${encodeURIComponent(storeId)}`, { auth: true });
   }
 
-  driverArrive(routeId: string, stopId: string): Promise<DeliveryRouteDTO> {
-    return this.request(`/driver/routes/${routeId}/stops/${stopId}/arrive`, { method: "POST", auth: true });
+  assignDelivery(id: string, driverId: string): Promise<DeliveryDTO> {
+    return this.request(`/store/deliveries/${id}/assign`, { method: "POST", body: { driverId }, auth: true });
   }
 
-  driverLeavePickup(routeId: string, stopId: string): Promise<DeliveryRouteDTO> {
-    return this.request(`/driver/routes/${routeId}/stops/${stopId}/leave`, { method: "POST", auth: true });
+  unassignDelivery(id: string): Promise<DeliveryDTO> {
+    return this.request(`/store/deliveries/${id}/unassign`, { method: "POST", auth: true });
   }
 
-  driverConfirmDelivery(routeId: string, stopId: string, deliveryCode: string): Promise<DeliveryRouteDTO> {
-    return this.request(`/driver/routes/${routeId}/stops/${stopId}/confirm`, {
+  /** Retirada na loja: cliente apresenta o código; a loja confirma a entrega. */
+  storeHandover(orderGroupId: string, code: string): Promise<unknown> {
+    return this.request(`/store/order-groups/${orderGroupId}/handover`, {
       method: "POST",
-      body: { deliveryCode },
+      body: { code },
       auth: true,
     });
   }
 
-  driverCompleteDelivery(routeId: string, stopId: string): Promise<DeliveryRouteDTO> {
-    return this.request(`/driver/routes/${routeId}/stops/${stopId}/complete`, { method: "POST", auth: true });
+  // ─── Notificações push (S5.6) ────────────────────────
+  /** Registra (upsert) o token de push do device no login do app. */
+  registerDeviceToken(token: string, platform: "ios" | "android" | "web"): Promise<{ ok: boolean }> {
+    return this.request("/notifications/device-tokens", {
+      method: "POST",
+      body: { token, platform },
+      auth: true,
+    });
   }
 
-  driverEarnings(date?: string): Promise<DriverEarningsDTO> {
-    return this.request(`/driver/earnings${date ? `?date=${encodeURIComponent(date)}` : ""}`, { auth: true });
-  }
-
-  driverRoutes(status?: string): Promise<DeliveryRouteSummary[]> {
-    return this.request(`/driver/routes${status ? `?status=${encodeURIComponent(status)}` : ""}`, { auth: true });
+  /** Remove o token (logout). */
+  unregisterDeviceToken(token: string): Promise<{ ok: boolean }> {
+    return this.request("/notifications/device-tokens", {
+      method: "DELETE",
+      body: { token },
+      auth: true,
+    });
   }
 
   // ─── Core request com refresh automático ─────────────

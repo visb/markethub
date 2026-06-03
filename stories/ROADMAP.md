@@ -79,7 +79,8 @@ Ordem de construção: **Base → catálogo/ERP/enriquecimento → cliente → p
 - S3.10 Cadastro de produto canônico pelo merchant (API)
 - S3.11 Admin SPA: área do merchant (manager)
 
-### Fase 4 — Delivery (entregador)
+### Fase 4 — Delivery (entregador) — SUPERSEDED
+> Marketplace de entregadores substituído por **entrega própria pela loja** + retirada (MVP). Removidos rota/matching/oferta/ganhos/perfil do entregador; entregador virou `StoreStaff` role driver. Ver memória delivery-own-store-model e stories/phase-5.
 - S4.1 Modelo de domínio de entrega (rota multi-stop, paradas, perfil do entregador)
 - S4.2 Disponibilidade e localização do entregador (ref: `Home - Pressing Status toggle.jpg`)
 - S4.3 Motor de rotas + matching multi-stop coleta+entrega (ref: `Home - Route found.jpg`)

@@ -16,6 +16,10 @@ import { PaymentModule } from "./payment/payment.module";
 import { PickingModule } from "./picking/picking.module";
 import { MerchantModule } from "./merchant/merchant.module";
 import { DriverModule } from "./driver/driver.module";
+import { ReviewsModule } from "./reviews/reviews.module";
+import { SchedulingModule } from "./scheduling/scheduling.module";
+import { NotificationsModule } from "./notifications/notifications.module";
+import { AdminModule } from "./admin/admin.module";
 import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
 import { RolesGuard } from "./auth/guards/roles.guard";
 
@@ -36,6 +40,10 @@ import { RolesGuard } from "./auth/guards/roles.guard";
     PickingModule,
     MerchantModule,
     DriverModule,
+    ReviewsModule,
+    SchedulingModule,
+    NotificationsModule,
+    AdminModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
