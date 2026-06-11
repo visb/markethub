@@ -6,6 +6,7 @@ export interface Merchant {
   id: string;
   name: string;
   slug: string;
+  logoUrl: string | null;
 }
 export interface Store {
   id: string;
@@ -63,7 +64,13 @@ export interface CartTotals {
 export interface CartView {
   couponCode: string | null;
   itemCount: number;
-  groups: { merchantId: string; merchant: string; storeId: string; items: CartItemView[] }[];
+  groups: {
+    merchantId: string;
+    merchant: string;
+    merchantLogoUrl: string | null;
+    storeId: string;
+    items: CartItemView[];
+  }[];
   totals: CartTotals;
 }
 
@@ -106,6 +113,7 @@ export interface OrderTrackingGroup {
   storeName: string;
   merchantId: string;
   merchantName: string;
+  merchantLogoUrl: string | null;
   fulfillment: "delivery" | "pickup";
   status: string;
   subtotalCents: number;
@@ -175,6 +183,7 @@ export interface TipView {
 export interface FeedItem extends ProductView {
   storeId: string;
   merchant: string;
+  merchantLogoUrl: string | null;
   deliveryFeeCents: number;
   deliveryEta: string;
   distanceKm: number | null;
@@ -198,7 +207,7 @@ export interface ProductDetail {
     id: string;
     priceCents: number;
     promoPriceCents: number | null;
-    store: { id: string; name: string; merchant: { name: string } };
+    store: { id: string; name: string; merchant: { name: string; logoUrl: string | null } };
   }[];
 }
 

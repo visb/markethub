@@ -118,6 +118,8 @@ model Merchant {
   id               String       @id @default(cuid())
   name             String
   slug             String       @unique
+  // logo exibida no app cliente (upload via admin → S3/MinIO)
+  logoUrl          String?
   active           Boolean      @default(true)
   // Integração ERP (S1.2): tipo de conector e config (ex.: { "dir": "..." } pro CSV).
   connectorType    String?

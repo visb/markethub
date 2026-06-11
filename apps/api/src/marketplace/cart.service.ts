@@ -165,6 +165,7 @@ export class CartService {
       return {
         merchantId: mid,
         merchant: merchant.name,
+        merchantLogoUrl: merchant.logoUrl,
         storeId: its[0]!.offer.storeId,
         items: its.map((it) => ({
           id: it.id,

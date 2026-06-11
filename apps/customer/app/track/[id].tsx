@@ -7,6 +7,7 @@ import { Button, Text, colors, radius, spacing } from "@markethub/ui";
 import { useAuth } from "@/auth-context";
 import { brl, marketplace, type OrderTracking, type SubstitutionView } from "@/api/marketplace";
 import { Header } from "@/components/Header";
+import { MerchantLogo } from "@/components/MerchantLogo";
 
 // Macro-etapas da visão do cliente (ref: Confirmed.jpg / Picking.jpg):
 // Pedido confirmado → Comprando (separação) → A caminho (ou Pronto p/ retirar).
@@ -229,9 +230,7 @@ export default function TrackScreen() {
           <Text style={{ fontWeight: "700", padding: spacing.md }}>Detalhes do pedido</Text>
           {data.groups.map((g) => (
             <View key={g.orderGroupId} style={styles.groupRow}>
-              <View style={styles.storeDot}>
-                <Ionicons name="storefront" size={14} color={colors.white} />
-              </View>
+              <MerchantLogo name={g.merchantName} logoUrl={g.merchantLogoUrl} size={32} />
               <View style={{ flex: 1 }}>
                 <Text style={{ fontWeight: "600" }}>{g.merchantName}</Text>
                 <Text variant="caption" muted>
@@ -344,13 +343,5 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-  },
-  storeDot: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.full,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
   },
 });

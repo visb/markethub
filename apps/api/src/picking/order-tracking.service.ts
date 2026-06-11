@@ -27,6 +27,7 @@ export interface OrderTrackingGroup {
   storeName: string;
   merchantId: string;
   merchantName: string;
+  merchantLogoUrl: string | null;
   fulfillment: FulfillmentType;
   status: OrderStatus;
   subtotalCents: number;
@@ -87,7 +88,7 @@ export class OrderTrackingService {
             fulfillment: true,
             subtotalCents: true,
             store: { select: { name: true } },
-            merchant: { select: { name: true } },
+            merchant: { select: { name: true, logoUrl: true } },
             delivery: {
               select: { status: true, driver: { select: { name: true } } },
             },
@@ -112,6 +113,7 @@ export class OrderTrackingService {
       storeName: g.store.name,
       merchantId: g.merchantId,
       merchantName: g.merchant.name,
+      merchantLogoUrl: g.merchant.logoUrl,
       fulfillment: g.fulfillment,
       status: g.status,
       subtotalCents: g.subtotalCents,

@@ -18,7 +18,7 @@ export class CatalogService {
   listMerchants() {
     return this.prisma.merchant.findMany({
       where: { active: true },
-      select: { id: true, name: true, slug: true },
+      select: { id: true, name: true, slug: true, logoUrl: true },
       orderBy: { name: "asc" },
     });
   }
@@ -142,7 +142,7 @@ export class CatalogService {
             id: true,
             priceCents: true,
             promoPriceCents: true,
-            store: { select: { id: true, name: true, merchant: { select: { name: true } } } },
+            store: { select: { id: true, name: true, merchant: { select: { name: true, logoUrl: true } } } },
           },
         },
       },
@@ -255,7 +255,11 @@ export class CatalogService {
         priceCents: true,
         promoPriceCents: true,
         store: {
-          select: { id: true, name: true, merchant: { select: { name: true, deliveryFeeCents: true } } },
+          select: {
+            id: true,
+            name: true,
+            merchant: { select: { name: true, logoUrl: true, deliveryFeeCents: true } },
+          },
         },
         product: {
           select: { id: true, name: true, brand: true, packageSize: true, saleType: true, imageUrl: true },
@@ -332,7 +336,11 @@ type FeedRow = {
   id: string;
   priceCents: number;
   promoPriceCents: number | null;
-  store: { id: string; name: string; merchant: { name: string; deliveryFeeCents: number } };
+  store: {
+    id: string;
+    name: string;
+    merchant: { name: string; logoUrl: string | null; deliveryFeeCents: number };
+  };
   product: {
     id: string;
     name: string;
@@ -351,6 +359,7 @@ function toFeedView(row: FeedRow) {
     promoPriceCents: row.promoPriceCents,
     storeId: row.store.id,
     merchant: row.store.merchant.name,
+    merchantLogoUrl: row.store.merchant.logoUrl,
     deliveryFeeCents: row.store.merchant.deliveryFeeCents,
     deliveryEta: "30 min",
     distanceKm: null as number | null, // proximidade real: Fase 4 (geo)

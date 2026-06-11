@@ -7,6 +7,7 @@ import { Button, Text, colors, radius, spacing } from "@markethub/ui";
 import { useAuth } from "@/auth-context";
 import { brl, marketplace, type ProductDetail } from "@/api/marketplace";
 import { Header } from "@/components/Header";
+import { MerchantLogo } from "@/components/MerchantLogo";
 import { QtyStepper } from "@/components/QtyStepper";
 import { Select } from "@/components/Select";
 
@@ -116,9 +117,11 @@ export default function ProductDetailScreen() {
         {/* Mercado principal */}
         {main ? (
           <View style={styles.storeCard}>
-            <View style={styles.storeDot}>
-              <Ionicons name="storefront" size={16} color={colors.white} />
-            </View>
+            <MerchantLogo
+              name={main.store.merchant.name}
+              logoUrl={main.store.merchant.logoUrl}
+              size={32}
+            />
             <View style={{ flex: 1 }}>
               <Text style={{ fontWeight: "700" }}>{main.store.merchant.name}</Text>
               <Text variant="caption" muted>
@@ -214,14 +217,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radius.md,
     padding: spacing.md,
-  },
-  storeDot: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.full,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
   },
   otherRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   footer: {

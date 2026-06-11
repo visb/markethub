@@ -3,10 +3,12 @@ import { Image, Pressable, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Button, Text, colors, radius, spacing } from "@markethub/ui";
 import { brl, type ProductView } from "@/api/marketplace";
+import { MerchantLogo } from "./MerchantLogo";
 import { QtyStepper } from "./QtyStepper";
 
 interface MerchantHeader {
   merchant: string;
+  logoUrl?: string | null;
   eta: string;
   distanceKm: number | null;
   deliveryFeeCents: number;
@@ -43,7 +45,7 @@ export function ProductCard({
       {header ? (
         <View style={styles.merchant}>
           <View style={styles.merchantLine}>
-            <View style={styles.dot} />
+            <MerchantLogo name={header.merchant} logoUrl={header.logoUrl} size={16} />
             <Text variant="caption" numberOfLines={1} style={{ flex: 1, fontWeight: "600" }}>
               {header.merchant}
               {header.distanceKm != null ? ` (${header.distanceKm}km)` : ""}
@@ -100,7 +102,6 @@ const styles = StyleSheet.create({
   merchant: { gap: 2 },
   merchantLine: { flexDirection: "row", alignItems: "center", gap: 4 },
   deliveryLine: { flexDirection: "row", alignItems: "center", gap: 2 },
-  dot: { width: 14, height: 14, borderRadius: radius.full, backgroundColor: colors.border },
   img: { width: "100%", height: 92, borderRadius: radius.sm, backgroundColor: colors.white },
   imgEmpty: { borderWidth: 1, borderColor: colors.border },
   badge: {

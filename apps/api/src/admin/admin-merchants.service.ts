@@ -27,6 +27,7 @@ export interface CreateMerchantInput {
 export interface UpdateMerchantInput {
   name?: string;
   slug?: string;
+  logoUrl?: string | null;
   deliveryFeeCents?: number;
   prepFeeCents?: number;
   platformFeeBps?: number;
@@ -90,6 +91,7 @@ export class AdminMerchantsService {
         id: true,
         name: true,
         slug: true,
+        logoUrl: true,
         active: true,
         deliveryFeeCents: true,
         platformFeeBps: true,
@@ -100,6 +102,7 @@ export class AdminMerchantsService {
       id: m.id,
       name: m.name,
       slug: m.slug,
+      logoUrl: m.logoUrl,
       active: m.active,
       deliveryFeeCents: m.deliveryFeeCents,
       platformFeeBps: m.platformFeeBps,
@@ -114,6 +117,7 @@ export class AdminMerchantsService {
         id: true,
         name: true,
         slug: true,
+        logoUrl: true,
         active: true,
         deliveryFeeCents: true,
         prepFeeCents: true,
@@ -188,6 +192,7 @@ export class AdminMerchantsService {
       }
       data.slug = slug;
     }
+    if (patch.logoUrl !== undefined) data.logoUrl = patch.logoUrl;
     if (patch.deliveryFeeCents !== undefined) data.deliveryFeeCents = patch.deliveryFeeCents;
     if (patch.prepFeeCents !== undefined) data.prepFeeCents = patch.prepFeeCents;
     if (patch.platformFeeBps !== undefined) data.platformFeeBps = patch.platformFeeBps;

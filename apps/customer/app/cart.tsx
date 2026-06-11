@@ -7,6 +7,7 @@ import { Button, Text, colors, radius, spacing } from "@markethub/ui";
 import { useAuth } from "@/auth-context";
 import { brl, marketplace, type CartItemView, type CartView } from "@/api/marketplace";
 import { Header } from "@/components/Header";
+import { MerchantLogo } from "@/components/MerchantLogo";
 import { QtyStepper } from "@/components/QtyStepper";
 
 export default function CartScreen() {
@@ -84,9 +85,7 @@ export default function CartScreen() {
           return (
           <View key={g.merchantId} style={styles.groupCard}>
             <View style={styles.groupHead}>
-              <View style={styles.dot}>
-                <Ionicons name="storefront" size={14} color={colors.white} />
-              </View>
+              <MerchantLogo name={g.merchant} logoUrl={g.merchantLogoUrl} size={24} />
               <Text style={{ flex: 1, fontWeight: "700" }}>{g.merchant}</Text>
               <Text variant="caption" muted>
                 🛵 {gt ? brl(gt.deliveryCents) : "—"} · ⏱ 30 min
@@ -223,14 +222,6 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-  },
-  dot: {
-    width: 24,
-    height: 24,
-    borderRadius: radius.full,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
   },
   item: {
     flexDirection: "row",

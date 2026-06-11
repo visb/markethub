@@ -10,13 +10,8 @@ import { useCart } from "@/use-cart";
 import { ProductCard } from "@/components/ProductCard";
 import { BottomTabs } from "@/components/BottomTabs";
 import { CategoryMenu } from "@/components/CategoryMenu";
+import { MerchantLogo } from "@/components/MerchantLogo";
 import Logo from "@/assets/logo.svg";
-
-/** Iniciais do mercado p/ o atalho flutuante (sem logo no modelo ainda). */
-function initials(name: string): string {
-  const words = name.replace(/^(super)?mercado\s+/i, "").trim().split(/\s+/);
-  return words.slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
-}
 
 export default function MarketplaceHome() {
   const { api } = useAuth();
@@ -92,6 +87,7 @@ export default function MarketplaceHome() {
                     product={item}
                     header={{
                       merchant: item.merchant,
+                      logoUrl: item.merchantLogoUrl,
                       eta: item.deliveryEta,
                       distanceKm: item.distanceKm,
                       deliveryFeeCents: item.deliveryFeeCents,
@@ -115,12 +111,11 @@ export default function MarketplaceHome() {
           {cart.stores.map((s) => (
             <Pressable
               key={s.storeId}
-              style={styles.storeFab}
               onPress={() =>
                 router.push(`/store/${s.storeId}?name=${encodeURIComponent(s.merchant)}`)
               }
             >
-              <Text style={styles.storeFabText}>{initials(s.merchant)}</Text>
+              <MerchantLogo name={s.merchant} logoUrl={s.logoUrl} size={52} style={styles.storeFab} />
             </Pressable>
           ))}
         </View>
@@ -183,19 +178,12 @@ const styles = StyleSheet.create({
   fabTotal: { color: colors.white, fontSize: 11, fontWeight: "700" },
   storeStack: { position: "absolute", right: spacing.lg + 10, bottom: 168, gap: spacing.sm },
   storeFab: {
-    width: 52,
-    height: 52,
-    borderRadius: radius.full,
-    backgroundColor: colors.white,
     borderWidth: 1.5,
     borderColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
     elevation: 3,
     shadowColor: "#000",
     shadowOpacity: 0.15,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
   },
-  storeFabText: { color: colors.primary, fontWeight: "800", fontSize: 16 },
 });

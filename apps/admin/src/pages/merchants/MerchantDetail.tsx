@@ -15,12 +15,19 @@ interface MerchantDetailData {
   id: string;
   name: string;
   slug: string;
+  logoUrl: string | null;
   active: boolean;
   deliveryFeeCents: number;
   prepFeeCents: number;
   platformFeeBps: number;
   connectorType: string | null;
   stores: StoreRow[];
+}
+
+interface PresignedUpload {
+  uploadUrl: string;
+  publicUrl: string;
+  headers: Record<string, string>;
 }
 
 const brl = (c: number) => `R$ ${(c / 100).toFixed(2).replace(".", ",")}`;
@@ -66,7 +73,10 @@ export function MerchantDetail() {
         <Link to="/merchants">Mercados</Link> / {data.name}
       </nav>
       <div className="detail-head">
-        <h1>{data.name}</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <MerchantLogo merchant={data} onChanged={load} />
+          <h1>{data.name}</h1>
+        </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button className="btn-ghost" onClick={() => setEdit((v) => !v)}>
             {edit ? "Cancelar" : "Editar"}
@@ -146,6 +156,64 @@ export function MerchantDetail() {
       </table>
       {data.stores.length === 0 && <p className="muted">Nenhuma loja.</p>}
     </div>
+  );
+}
+
+/** Logo do mercado: clique para enviar (presign → PUT no storage → PATCH logoUrl). */
+function MerchantLogo({ merchant, onChanged }: { merchant: MerchantDetailData; onChanged: () => void }) {
+  const { api } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function pick() {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/png,image/jpeg,image/webp,image/svg+xml";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      setBusy(true);
+      setErr(null);
+      try {
+        const presigned = await api.request<PresignedUpload>(
+          `/admin/merchants/${merchant.id}/logo-upload-url`,
+          { method: "POST", auth: true, body: { filename: file.name, contentType: file.type } },
+        );
+        const put = await fetch(presigned.uploadUrl, {
+          method: "PUT",
+          headers: presigned.headers,
+          body: file,
+        });
+        if (!put.ok) throw new Error(`Upload falhou (${put.status})`);
+        await api.request(`/admin/merchants/${merchant.id}`, {
+          method: "PATCH",
+          auth: true,
+          body: { logoUrl: presigned.publicUrl },
+        });
+        onChanged();
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : "Erro no upload");
+      } finally {
+        setBusy(false);
+      }
+    };
+    input.click();
+  }
+
+  return (
+    <button
+      type="button"
+      className="merchant-logo"
+      onClick={pick}
+      disabled={busy}
+      title={err ?? "Clique para trocar a logo"}
+    >
+      {merchant.logoUrl ? (
+        <img src={merchant.logoUrl} alt={`Logo ${merchant.name}`} />
+      ) : (
+        <span>{busy ? "…" : "+ logo"}</span>
+      )}
+    </button>
   );
 }
 

@@ -348,3 +348,29 @@ body {
   margin: 8px 0 0;
   padding-left: 18px;
 }
+
+/* Logo do mercado (MerchantDetail): clique p/ enviar */
+.merchant-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 1.5px dashed #c9c9c9;
+  background: #fff;
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: #888;
+  flex-shrink: 0;
+}
+.merchant-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.merchant-logo:hover {
+  border-color: #c0182a;
+  color: #c0182a;
+}

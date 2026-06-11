@@ -11,6 +11,7 @@ import {
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import type { AuthUser } from "../auth/auth.types";
+import { StorageService } from "../storage/storage.service";
 import { AdminMerchantsService } from "./admin-merchants.service";
 
 class CreateMerchantDto {
@@ -25,10 +26,17 @@ class CreateMerchantDto {
 class UpdateMerchantDto {
   @IsOptional() @IsString() @MinLength(1) name?: string;
   @IsOptional() @IsString() slug?: string;
+  /** URL pública da logo (após upload via logo-upload-url); null remove. */
+  @IsOptional() logoUrl?: string | null;
   @IsOptional() @IsInt() @Min(0) deliveryFeeCents?: number;
   @IsOptional() @IsInt() @Min(0) prepFeeCents?: number;
   @IsOptional() @IsInt() @Min(0) platformFeeBps?: number;
   @IsOptional() @IsBoolean() active?: boolean;
+}
+
+class LogoUploadUrlDto {
+  @IsString() @MinLength(1) filename!: string;
+  @IsString() @MinLength(1) contentType!: string;
 }
 
 class CreateStoreDto {
@@ -79,7 +87,17 @@ class SetActiveDto {
 @Roles("admin")
 @Controller("admin/merchants")
 export class AdminMerchantsController {
-  constructor(private readonly merchants: AdminMerchantsService) {}
+  constructor(
+    private readonly merchants: AdminMerchantsService,
+    private readonly storage: StorageService,
+  ) {}
+
+  /** Presigna upload da logo do mercado (PUT direto no S3/MinIO). */
+  @Post(":id/logo-upload-url")
+  logoUploadUrl(@Param("id") id: string, @Body() dto: LogoUploadUrlDto) {
+    const safe = dto.filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+    return this.storage.presignUpload(`merchants/${id}/logo-${Date.now()}-${safe}`, dto.contentType);
+  }
 
   @Get()
   list(@Query("search") search?: string) {

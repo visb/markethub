@@ -14,6 +14,7 @@ export interface CartStore {
   storeId: string;
   merchantId: string;
   merchant: string;
+  logoUrl: string | null;
 }
 
 const SYNC_DELAY = 450;
@@ -49,7 +50,12 @@ export function useCart() {
     setMap(m);
     setTotal(cart.totals.totalCents);
     setStores(
-      cart.groups.map((g) => ({ storeId: g.storeId, merchantId: g.merchantId, merchant: g.merchant })),
+      cart.groups.map((g) => ({
+        storeId: g.storeId,
+        merchantId: g.merchantId,
+        merchant: g.merchant,
+        logoUrl: g.merchantLogoUrl,
+      })),
     );
   }, [mkt]);
 
