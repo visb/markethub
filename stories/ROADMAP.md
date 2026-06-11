@@ -33,6 +33,7 @@ briefing/    screenshots de referência
 | fix | Correções de domínio (pré-fase-4) | `phase-fix-corrections/` |
 | 4 | Delivery (entregador) | `phase-4-delivery/` |
 | 5 | Rastreio, avaliações, admin, polish | `phase-5-tracking-reviews-admin/` |
+| 6 | Refinamento do app cliente | `phase-6-customer-refinement/` |
 
 Ordem de construção: **Base → catálogo/ERP/enriquecimento → cliente → picking → delivery → polish**.
 
@@ -104,6 +105,14 @@ Ordem de construção: **Base → catálogo/ERP/enriquecimento → cliente → p
 - S5.6 Notificações push (FCM/APNs)
 - S5.7 Navegação admin Mercados → Lojas → produtos/pedidos/funcionários/dados (drill-down)
 - S5.8 Alinhamento do app cliente com as telas de referência do marketplace (ref: `briefing/screenshots/marketplace/`)
+
+### Fase 6 — Refinamento do app cliente
+- S6.1 FAB do carrinho fiel ao layout (ref: `Merchant Home.jpg`)
+- S6.2 Endereço: CEP primeiro + autocomplete ViaCEP + localização do dispositivo
+- S6.3 Cobertura: Curitiba e municípios limítrofes (lista de cidades permitidas)
+- S6.4 Configuração de entrega: bottom sheet + raio de mercados (slider 5–25 km)
+- S6.5 Favoritos de oferta (produto + loja)
+- S6.6 Opções de preparo por categoria (maturação/corte/ponto do pão)
 
 ## Convenção de status
 
