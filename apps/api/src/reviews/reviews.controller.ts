@@ -10,6 +10,8 @@ class CreateReviewDto {
   @IsIn(["platform", "delivery", "merchant"]) axis!: "platform" | "delivery" | "merchant";
   @IsInt() @Min(1) @Max(5) rating!: number;
   @IsOptional() @IsString() @MaxLength(500) comment?: string;
+  /** Eixo merchant em pedido multi-loja: qual mercado está sendo avaliado. */
+  @IsOptional() @IsString() merchantId?: string;
 }
 
 class CreateTipDto {

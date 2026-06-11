@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -15,6 +15,9 @@ export default function CartScreen() {
   const router = useRouter();
   const [cart, setCart] = useState<CartView | null>(null);
   const [loading, setLoading] = useState(true);
+  const [couponOpen, setCouponOpen] = useState(false);
+  const [couponInput, setCouponInput] = useState("");
+  const [couponError, setCouponError] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -76,7 +79,9 @@ export default function CartScreen() {
     <SafeAreaView style={styles.flex} edges={["top"]}>
       <Header title="Meu carrinho" />
       <ScrollView contentContainerStyle={{ padding: spacing.md, gap: spacing.lg }}>
-        {cart.groups.map((g) => (
+        {cart.groups.map((g) => {
+          const gt = cart.totals.groups.find((x) => x.merchantId === g.merchantId);
+          return (
           <View key={g.merchantId} style={styles.groupCard}>
             <View style={styles.groupHead}>
               <View style={styles.dot}>
@@ -84,7 +89,7 @@ export default function CartScreen() {
               </View>
               <Text style={{ flex: 1, fontWeight: "700" }}>{g.merchant}</Text>
               <Text variant="caption" muted>
-                🛵 R$7 · ⏱ 30 min
+                🛵 {gt ? brl(gt.deliveryCents) : "—"} · ⏱ 30 min
               </Text>
             </View>
 
@@ -114,14 +119,65 @@ export default function CartScreen() {
               </View>
             ))}
 
-            <Pressable style={styles.coupon} onPress={() => {}}>
-              <Ionicons name="pricetag-outline" size={16} color={colors.textMuted} />
-              <Text variant="caption" muted>
-                Adicionar cupom
-              </Text>
+          </View>
+          );
+        })}
+
+        {/* Cupom (aplica ao carrinho; cupom de loja restringe pelo merchant) */}
+        {cart.couponCode ? (
+          <View style={styles.coupon}>
+            <Ionicons name="pricetag" size={16} color={colors.success} />
+            <Text variant="caption" style={{ flex: 1, color: colors.success, fontWeight: "700" }}>
+              Cupom {cart.couponCode} aplicado
+            </Text>
+            <Pressable
+              hitSlop={8}
+              onPress={async () => setCart(await mkt.removeCoupon())}
+            >
+              <Ionicons name="close" size={18} color={colors.textMuted} />
             </Pressable>
           </View>
-        ))}
+        ) : couponOpen ? (
+          <View style={styles.coupon}>
+            <TextInput
+              style={styles.couponInput}
+              placeholder="Código do cupom"
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="characters"
+              value={couponInput}
+              onChangeText={(v) => {
+                setCouponInput(v);
+                setCouponError(false);
+              }}
+            />
+            <Button
+              title="Aplicar"
+              size="sm"
+              disabled={!couponInput.trim()}
+              onPress={async () => {
+                try {
+                  setCart(await mkt.applyCoupon(couponInput.trim().toUpperCase()));
+                  setCouponOpen(false);
+                  setCouponInput("");
+                } catch {
+                  setCouponError(true);
+                }
+              }}
+            />
+          </View>
+        ) : (
+          <Pressable style={styles.coupon} onPress={() => setCouponOpen(true)}>
+            <Ionicons name="pricetag-outline" size={16} color={colors.textMuted} />
+            <Text variant="caption" muted>
+              Adicionar cupom
+            </Text>
+          </Pressable>
+        )}
+        {couponError && (
+          <Text variant="caption" style={{ color: colors.danger }}>
+            Cupom inválido ou expirado.
+          </Text>
+        )}
 
         <View style={styles.summary}>
           <Row label="Subtotal" value={brl(t.itemsCents)} />
@@ -188,6 +244,15 @@ const styles = StyleSheet.create({
   thumbEmpty: { borderWidth: 1, borderColor: colors.border },
   itemPrice: { fontWeight: "700", marginTop: 2 },
   coupon: { flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md },
+  couponInput: {
+    flex: 1,
+    height: 40,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    color: colors.text,
+  },
   summary: {
     borderWidth: 1,
     borderColor: colors.border,

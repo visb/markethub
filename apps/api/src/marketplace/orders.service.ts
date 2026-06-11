@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import type { DeliveryMethod, FulfillmentType } from "@prisma/client";
 import { shortCode } from "../common/codes";
 import { ErpService } from "../erp/erp.service";
+import { RefundService } from "../payment/refund.service";
 import { OrderTrackingService } from "../picking/order-tracking.service";
 import { PickingService } from "../picking/picking.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -29,6 +30,7 @@ export class OrdersService {
     private readonly picking: PickingService,
     private readonly tracking: OrderTrackingService,
     private readonly scheduling: SchedulingService,
+    private readonly refund: RefundService,
   ) {}
 
   /** Snapshot de rastreio do pedido por etapas (S5.1). Só o dono acessa. */
@@ -154,6 +156,8 @@ export class OrdersService {
           createdAt: true,
           deliveryMethod: true,
           deliveryCode: true,
+          scheduledFrom: true,
+          scheduledTo: true,
           addressSnapshot: true,
           groups: { select: { fulfillment: true } },
           _count: { select: { groups: true } },
@@ -211,20 +215,46 @@ export class OrdersService {
     await this.tracking.emit(orderId);
   }
 
+  /**
+   * Cancela o pedido. Permitido antes da separação começar:
+   * - created (não pago): só cancela;
+   * - paid/preparing com todas as separações ainda não iniciadas: cancela,
+   *   remove as tarefas da fila e emite estorno integral.
+   */
   async cancel(userId: string, id: string) {
     const order = await this.detail(userId, id);
-    if (order.status !== "created") {
+    const cancelable = order.status === "created" || order.status === "paid" || order.status === "preparing";
+    if (!cancelable) {
       throw new BadRequestException({
         code: "CANNOT_CANCEL",
-        message: "Só é possível cancelar antes do preparo",
+        message: "Só é possível cancelar antes da separação começar",
       });
     }
-    const canceled = await this.prisma.order.update({
-      where: { id },
-      data: { status: "canceled" },
+    const tasks = await this.prisma.pickTask.findMany({
+      where: { orderGroup: { orderId: id } },
+      select: { id: true, status: true },
     });
+    if (tasks.some((t) => t.status !== "queued" && t.status !== "assigned")) {
+      throw new BadRequestException({
+        code: "CANNOT_CANCEL",
+        message: "Separação já começou — não é mais possível cancelar",
+      });
+    }
+
+    const canceled = await this.prisma.$transaction(async (tx) => {
+      if (tasks.length > 0) {
+        await tx.pickTask.deleteMany({ where: { id: { in: tasks.map((t) => t.id) } } });
+      }
+      await tx.orderGroup.updateMany({ where: { orderId: id }, data: { status: "canceled" } });
+      return tx.order.update({ where: { id }, data: { status: "canceled" } });
+    });
+
     // libera a vaga do slot reservado (S5.3)
     if (order.deliverySlotId) await this.scheduling.release(order.deliverySlotId);
+    // estorno integral se já pago
+    await this.refund.issueCancelRefund(id);
+    // rastreio em tempo real
+    await this.tracking.emit(id);
     return canceled;
   }
 

@@ -8,12 +8,15 @@ interface CreateReviewInput {
   axis: ReviewAxis;
   rating: number;
   comment?: string;
+  /** Eixo merchant em pedido multi-loja: qual mercado está sendo avaliado. */
+  merchantId?: string;
 }
 
 /**
  * Avaliações multi-eixo (S5.2). Só o dono pode avaliar um pedido `delivered`,
  * dentro da janela configurável. O eixo `delivery` só se aplica quando houve
- * entrega própria com entregador. Unicidade por (orderId, axis).
+ * entrega própria com entregador. Unicidade por (orderId, axis, merchant):
+ * platform/delivery uma vez por pedido; merchant uma vez por mercado do pedido.
  */
 @Injectable()
 export class ReviewsService {
@@ -37,10 +40,14 @@ export class ReviewsService {
       throw new BadRequestException({ code: "INVALID_RATING", message: "Nota deve ser de 1 a 5" });
     }
     const order = await this.assertOwnedDelivered(userId, orderId);
-    const targets = this.resolveTargets(order, input.axis);
+    const targets = this.resolveTargets(order, input.axis, input.merchantId);
 
-    const existing = await this.prisma.review.findUnique({
-      where: { orderId_axis: { orderId, axis: input.axis } },
+    const existing = await this.prisma.review.findFirst({
+      where: {
+        orderId,
+        axis: input.axis,
+        ...(input.axis === "merchant" ? { targetMerchantId: targets.merchantId } : {}),
+      },
     });
     if (existing) {
       throw new BadRequestException({
@@ -66,11 +73,19 @@ export class ReviewsService {
   private resolveTargets(
     order: OrderWithGroups,
     axis: ReviewAxis,
+    merchantId?: string,
   ): { merchantId: string | null; driverId: string | null } {
     if (axis === "platform") return { merchantId: null, driverId: null };
     if (axis === "merchant") {
-      // MVP: avalia o merchant primário do pedido (primeiro grupo).
-      return { merchantId: order.groups[0]?.merchantId ?? null, driverId: null };
+      // multi-loja: o cliente indica qual mercado; default = primeiro grupo
+      const target = merchantId ?? order.groups[0]?.merchantId ?? null;
+      if (target && !order.groups.some((g) => g.merchantId === target)) {
+        throw new BadRequestException({
+          code: "MERCHANT_NOT_IN_ORDER",
+          message: "Mercado não faz parte deste pedido",
+        });
+      }
+      return { merchantId: target, driverId: null };
     }
     // delivery: exige entrega própria com entregador atribuído
     const driverId = order.groups

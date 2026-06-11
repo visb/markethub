@@ -103,6 +103,7 @@ Ordem de construção: **Base → catálogo/ERP/enriquecimento → cliente → p
 - S5.5 Enriquecimento avançado + métricas de qualidade de catálogo
 - S5.6 Notificações push (FCM/APNs)
 - S5.7 Navegação admin Mercados → Lojas → produtos/pedidos/funcionários/dados (drill-down)
+- S5.8 Alinhamento do app cliente com as telas de referência do marketplace (ref: `briefing/screenshots/marketplace/`)
 
 ## Convenção de status
 

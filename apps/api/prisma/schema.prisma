@@ -773,7 +773,9 @@ model Review {
   targetDriverId   String?
   createdAt        DateTime   @default(now())
 
-  @@unique([orderId, axis])
+  // platform/delivery: 1 por pedido; merchant: 1 por mercado do pedido
+  // (NULLs são distintos no Postgres; unicidade dos eixos sem alvo é garantida no service)
+  @@unique([orderId, axis, targetMerchantId])
   @@index([targetMerchantId])
   @@index([targetDriverId])
   @@map("reviews")

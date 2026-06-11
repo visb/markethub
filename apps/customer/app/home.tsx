@@ -21,6 +21,7 @@ export default function MarketplaceHome() {
   const [address, setAddress] = useState<Address | null>(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [catsOpen, setCatsOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -103,6 +104,32 @@ export default function MarketplaceHome() {
         </ScrollView>
       )}
 
+      {/* Atalho flutuante de categorias (ref: Home.png) */}
+      {catsOpen && (
+        <View style={styles.catsPopup}>
+          {sections.map((s) => (
+            <Pressable
+              key={s.category.id}
+              style={styles.catsItem}
+              onPress={() => {
+                setCatsOpen(false);
+                router.push(`/category/${s.category.id}?name=${encodeURIComponent(s.category.name)}`);
+              }}
+            >
+              <Text>{s.category.name}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+      {sections.length > 0 && (
+        <Pressable
+          style={[styles.fab, styles.fabSmall, { bottom: cart.total > 0 ? 168 : 84 }]}
+          onPress={() => setCatsOpen((v) => !v)}
+        >
+          <Ionicons name={catsOpen ? "close" : "menu"} size={22} color={colors.white} />
+        </Pressable>
+      )}
+
       {cart.total > 0 && (
         <Pressable style={styles.fab} onPress={() => router.push("/cart")}>
           <Ionicons name="cart" size={24} color={colors.white} />
@@ -158,4 +185,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   fabTotal: { color: colors.white, fontSize: 11, fontWeight: "700" },
+  fabSmall: { width: 52, height: 52, right: spacing.lg + 10 },
+  catsPopup: {
+    position: "absolute",
+    right: spacing.lg,
+    bottom: 232,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: spacing.xs,
+    maxWidth: 220,
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  catsItem: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
 });

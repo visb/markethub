@@ -18,6 +18,53 @@ export class RefundService {
     @Inject(PAYMENT_PROVIDER) private readonly provider: PaymentProvider,
   ) {}
 
+  /**
+   * Estorno integral quando o cliente cancela um pedido já pago (antes da
+   * separação começar). Idempotente via unique(orderId) do Refund.
+   */
+  async issueCancelRefund(orderId: string): Promise<void> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { payment: true, refund: true },
+    });
+    if (!order || order.refund) return;
+    if (!order.payment || order.payment.status !== "paid") return;
+
+    const amountCents = order.payment.amountCents;
+    let refundId: string;
+    try {
+      const refund = await this.prisma.refund.create({
+        data: {
+          orderId,
+          amountCents,
+          status: "pending",
+          provider: order.payment.provider,
+          reason: "customer_cancel",
+        },
+      });
+      refundId = refund.id;
+    } catch {
+      this.logger.warn(`Reembolso já existe p/ pedido ${orderId} (corrida) — ignorando`);
+      return;
+    }
+
+    try {
+      const result = await this.provider.refund({
+        chargeId: order.payment.providerChargeId ?? "",
+        amountCents,
+        reason: "customer_cancel",
+      });
+      await this.prisma.refund.update({
+        where: { id: refundId },
+        data: { status: "processed", providerRefundId: result.refundId, processedAt: new Date() },
+      });
+      this.logger.log(`Estorno integral de ${amountCents}c p/ pedido cancelado ${orderId}`);
+    } catch (e) {
+      this.logger.error(`Falha no estorno do cancelamento ${orderId}: ${String(e)}`);
+      await this.prisma.refund.update({ where: { id: refundId }, data: { status: "failed" } });
+    }
+  }
+
   async maybeIssueRefundForOrder(orderId: string): Promise<void> {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },

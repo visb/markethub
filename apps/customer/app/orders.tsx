@@ -60,12 +60,28 @@ export default function OrdersScreen() {
                 )
               }
             >
-              <Text style={styles.id}>#{item.id.slice(0, 4)}</Text>
+              <Text style={styles.id}>#{item.id.slice(-4)}</Text>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontWeight: "600" }}>{STATUS_LABEL[item.status] ?? item.status}</Text>
-                <Text variant="caption" muted>
-                  {new Date(item.createdAt).toLocaleString("pt-BR")}
+                <Text style={{ fontWeight: "600" }}>
+                  {item.status === "delivered" && item.addressSnapshot?.street
+                    ? `Entregue em: ${item.addressSnapshot.street}, ${item.addressSnapshot.number ?? ""}`
+                    : STATUS_LABEL[item.status] ?? item.status}
                 </Text>
+                {item.status !== "delivered" && item.status !== "canceled" && item.scheduledTo ? (
+                  <Text variant="caption" muted>
+                    Entrega prevista para:{" "}
+                    {new Date(item.scheduledTo).toLocaleString("pt-BR", {
+                      day: "2-digit",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </Text>
+                ) : (
+                  <Text variant="caption" muted>
+                    {new Date(item.createdAt).toLocaleString("pt-BR")}
+                  </Text>
+                )}
                 {item.refund && item.refund.amountCents > 0 && (
                   <Text variant="caption" style={{ color: colors.success }}>
                     Reembolso: {brl(item.refund.amountCents)} (falta na separação)
@@ -80,18 +96,19 @@ export default function OrdersScreen() {
                     </Text>
                   )}
               </View>
-              {item.status === "created" ? (
-                <Button title="Pagar" size="sm" onPress={() => router.push(`/payment/${item.id}`)} />
-              ) : item.status === "delivered" ? (
-                <Button
-                  title="Avaliar"
-                  size="sm"
-                  variant="outline"
-                  onPress={() => router.push(`/review/${item.id}`)}
-                />
-              ) : (
+              <View style={{ alignItems: "flex-end", gap: spacing.xs }}>
                 <Text style={{ fontWeight: "700" }}>{brl(item.totalCents)}</Text>
-              )}
+                {item.status === "created" ? (
+                  <Button title="Pagar" size="sm" onPress={() => router.push(`/payment/${item.id}`)} />
+                ) : item.status === "delivered" ? (
+                  <Button
+                    title="Avaliar"
+                    size="sm"
+                    variant="outline"
+                    onPress={() => router.push(`/review/${item.id}`)}
+                  />
+                ) : null}
+              </View>
             </Pressable>
           )}
         />

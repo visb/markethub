@@ -5,12 +5,15 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Button, Text, colors, radius, spacing } from "@markethub/ui";
 import { useAuth } from "@/auth-context";
-import { marketplace, type Address, type SlotView } from "@/api/marketplace";
+import { brl, marketplace, type Address, type CartView, type SlotView } from "@/api/marketplace";
 import { Header } from "@/components/Header";
 
 type Method = "gate" | "door";
 type When = "now" | "schedule";
 type Fulfillment = "delivery" | "pickup";
+
+/** Mantém em sincronia com CartService.DOOR_SURCHARGE_CENTS na API. */
+const DOOR_SURCHARGE_CENTS = 400;
 
 export default function CheckoutScreen() {
   const { api } = useAuth();
@@ -28,14 +31,16 @@ export default function CheckoutScreen() {
   const [storeId, setStoreId] = useState<string | null>(null);
   const [slots, setSlots] = useState<SlotView[]>([]);
   const [slotId, setSlotId] = useState<string | null>(null);
+  const [cart, setCart] = useState<CartView | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [list, cart] = await Promise.all([mkt.addresses(), mkt.getCart()]);
+      const [list, cartView] = await Promise.all([mkt.addresses(), mkt.getCart()]);
       setAddresses(list);
       setSelected(list.find((a) => a.isDefault)?.id ?? list[0]?.id ?? null);
-      setStoreId(cart.groups[0]?.storeId ?? null);
+      setStoreId(cartView.groups[0]?.storeId ?? null);
+      setCart(cartView);
     } finally {
       setLoading(false);
     }
@@ -134,6 +139,34 @@ export default function CheckoutScreen() {
                     />
                   ))}
                   <Button title="Salvar endereço" variant="outline" onPress={addAddress} />
+                </View>
+              )}
+
+              {/* Valor da entrega + desconto de cupom (ref: Shipping Settings.jpg) */}
+              {cart && (
+                <View style={[styles.cardBody, styles.feeBox]}>
+                  {cart.couponCode && (
+                    <View style={styles.feeRow}>
+                      <Ionicons name="pricetag" size={16} color={colors.success} />
+                      <Text variant="caption" style={{ color: colors.success, fontWeight: "700" }}>
+                        Cupom {cart.couponCode} aplicado
+                      </Text>
+                    </View>
+                  )}
+                  <Text variant="caption" muted style={{ textAlign: "right" }}>
+                    Valor da entrega:{" "}
+                    {brl(cart.totals.deliveryCents + (method === "door" ? DOOR_SURCHARGE_CENTS : 0))}
+                  </Text>
+                  {cart.totals.discountCents > 0 && (
+                    <>
+                      <Text variant="caption" muted style={{ textAlign: "right" }}>
+                        Desconto: {brl(cart.totals.discountCents)}
+                      </Text>
+                      <Text variant="caption" style={{ textAlign: "right", fontWeight: "700" }}>
+                        Total: {brl(cart.totals.totalCents + (method === "door" ? DOOR_SURCHARGE_CENTS : 0))}
+                      </Text>
+                    </>
+                  )}
                 </View>
               )}
             </View>
@@ -236,6 +269,8 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   cardBody: { padding: spacing.md, gap: 2 },
+  feeBox: { borderTopWidth: 1, borderTopColor: colors.border },
+  feeRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   link: { color: colors.primary, textDecorationLine: "underline", fontSize: 13 },
   sectionLabel: { color: colors.textMuted, fontSize: 13, marginTop: spacing.sm },
   input: {

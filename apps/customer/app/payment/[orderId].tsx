@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import * as Clipboard from "expo-clipboard";
+import QRCode from "react-native-qrcode-svg";
 import { Button, Text, colors, radius, spacing } from "@markethub/ui";
 import { useAuth } from "@/auth-context";
 import { brl, marketplace, type PaymentView } from "@/api/marketplace";
@@ -21,6 +23,7 @@ export default function PaymentScreen() {
   const mkt = marketplace(api);
   const router = useRouter();
   const [payment, setPayment] = useState<PaymentView | null>(null);
+  const [copied, setCopied] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stop = () => {
@@ -67,7 +70,7 @@ export default function PaymentScreen() {
             title="Acompanhe seu pedido"
             variant="outline"
             style={{ marginTop: spacing.xl, alignSelf: "stretch" }}
-            onPress={() => router.replace("/orders")}
+            onPress={() => router.replace(`/track/${orderId}`)}
           />
         </View>
       </SafeAreaView>
@@ -96,21 +99,38 @@ export default function PaymentScreen() {
           </View>
         </View>
 
-        {/* QR placeholder */}
+        {/* QR do payload PIX copia-e-cola */}
         <View style={styles.qr}>
-          <Ionicons name="qr-code" size={140} color={colors.text} />
+          {payment.qrCode ? (
+            <QRCode value={payment.qrCode} size={180} />
+          ) : (
+            <Ionicons name="qr-code" size={140} color={colors.text} />
+          )}
         </View>
 
         <Text muted style={{ textAlign: "center" }}>
           Escaneie o QR Code ou copie o código abaixo, cole em seu banco
         </Text>
 
-        <View style={styles.codeBox}>
+        <Pressable
+          style={styles.codeBox}
+          onPress={async () => {
+            if (!payment.qrCode) return;
+            await Clipboard.setStringAsync(payment.qrCode);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          }}
+        >
           <Text selectable style={styles.code} numberOfLines={2}>
             {payment.qrCode}
           </Text>
-          <Ionicons name="copy-outline" size={20} color={colors.primary} />
-        </View>
+          <Ionicons name={copied ? "checkmark" : "copy-outline"} size={20} color={copied ? colors.success : colors.primary} />
+        </Pressable>
+        {copied && (
+          <Text variant="caption" style={{ color: colors.success, textAlign: "center" }}>
+            Código copiado!
+          </Text>
+        )}
 
         <View>
           <Text style={{ fontWeight: "700", marginBottom: spacing.sm }}>Siga essas instruções:</Text>

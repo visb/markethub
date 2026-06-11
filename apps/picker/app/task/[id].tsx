@@ -5,6 +5,14 @@ import type { PickItemDTO, PickTaskDTO } from "@markethub/api-client";
 import { Button, Text, colors, radius, spacing } from "@markethub/ui";
 import { useAuth } from "@/auth-context";
 
+/** Resultado da busca pública de catálogo (/search) usado p/ propor substituto. */
+interface SubOffer {
+  offerId: string;
+  name: string;
+  priceCents: number;
+  promoPriceCents: number | null;
+}
+
 const ITEM_STATUS: Record<string, { label: string; color: string }> = {
   pending: { label: "A separar", color: colors.textMuted },
   picked: { label: "Separado", color: colors.success },
@@ -21,6 +29,10 @@ export default function TaskScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pickupCode, setPickupCode] = useState("");
+  // substituição: item em edição + busca de ofertas da mesma loja
+  const [subFor, setSubFor] = useState<string | null>(null);
+  const [subQuery, setSubQuery] = useState("");
+  const [subResults, setSubResults] = useState<SubOffer[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -69,12 +81,26 @@ export default function TaskScreen() {
     ]);
   };
 
-  const substitute = (item: PickItemDTO) => {
-    // Substituição manual por id da oferta (busca de substitutos: fase posterior).
-    Alert.prompt?.("Substituir", "ID da oferta substituta", (offerId) => {
-      if (offerId) void run(() => client.pickSubstitute(id, item.id, offerId));
-    });
+  // Busca ofertas da mesma loja p/ propor substituto (cliente aprova no app dele).
+  const searchSubs = async (storeId: string) => {
+    const q = subQuery.trim();
+    if (!q) {
+      setSubResults([]);
+      return;
+    }
+    const r = await client.request<{ items: SubOffer[] }>(
+      `/search?storeId=${encodeURIComponent(storeId)}&q=${encodeURIComponent(q)}`,
+    );
+    setSubResults(r.items);
   };
+
+  const proposeSub = (item: PickItemDTO, offerId: string) =>
+    run(async () => {
+      await client.pickSubstitute(id, item.id, offerId);
+      setSubFor(null);
+      setSubQuery("");
+      setSubResults([]);
+    });
 
   if (loading) {
     return (
@@ -135,7 +161,48 @@ export default function TaskScreen() {
               <View style={styles.actions}>
                 <Action label="Separar" onPress={() => void pickItem(item)} disabled={busy} />
                 <Action label="Recusar" onPress={() => refuseItem(item)} disabled={busy} danger />
-                <Action label="Substituir" onPress={() => substitute(item)} disabled={busy} />
+                <Action
+                  label="Substituir"
+                  onPress={() => {
+                    setSubFor(subFor === item.id ? null : item.id);
+                    setSubQuery("");
+                    setSubResults([]);
+                  }}
+                  disabled={busy}
+                />
+              </View>
+            )}
+            {subFor === item.id && (
+              <View style={{ marginTop: spacing.sm, gap: spacing.sm }}>
+                <TextInput
+                  value={subQuery}
+                  onChangeText={setSubQuery}
+                  placeholder="Buscar substituto na loja..."
+                  placeholderTextColor={colors.textMuted}
+                  style={styles.subInput}
+                  returnKeyType="search"
+                  onSubmitEditing={() => void searchSubs(task.storeId)}
+                />
+                {subResults.map((o) => (
+                  <Pressable
+                    key={o.offerId}
+                    style={styles.subResult}
+                    disabled={busy}
+                    onPress={() => void proposeSub(item, o.offerId)}
+                  >
+                    <Text variant="caption" style={{ flex: 1 }} numberOfLines={1}>
+                      {o.name}
+                    </Text>
+                    <Text variant="caption" style={{ color: colors.primary, fontWeight: "700" }}>
+                      R$ {((o.promoPriceCents ?? o.priceCents) / 100).toFixed(2).replace(".", ",")}
+                    </Text>
+                  </Pressable>
+                ))}
+                {subResults.length === 0 && subQuery.trim() !== "" && (
+                  <Text variant="caption" muted>
+                    Busque e toque no produto para propor ao cliente.
+                  </Text>
+                )}
               </View>
             )}
           </View>
@@ -254,6 +321,23 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   actionDanger: { borderColor: colors.danger },
+  subInput: {
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    color: colors.text,
+  },
+  subResult: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
   codeBox: { alignItems: "center", paddingVertical: spacing.sm },
   codeInput: {
     backgroundColor: colors.surface,
