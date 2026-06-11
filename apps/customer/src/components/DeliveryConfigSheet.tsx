@@ -4,11 +4,13 @@ import {
   LayoutChangeEvent,
   Modal,
   PanResponder,
+  Platform,
   Pressable,
   StyleSheet,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as Slider from "@rn-primitives/slider";
 import { Text, colors, radius, spacing } from "@markethub/ui";
 import type { Address } from "@/api/marketplace";
 import { RADIUS_MAX, RADIUS_MIN, type FulfillmentMode } from "@/prefs";
@@ -93,24 +95,76 @@ export function DeliveryConfigSheet({
 
 const THUMB = 22;
 
-/**
- * Slider de raio cross-platform (web + nativo) via PanResponder — comportamento de
- * `<input type="range">`: arrastar move o thumb e a bolha em tempo real; commit do
- * valor (onChange) ao soltar. O `@react-native-community/slider` não recebe gesto no web.
- */
-function RangeSlider({
-  value,
-  min,
-  max,
-  disabled,
-  onChange,
-}: {
+interface RangeSliderProps {
   value: number;
   min: number;
   max: number;
   disabled?: boolean;
   onChange: (v: number) => void;
-}) {
+}
+
+/**
+ * Slider do raio de busca de mercados. Híbrido por plataforma:
+ * - web: `@rn-primitives/slider` (Radix) → interação nativa de `<input type=range>`;
+ * - iOS/Android: PanResponder próprio (o primitive não tem gesto no nativo).
+ * A bolha de valor é overlay comum às duas, posicionada pela fração do valor.
+ */
+function RangeSlider(props: RangeSliderProps) {
+  return Platform.OS === "web" ? <WebRangeSlider {...props} /> : <NativeRangeSlider {...props} />;
+}
+
+/** Web: Radix via @rn-primitives. onValueChange é contínuo (sem onValueCommit no primitive). */
+function WebRangeSlider({ value, min, max, disabled, onChange }: RangeSliderProps) {
+  const [display, setDisplay] = useState(value);
+  const [trackW, setTrackW] = useState(0);
+  const [bubbleW, setBubbleW] = useState(0);
+  useEffect(() => setDisplay(value), [value]);
+
+  const frac = (display - min) / (max - min);
+  const thumbCenter = THUMB / 2 + frac * (trackW - THUMB);
+  const bubbleLeft = Math.max(0, Math.min(trackW - bubbleW, thumbCenter - bubbleW / 2));
+
+  return (
+    <View
+      style={[styles.sliderArea, disabled && { opacity: 0.4 }]}
+      onLayout={(e: LayoutChangeEvent) => setTrackW(e.nativeEvent.layout.width)}
+    >
+      <View
+        style={[styles.bubble, { left: bubbleLeft }]}
+        onLayout={(e: LayoutChangeEvent) => setBubbleW(e.nativeEvent.layout.width)}
+      >
+        <Text style={styles.bubbleText}>{display}km</Text>
+      </View>
+      <Slider.Root
+        value={display}
+        min={min}
+        max={max}
+        step={1}
+        disabled={disabled}
+        onValueChange={(v) => {
+          const n = v[0] ?? min;
+          setDisplay(n);
+          onChange(n);
+        }}
+        style={styles.webRoot}
+      >
+        <Slider.Track style={styles.webTrack}>
+          <Slider.Range style={styles.webFill} />
+        </Slider.Track>
+        <Slider.Thumb style={styles.webThumb} />
+      </Slider.Root>
+    </View>
+  );
+}
+
+/** Nativo: gesto via PanResponder (drag contínuo, commit ao soltar). */
+function NativeRangeSlider({
+  value,
+  min,
+  max,
+  disabled,
+  onChange,
+}: RangeSliderProps) {
   const [display, setDisplay] = useState(value);
   const [trackW, setTrackW] = useState(0);
   const [bubbleW, setBubbleW] = useState(0);
@@ -227,6 +281,30 @@ const styles = StyleSheet.create({
   },
   sliderRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   sliderArea: { flex: 1, height: 46 },
+  // web (Radix posiciona Range/Thumb via estilo inline; só damos aparência)
+  webRoot: {
+    position: "relative",
+    flexDirection: "row",
+    alignItems: "center",
+    height: THUMB,
+    marginTop: 24,
+  },
+  webTrack: {
+    position: "relative",
+    flexGrow: 1,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+  },
+  webFill: { position: "absolute", height: 4, borderRadius: 2, backgroundColor: colors.primary },
+  webThumb: {
+    width: THUMB,
+    height: THUMB,
+    borderRadius: THUMB / 2,
+    backgroundColor: colors.primary,
+    borderWidth: 2,
+    borderColor: colors.white,
+  },
   track: {
     position: "absolute",
     left: 0,
