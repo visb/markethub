@@ -1,5 +1,5 @@
-import React from "react";
-import { Modal, Pressable, StyleSheet, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { LayoutChangeEvent, Modal, Pressable, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
 import { Text, colors, radius, spacing } from "@markethub/ui";
@@ -31,6 +31,18 @@ export function DeliveryConfigSheet({
   onRadiusKm: (km: number) => void;
 }) {
   const radiusEnabled = address?.latitude != null && address?.longitude != null;
+  // valor mostrado segue o thumb em tempo real (onValueChange); commit só no fim.
+  const [display, setDisplay] = useState(radiusKm);
+  const [trackW, setTrackW] = useState(0);
+  const [bubbleW, setBubbleW] = useState(0);
+  useEffect(() => setDisplay(radiusKm), [radiusKm]);
+
+  // posição horizontal da bolha = fração do valor no intervalo, centrada no thumb.
+  const frac = (display - RADIUS_MIN) / (RADIUS_MAX - RADIUS_MIN);
+  const THUMB = 20; // largura aproximada do thumb p/ manter a bolha dentro da track
+  const center = THUMB / 2 + frac * (trackW - THUMB);
+  const bubbleLeft = Math.max(0, Math.min(trackW - bubbleW, center - bubbleW / 2));
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
@@ -63,9 +75,15 @@ export function DeliveryConfigSheet({
           <Text variant="caption" muted>
             {RADIUS_MIN}km
           </Text>
-          <View style={{ flex: 1, alignItems: "center" }}>
-            <View style={styles.bubble}>
-              <Text style={styles.bubbleText}>{radiusKm}km</Text>
+          <View
+            style={{ flex: 1, paddingTop: 22 }}
+            onLayout={(e: LayoutChangeEvent) => setTrackW(e.nativeEvent.layout.width)}
+          >
+            <View
+              style={[styles.bubble, { left: bubbleLeft }]}
+              onLayout={(e: LayoutChangeEvent) => setBubbleW(e.nativeEvent.layout.width)}
+            >
+              <Text style={styles.bubbleText}>{display}km</Text>
             </View>
             <Slider
               style={{ alignSelf: "stretch" }}
@@ -77,6 +95,7 @@ export function DeliveryConfigSheet({
               minimumTrackTintColor={colors.primary}
               maximumTrackTintColor={colors.border}
               thumbTintColor={colors.primary}
+              onValueChange={setDisplay}
               onSlidingComplete={onRadiusKm}
             />
           </View>
@@ -138,6 +157,8 @@ const styles = StyleSheet.create({
   },
   sliderRow: { flexDirection: "row", alignItems: "flex-end", gap: spacing.sm },
   bubble: {
+    position: "absolute",
+    top: 0,
     backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: colors.primary,
