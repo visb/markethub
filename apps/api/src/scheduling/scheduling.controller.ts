@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Post, Query } from "@nestjs/common";
 import { IsInt, IsString, Min, MinLength } from "class-validator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
@@ -37,5 +37,11 @@ export class SchedulingController {
   @Post("store/slots")
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateSlotDto) {
     return this.scheduling.create(user.id, user.roles, dto);
+  }
+
+  @Roles("merchant", "admin")
+  @Delete("store/slots/:id")
+  remove(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.scheduling.deleteSlot(user.id, user.roles, id);
   }
 }

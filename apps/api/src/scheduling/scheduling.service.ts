@@ -68,6 +68,18 @@ export class SchedulingService {
     });
   }
 
+  /** Remove um slot (manager/admin da loja). Bloqueia se já houver reserva. */
+  async deleteSlot(userId: string, roles: string[], slotId: string) {
+    const slot = await this.prisma.deliverySlot.findUnique({ where: { id: slotId } });
+    if (!slot) throw new BadRequestException({ code: "SLOT_NOT_FOUND", message: "Slot não encontrado" });
+    await this.assertStoreManager(userId, roles, slot.storeId);
+    if (slot.reserved > 0) {
+      throw new BadRequestException({ code: "SLOT_HAS_RESERVATIONS", message: "Slot com reservas" });
+    }
+    await this.prisma.deliverySlot.delete({ where: { id: slotId } });
+    return { removed: true };
+  }
+
   /**
    * Reserva atômica de uma vaga (usado no checkout, dentro da transação). Valida
    * que o slot pertence a uma das lojas do carrinho e que há vaga. Retorna a janela.

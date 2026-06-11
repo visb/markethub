@@ -16,6 +16,9 @@ import { MarketplaceCategories } from "@/pages/MarketplaceCategories";
 import { Offers } from "@/pages/merchant/Offers";
 import { Stock } from "@/pages/merchant/Stock";
 import { Products } from "@/pages/merchant/Products";
+import { MerchantsList } from "@/pages/merchants/MerchantsList";
+import { MerchantDetail } from "@/pages/merchants/MerchantDetail";
+import { StoreDetail } from "@/pages/merchants/StoreDetail";
 
 /** Tela inicial conforme papel: admin vê o dashboard; manager vai p/ ofertas. */
 function RoleHome() {
@@ -46,6 +49,9 @@ export function App() {
               <Route path="merchant/products" element={<Products />} />
               {/* Telas globais — só admin */}
               <Route element={<AdminOnly />}>
+                <Route path="merchants" element={<MerchantsList />} />
+                <Route path="merchants/:merchantId" element={<MerchantDetail />} />
+                <Route path="stores/:storeId" element={<StoreDetail />} />
                 <Route path="catalog" element={<Catalog />} />
                 <Route path="catalog/:id" element={<ProductDetail />} />
                 <Route path="catalog-quality" element={<CatalogQuality />} />

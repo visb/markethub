@@ -313,3 +313,38 @@ body {
   flex: none;
   width: 100%;
 }
+
+/* Breadcrumb (navegação Mercado → Loja) */
+.breadcrumb {
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.breadcrumb a {
+  color: inherit;
+  text-decoration: none;
+}
+.breadcrumb a:hover {
+  text-decoration: underline;
+}
+
+/* Drawer de detalhe (pedido) */
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  justify-content: flex-end;
+  z-index: 50;
+}
+.drawer {
+  width: min(520px, 100%);
+  height: 100%;
+  overflow-y: auto;
+  background: #fff;
+  padding: 20px;
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.15);
+}
+.drawer ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}

@@ -102,6 +102,7 @@ Ordem de construção: **Base → catálogo/ERP/enriquecimento → cliente → p
 - S5.4 Dashboard admin (pedidos, operações, financeiro)
 - S5.5 Enriquecimento avançado + métricas de qualidade de catálogo
 - S5.6 Notificações push (FCM/APNs)
+- S5.7 Navegação admin Mercados → Lojas → produtos/pedidos/funcionários/dados (drill-down)
 
 ## Convenção de status
 
