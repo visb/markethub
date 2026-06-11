@@ -9,6 +9,13 @@ interface Entry {
   saleType: SaleType;
 }
 
+/** Loja com itens no carrinho (atalhos flutuantes da home). */
+export interface CartStore {
+  storeId: string;
+  merchantId: string;
+  merchant: string;
+}
+
 const SYNC_DELAY = 450;
 const WEIGHT_STEP = 100;
 const WEIGHT_MIN = 100;
@@ -23,6 +30,7 @@ export function useCart() {
   const mkt = useMemo(() => marketplace(api), [api]);
   const [map, setMap] = useState<Record<string, Entry>>({});
   const [total, setTotal] = useState(0);
+  const [stores, setStores] = useState<CartStore[]>([]);
   const mapRef = useRef(map);
   mapRef.current = map;
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -40,6 +48,9 @@ export function useCart() {
         };
     setMap(m);
     setTotal(cart.totals.totalCents);
+    setStores(
+      cart.groups.map((g) => ({ storeId: g.storeId, merchantId: g.merchantId, merchant: g.merchant })),
+    );
   }, [mkt]);
 
   useEffect(() => {
@@ -118,5 +129,5 @@ export function useCart() {
     [map],
   );
 
-  return { total, refresh, add, inc, dec, labelFor };
+  return { total, stores, refresh, add, inc, dec, labelFor };
 }

@@ -12,6 +12,12 @@ import { BottomTabs } from "@/components/BottomTabs";
 import { CategoryMenu } from "@/components/CategoryMenu";
 import Logo from "@/assets/logo.svg";
 
+/** Iniciais do mercado p/ o atalho flutuante (sem logo no modelo ainda). */
+function initials(name: string): string {
+  const words = name.replace(/^(super)?mercado\s+/i, "").trim().split(/\s+/);
+  return words.slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("");
+}
+
 export default function MarketplaceHome() {
   const { api } = useAuth();
   const mkt = marketplace(api);
@@ -21,7 +27,6 @@ export default function MarketplaceHome() {
   const [address, setAddress] = useState<Address | null>(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
-  const [catsOpen, setCatsOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -104,30 +109,21 @@ export default function MarketplaceHome() {
         </ScrollView>
       )}
 
-      {/* Atalho flutuante de categorias (ref: Home.png) */}
-      {catsOpen && (
-        <View style={styles.catsPopup}>
-          {sections.map((s) => (
+      {/* Atalhos flutuantes para as lojas com itens no carrinho (ref: Home.png) */}
+      {cart.stores.length > 0 && (
+        <View style={styles.storeStack}>
+          {cart.stores.map((s) => (
             <Pressable
-              key={s.category.id}
-              style={styles.catsItem}
-              onPress={() => {
-                setCatsOpen(false);
-                router.push(`/category/${s.category.id}?name=${encodeURIComponent(s.category.name)}`);
-              }}
+              key={s.storeId}
+              style={styles.storeFab}
+              onPress={() =>
+                router.push(`/store/${s.storeId}?name=${encodeURIComponent(s.merchant)}`)
+              }
             >
-              <Text>{s.category.name}</Text>
+              <Text style={styles.storeFabText}>{initials(s.merchant)}</Text>
             </Pressable>
           ))}
         </View>
-      )}
-      {sections.length > 0 && (
-        <Pressable
-          style={[styles.fab, styles.fabSmall, { bottom: cart.total > 0 ? 168 : 84 }]}
-          onPress={() => setCatsOpen((v) => !v)}
-        >
-          <Ionicons name={catsOpen ? "close" : "menu"} size={22} color={colors.white} />
-        </Pressable>
       )}
 
       {cart.total > 0 && (
@@ -185,22 +181,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   fabTotal: { color: colors.white, fontSize: 11, fontWeight: "700" },
-  fabSmall: { width: 52, height: 52, right: spacing.lg + 10 },
-  catsPopup: {
-    position: "absolute",
-    right: spacing.lg,
-    bottom: 232,
+  storeStack: { position: "absolute", right: spacing.lg + 10, bottom: 168, gap: spacing.sm },
+  storeFab: {
+    width: 52,
+    height: 52,
+    borderRadius: radius.full,
     backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: spacing.xs,
-    maxWidth: 220,
-    elevation: 4,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 3,
     shadowColor: "#000",
     shadowOpacity: 0.15,
-    shadowRadius: 8,
+    shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
   },
-  catsItem: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  storeFabText: { color: colors.primary, fontWeight: "800", fontSize: 16 },
 });
