@@ -1,16 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import {
-  GestureResponderEvent,
-  LayoutChangeEvent,
-  Modal,
-  PanResponder,
-  Platform,
-  Pressable,
-  StyleSheet,
-  View,
-} from "react-native";
+import React, { useEffect, useState } from "react";
+import { LayoutChangeEvent, Modal, Pressable, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import * as Slider from "@rn-primitives/slider";
+import Slider from "@react-native-community/slider";
 import { Text, colors, radius, spacing } from "@markethub/ui";
 import type { Address } from "@/api/marketplace";
 import { RADIUS_MAX, RADIUS_MIN, type FulfillmentMode } from "@/prefs";
@@ -39,7 +30,7 @@ export function DeliveryConfigSheet({
   radiusKm: number;
   onRadiusKm: (km: number) => void;
 }) {
-  const radiusEnabled = address?.latitude != null && address?.longitude != null;
+  const hasCoords = address?.latitude != null && address?.longitude != null;
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
@@ -68,24 +59,10 @@ export function DeliveryConfigSheet({
         <Text variant="caption" muted style={{ marginTop: spacing.md }}>
           Mercados nesta área
         </Text>
-        <View style={styles.sliderRow}>
+        <RadiusSlider value={radiusKm} onChange={onRadiusKm} />
+        {!hasCoords && (
           <Text variant="caption" muted>
-            {RADIUS_MIN}km
-          </Text>
-          <RangeSlider
-            value={radiusKm}
-            min={RADIUS_MIN}
-            max={RADIUS_MAX}
-            disabled={!radiusEnabled}
-            onChange={onRadiusKm}
-          />
-          <Text variant="caption" muted>
-            {RADIUS_MAX}km
-          </Text>
-        </View>
-        {!radiusEnabled && (
-          <Text variant="caption" muted>
-            Cadastre um endereço para filtrar mercados por distância.
+            Cadastre um endereço com localização para filtrar mercados por distância.
           </Text>
         )}
       </View>
@@ -95,144 +72,53 @@ export function DeliveryConfigSheet({
 
 const THUMB = 22;
 
-interface RangeSliderProps {
-  value: number;
-  min: number;
-  max: number;
-  disabled?: boolean;
-  onChange: (v: number) => void;
-}
-
 /**
- * Slider do raio de busca de mercados. Híbrido por plataforma:
- * - web: `@rn-primitives/slider` (Radix) → interação nativa de `<input type=range>`;
- * - iOS/Android: PanResponder próprio (o primitive não tem gesto no nativo).
- * A bolha de valor é overlay comum às duas, posicionada pela fração do valor.
+ * Slider do raio (5–25 km) com bolha de valor que segue o thumb em tempo real.
+ * @react-native-community/slider funciona em web e nativo. A bolha é overlay
+ * posicionado pela fração do valor; o slider sempre é interativo (o filtro por
+ * distância só se aplica quando o endereço tem coordenadas).
  */
-function RangeSlider(props: RangeSliderProps) {
-  return Platform.OS === "web" ? <WebRangeSlider {...props} /> : <NativeRangeSlider {...props} />;
-}
-
-/** Web: Radix via @rn-primitives. onValueChange é contínuo (sem onValueCommit no primitive). */
-function WebRangeSlider({ value, min, max, disabled, onChange }: RangeSliderProps) {
+function RadiusSlider({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const [display, setDisplay] = useState(value);
   const [trackW, setTrackW] = useState(0);
   const [bubbleW, setBubbleW] = useState(0);
   useEffect(() => setDisplay(value), [value]);
 
-  const frac = (display - min) / (max - min);
+  const frac = (display - RADIUS_MIN) / (RADIUS_MAX - RADIUS_MIN);
   const thumbCenter = THUMB / 2 + frac * (trackW - THUMB);
   const bubbleLeft = Math.max(0, Math.min(trackW - bubbleW, thumbCenter - bubbleW / 2));
 
   return (
-    <View
-      style={[styles.sliderArea, disabled && { opacity: 0.4 }]}
-      onLayout={(e: LayoutChangeEvent) => setTrackW(e.nativeEvent.layout.width)}
-    >
+    <View style={styles.sliderRow}>
+      <Text variant="caption" muted>
+        {RADIUS_MIN}km
+      </Text>
       <View
-        style={[styles.bubble, { left: bubbleLeft }]}
-        onLayout={(e: LayoutChangeEvent) => setBubbleW(e.nativeEvent.layout.width)}
+        style={styles.sliderArea}
+        onLayout={(e: LayoutChangeEvent) => setTrackW(e.nativeEvent.layout.width)}
       >
-        <Text style={styles.bubbleText}>{display}km</Text>
+        <View
+          style={[styles.bubble, { left: bubbleLeft }]}
+          onLayout={(e: LayoutChangeEvent) => setBubbleW(e.nativeEvent.layout.width)}
+        >
+          <Text style={styles.bubbleText}>{display}km</Text>
+        </View>
+        <Slider
+          style={styles.slider}
+          minimumValue={RADIUS_MIN}
+          maximumValue={RADIUS_MAX}
+          step={1}
+          value={value}
+          minimumTrackTintColor={colors.primary}
+          maximumTrackTintColor={colors.border}
+          thumbTintColor={colors.primary}
+          onValueChange={setDisplay}
+          onSlidingComplete={onChange}
+        />
       </View>
-      <Slider.Root
-        value={display}
-        min={min}
-        max={max}
-        step={1}
-        disabled={disabled}
-        onValueChange={(v) => {
-          const n = v[0] ?? min;
-          setDisplay(n);
-          onChange(n);
-        }}
-        style={styles.webRoot}
-      >
-        <Slider.Track style={styles.webTrack}>
-          <Slider.Range style={styles.webFill} />
-        </Slider.Track>
-        <Slider.Thumb style={styles.webThumb} />
-      </Slider.Root>
-    </View>
-  );
-}
-
-/** Nativo: gesto via PanResponder (drag contínuo, commit ao soltar). */
-function NativeRangeSlider({
-  value,
-  min,
-  max,
-  disabled,
-  onChange,
-}: RangeSliderProps) {
-  const [display, setDisplay] = useState(value);
-  const [trackW, setTrackW] = useState(0);
-  const [bubbleW, setBubbleW] = useState(0);
-  const areaRef = useRef<View>(null);
-  const trackWRef = useRef(0);
-  const offsetXRef = useRef(0); // posição da área na janela, p/ converter X absoluto → local
-  useEffect(() => setDisplay(value), [value]);
-  useEffect(() => {
-    trackWRef.current = trackW;
-  }, [trackW]);
-
-  // X absoluto (pageX/moveX) → valor; mede o offset da área pra não depender de
-  // locationX (que no web vem relativo ao elemento tocado, ex.: o thumb).
-  const valueFromPageX = (pageX: number): number => {
-    const w = trackWRef.current || 1;
-    const local = pageX - offsetXRef.current;
-    const frac = Math.max(0, Math.min(1, (local - THUMB / 2) / (w - THUMB)));
-    return Math.round(min + frac * (max - min));
-  };
-  const measure = () => areaRef.current?.measureInWindow((x) => (offsetXRef.current = x));
-
-  const pan = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => !disabled,
-        onMoveShouldSetPanResponder: () => !disabled,
-        onPanResponderGrant: (e: GestureResponderEvent) => {
-          measure();
-          setDisplay(valueFromPageX(e.nativeEvent.pageX));
-        },
-        onPanResponderMove: (_e, g) => setDisplay(valueFromPageX(g.moveX)),
-        onPanResponderRelease: (_e, g) => {
-          const v = valueFromPageX(g.moveX);
-          setDisplay(v);
-          onChange(v);
-        },
-      }),
-    // trackW/offset lidos via ref; recria só quando muda disabled.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [disabled],
-  );
-
-  const frac = (display - min) / (max - min);
-  const thumbLeft = frac * (trackW - THUMB);
-  const thumbCenter = thumbLeft + THUMB / 2;
-  const fillW = thumbCenter;
-  const bubbleLeft = Math.max(0, Math.min(trackW - bubbleW, thumbCenter - bubbleW / 2));
-
-  return (
-    <View
-      ref={areaRef}
-      style={[styles.sliderArea, disabled && { opacity: 0.4 }]}
-      onLayout={(e: LayoutChangeEvent) => {
-        setTrackW(e.nativeEvent.layout.width);
-        measure();
-      }}
-      {...pan.panHandlers}
-    >
-      <View
-        style={[styles.bubble, { left: bubbleLeft }]}
-        onLayout={(e: LayoutChangeEvent) => setBubbleW(e.nativeEvent.layout.width)}
-      >
-        <Text style={styles.bubbleText}>{display}km</Text>
-      </View>
-      <View style={styles.track}>
-        <View style={[styles.fill, { width: fillW }]} />
-      </View>
-      <View style={[styles.thumb, { left: thumbLeft }]} />
+      <Text variant="caption" muted>
+        {RADIUS_MAX}km
+      </Text>
     </View>
   );
 }
@@ -280,52 +166,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   sliderRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  sliderArea: { flex: 1, height: 46 },
-  // web (Radix posiciona Range/Thumb via estilo inline; só damos aparência)
-  webRoot: {
-    position: "relative",
-    flexDirection: "row",
-    alignItems: "center",
-    height: THUMB,
-    marginTop: 24,
-  },
-  webTrack: {
-    position: "relative",
-    flexGrow: 1,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border,
-  },
-  webFill: { position: "absolute", height: 4, borderRadius: 2, backgroundColor: colors.primary },
-  webThumb: {
-    width: THUMB,
-    height: THUMB,
-    borderRadius: THUMB / 2,
-    backgroundColor: colors.primary,
-    borderWidth: 2,
-    borderColor: colors.white,
-  },
-  track: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: 24,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border,
-    overflow: "hidden",
-  },
-  fill: { height: 4, backgroundColor: colors.primary },
-  thumb: {
-    position: "absolute",
-    top: 15,
-    width: THUMB,
-    height: THUMB,
-    borderRadius: THUMB / 2,
-    backgroundColor: colors.primary,
-    borderWidth: 2,
-    borderColor: colors.white,
-  },
+  sliderArea: { flex: 1, height: 46, justifyContent: "flex-end" },
+  slider: { alignSelf: "stretch", height: 40 },
   bubble: {
     position: "absolute",
     top: 0,
