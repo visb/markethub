@@ -13,7 +13,8 @@ export default function AccountScreen() {
 
   const rows: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void }[] = [
     { icon: "receipt-outline", label: "Minhas compras", onPress: () => router.push("/orders") },
-    { icon: "location-outline", label: "Endereços", onPress: () => router.push("/checkout") },
+    { icon: "heart-outline", label: "Favoritos", onPress: () => router.push("/favorites") },
+    { icon: "location-outline", label: "Endereços", onPress: () => router.push("/delivery") },
     { icon: "log-out-outline", label: "Sair", onPress: () => void logout() },
   ];
 

@@ -16,6 +16,7 @@ interface StoreData {
   zipCode: string | null;
   latitude: number | null;
   longitude: number | null;
+  avgPrepMinutes: number;
   active: boolean;
   merchant: { id: string; name: string };
   counts: {
@@ -679,6 +680,7 @@ function DataTab({ store, onChange }: { store: StoreData; onChange: () => void }
             <p className="muted">
               Geo: {store.latitude ?? "—"}, {store.longitude ?? "—"}
             </p>
+            <p className="muted">Tempo de preparo médio: {store.avgPrepMinutes} min</p>
             <p className="muted">
               Ofertas: {store.counts.offers} · Funcionários: {store.counts.staff} · Slots:{" "}
               {store.counts.slots}
@@ -729,6 +731,7 @@ function StoreEditForm({ store, onSaved }: { store: StoreData; onSaved: () => vo
     zipCode: store.zipCode ?? "",
     latitude: store.latitude == null ? "" : String(store.latitude),
     longitude: store.longitude == null ? "" : String(store.longitude),
+    avgPrepMinutes: String(store.avgPrepMinutes),
   });
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -747,6 +750,7 @@ function StoreEditForm({ store, onSaved }: { store: StoreData; onSaved: () => vo
       };
       if (f.latitude !== "") body.latitude = Number(f.latitude);
       if (f.longitude !== "") body.longitude = Number(f.longitude);
+      if (f.avgPrepMinutes !== "") body.avgPrepMinutes = Math.max(1, Math.round(Number(f.avgPrepMinutes)));
       await api.request(`/admin/stores/${store.id}`, { method: "PATCH", auth: true, body });
       onSaved();
     } catch (e) {
@@ -771,6 +775,7 @@ function StoreEditForm({ store, onSaved }: { store: StoreData; onSaved: () => vo
         {field("zipCode", "CEP")}
         {field("latitude", "Latitude")}
         {field("longitude", "Longitude")}
+        {field("avgPrepMinutes", "Tempo de preparo (min)")}
         <button className="btn-primary" onClick={save}>
           Salvar
         </button>

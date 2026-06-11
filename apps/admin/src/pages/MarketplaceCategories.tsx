@@ -1,12 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/auth/auth-context";
 
+interface PrepOptions {
+  label: string;
+  options: string[];
+}
 interface Curated {
   id: string;
   name: string;
   slug: string;
   displayOrder: number;
   visible: boolean;
+  prepOptions: PrepOptions | null;
   _count: { rawCategories: number };
 }
 interface RawCat {
@@ -22,6 +27,9 @@ export function MarketplaceCategories() {
   const [curated, setCurated] = useState<Curated[]>([]);
   const [raw, setRaw] = useState<RawCat[]>([]);
   const [form, setForm] = useState({ name: "", displayOrder: 0 });
+  // editor de preparo (S6.6): id da categoria em edição + rascunho do form
+  const [prepEdit, setPrepEdit] = useState<string | null>(null);
+  const [prepDraft, setPrepDraft] = useState({ label: "", options: "" });
 
   const load = useCallback(async () => {
     setCurated(await api.request<Curated[]>("/admin/marketplace-categories", { auth: true }));
@@ -46,6 +54,23 @@ export function MarketplaceCategories() {
     if (!confirm("Remover categoria curada? As cruas serão desvinculadas.")) return;
     await api.request(`/admin/marketplace-categories/${id}`, { method: "DELETE", auth: true });
     await load();
+  }
+  function openPrep(c: Curated) {
+    setPrepEdit(c.id);
+    setPrepDraft({
+      label: c.prepOptions?.label ?? "",
+      options: c.prepOptions?.options.join(", ") ?? "",
+    });
+  }
+  async function savePrep(id: string) {
+    const label = prepDraft.label.trim();
+    const options = prepDraft.options
+      .split(",")
+      .map((o) => o.trim())
+      .filter(Boolean);
+    const prepOptions = label && options.length ? { label, options } : null;
+    await patch(id, { prepOptions });
+    setPrepEdit(null);
   }
   async function assign(categoryId: string, marketplaceCategoryId: string) {
     await api.request(`/admin/marketplace-categories/raw/${categoryId}/assign`, {
@@ -90,12 +115,14 @@ export function MarketplaceCategories() {
             <th>Nome</th>
             <th>Cruas vinculadas</th>
             <th>Visível</th>
+            <th>Preparo</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           {curated.map((c) => (
-            <tr key={c.id}>
+            <Fragment key={c.id}>
+            <tr>
               <td>
                 <input
                   className="input mini"
@@ -116,11 +143,49 @@ export function MarketplaceCategories() {
                 </button>
               </td>
               <td>
+                <button className="btn-ghost" onClick={() => openPrep(c)}>
+                  {c.prepOptions ? `${c.prepOptions.label} (${c.prepOptions.options.length})` : "definir"}
+                </button>
+              </td>
+              <td>
                 <button className="btn-ghost" onClick={() => remove(c.id)}>
                   remover
                 </button>
               </td>
             </tr>
+            {prepEdit === c.id && (
+              <tr>
+                <td colSpan={6}>
+                  <div className="card" style={{ display: "grid", gap: 8, padding: 12 }}>
+                    <p className="muted" style={{ margin: 0 }}>
+                      Pergunta de preparo exibida no detalhe do produto desta categoria. Opções
+                      separadas por vírgula. Deixe em branco para remover.
+                    </p>
+                    <input
+                      className="input"
+                      placeholder="Rótulo (ex.: Como prefere o corte?)"
+                      value={prepDraft.label}
+                      onChange={(e) => setPrepDraft({ ...prepDraft, label: e.target.value })}
+                    />
+                    <input
+                      className="input"
+                      placeholder="Opções (ex.: Inteiro, Em pedaços, Moído)"
+                      value={prepDraft.options}
+                      onChange={(e) => setPrepDraft({ ...prepDraft, options: e.target.value })}
+                    />
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button className="btn-primary" onClick={() => savePrep(c.id)}>
+                        Salvar
+                      </button>
+                      <button className="btn-ghost" onClick={() => setPrepEdit(null)}>
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            )}
+            </Fragment>
           ))}
         </tbody>
       </table>
