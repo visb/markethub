@@ -5,11 +5,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Button, Text, colors, radius, spacing } from "@markethub/ui";
 import { useAuth } from "@/auth-context";
-import { brl, marketplace, type ProductView } from "@/api/marketplace";
+import { brl, marketplace, type ProductView, type StoreMeta } from "@/api/marketplace";
 import { useCart } from "@/use-cart";
+import { CartFab } from "@/components/CartFab";
 import { ProductCard } from "@/components/ProductCard";
 import { CategoryMenu, type MenuCategory } from "@/components/CategoryMenu";
 import { Header } from "@/components/Header";
+import { MerchantLogo } from "@/components/MerchantLogo";
+import { getRadiusKm } from "@/prefs";
 
 export default function StoreHome() {
   const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
@@ -22,6 +25,7 @@ export default function StoreHome() {
     mostBought: ProductView[];
     recommended: ProductView[];
   } | null>(null);
+  const [store, setStore] = useState<StoreMeta | null>(null);
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<ProductView[] | null>(null);
@@ -31,7 +35,24 @@ export default function StoreHome() {
     if (!id) return;
     setLoading(true);
     try {
-      setSections(await mkt.sections(id));
+      // ETA/distância reais desta loja a partir do endereço padrão (S6.7)
+      let geo;
+      try {
+        const [addrs, km] = await Promise.all([mkt.addresses(), getRadiusKm()]);
+        const addr = addrs.find((a) => a.isDefault) ?? addrs[0] ?? null;
+        if (addr?.latitude != null && addr.longitude != null) {
+          geo = { lat: addr.latitude, lng: addr.longitude, radiusKm: km };
+        }
+      } catch {
+        /* sem endereço */
+      }
+      const data = await mkt.sections(id, geo);
+      setStore(data.store);
+      setSections({
+        featured: data.featured,
+        mostBought: data.mostBought,
+        recommended: data.recommended,
+      });
       setCategories(await mkt.categories());
     } finally {
       setLoading(false);
@@ -84,16 +105,15 @@ export default function StoreHome() {
       <Header title={name ?? "Loja"} />
 
       <View style={styles.storeHead}>
-        <View style={styles.logo}>
-          <Ionicons name="storefront" size={20} color={colors.white} />
-        </View>
+        <MerchantLogo name={store?.merchantName ?? name ?? "Loja"} logoUrl={store?.merchantLogoUrl} size={48} />
         <View style={{ flex: 1 }}>
-          <Text style={styles.storeName}>{name ?? "Loja"}</Text>
+          <Text style={styles.storeName}>{store?.merchantName ?? name ?? "Loja"}</Text>
           <Text variant="caption" muted>
-            🛵 Valor da entrega entre R$7 e R$15
+            🛵 Entrega {store ? brl(store.deliveryFeeCents) : "—"}
+            {store?.distanceKm != null ? ` · ${store.distanceKm} km` : ""}
           </Text>
           <Text variant="caption" muted>
-            ⏱ Entrega em 30 min ou programada
+            ⏱ {store ? `${store.etaMinutes} min` : "30 min"} ou programada
           </Text>
         </View>
         <Button title="♡ Seguir" size="sm" onPress={() => {}} />
@@ -144,12 +164,7 @@ export default function StoreHome() {
         </ScrollView>
       )}
 
-      {cart.total > 0 && (
-        <Pressable style={styles.fab} onPress={() => router.push("/cart")}>
-          <Ionicons name="cart" size={24} color={colors.white} />
-          <Text style={styles.fabTotal}>{brl(cart.total)}</Text>
-        </Pressable>
-      )}
+      <CartFab totalCents={cart.total} onPress={() => router.push("/cart")} />
     </SafeAreaView>
   );
 }
@@ -157,14 +172,6 @@ export default function StoreHome() {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   storeHead: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md },
-  logo: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.full,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   storeName: { color: colors.primary, fontSize: 18, fontWeight: "700" },
   searchWrap: {
     flexDirection: "row",
@@ -186,16 +193,4 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     marginBottom: spacing.sm,
   },
-  fab: {
-    position: "absolute",
-    right: spacing.lg,
-    bottom: spacing.lg,
-    backgroundColor: colors.primary,
-    borderRadius: radius.full,
-    width: 72,
-    height: 72,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  fabTotal: { color: colors.white, fontSize: 11, fontWeight: "700" },
 });

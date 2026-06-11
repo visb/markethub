@@ -20,6 +20,7 @@ import { ReviewsModule } from "./reviews/reviews.module";
 import { SchedulingModule } from "./scheduling/scheduling.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { AdminModule } from "./admin/admin.module";
+import { FavoritesModule } from "./favorites/favorites.module";
 import { JwtAuthGuard } from "./auth/guards/jwt-auth.guard";
 import { RolesGuard } from "./auth/guards/roles.guard";
 
@@ -44,6 +45,7 @@ import { RolesGuard } from "./auth/guards/roles.guard";
     SchedulingModule,
     NotificationsModule,
     AdminModule,
+    FavoritesModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

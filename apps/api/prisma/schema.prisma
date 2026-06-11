@@ -33,6 +33,7 @@ model User {
   driverDeliveries Delivery[]    @relation("DriverDeliveries")
   tipsReceived     Tip[]         @relation("DriverTips")
   deviceTokens     DeviceToken[]
+  favorites        Favorite[]
 
   @@map("users")
 }
@@ -153,6 +154,8 @@ model Store {
   zipCode       String?
   latitude      Float?
   longitude     Float?
+  // tempo médio de preparo do pedido (min) — compõe o ETA real (S6.7)
+  avgPrepMinutes Int           @default(15)
   active        Boolean        @default(true)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
@@ -194,6 +197,8 @@ model MarketplaceCategory {
   slug          String                @unique
   displayOrder  Int                   @default(0)
   visible       Boolean               @default(true)
+  // pergunta de preparo do departamento (S6.6): { label, options[] } — null = sem pergunta
+  prepOptions   Json?
   parent        MarketplaceCategory?  @relation("MktCatTree", fields: [parentId], references: [id])
   parentId      String?
   children      MarketplaceCategory[] @relation("MktCatTree")
@@ -255,6 +260,7 @@ model Offer {
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
   cartItems       CartItem[]
+  favorites       Favorite[]
 
   @@unique([storeId, productId])
   @@unique([storeId, externalId])
@@ -395,6 +401,21 @@ enum CouponType {
   fixed // valor fixo em centavos
   percent // percentual (value = %)
   free_shipping
+}
+
+// Favorito de oferta (produto numa loja) do cliente (S6.5). Referência viva à Offer:
+// preço/disponibilidade sempre atuais; se a Offer sumir, o app mostra indisponível.
+model Favorite {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  offer     Offer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  offerId   String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, offerId])
+  @@index([userId])
+  @@map("favorites")
 }
 
 model Address {

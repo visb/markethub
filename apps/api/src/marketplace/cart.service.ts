@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { etaMinutes, haversineKm } from "../common/geo";
 import { PrismaService } from "../prisma/prisma.service";
 import { computeCart, type CalcCoupon, type CalcGroup } from "./pricing";
 
@@ -147,7 +148,20 @@ export class CartService {
     }
 
     const calcGroups: CalcGroup[] = [];
+    const groupStores: {
+      storeId: string;
+      latitude: number | null;
+      longitude: number | null;
+      avgPrepMinutes: number;
+    }[] = [];
     const viewGroups = [...byMerchant.entries()].map(([mid, its]) => {
+      const st = its[0]!.offer.store;
+      groupStores.push({
+        storeId: st.id,
+        latitude: st.latitude,
+        longitude: st.longitude,
+        avgPrepMinutes: st.avgPrepMinutes,
+      });
       const merchant = its[0]!.offer.store.merchant;
       calcGroups.push({
         merchantId: mid,
@@ -187,13 +201,45 @@ export class CartService {
 
     const coupon = couponCode ? await this.loadValidCoupon(couponCode) : null;
     const totals = computeCart(calcGroups, { coupon, doorSurchargeCents });
+    const etaByStore = await this.groupEta(cartId, groupStores);
 
     return {
       couponCode,
       itemCount: items.length,
-      groups: viewGroups,
+      groups: viewGroups.map((g) => ({
+        ...g,
+        etaMinutes: etaByStore.get(g.storeId)?.etaMinutes ?? null,
+        distanceKm: etaByStore.get(g.storeId)?.distanceKm ?? null,
+      })),
       totals,
     };
+  }
+
+  /**
+   * ETA real por mercado (S6.7): preparo da loja + deslocamento até o endereço
+   * padrão do dono do carrinho. Sem coordenadas → distância null e ETA só de preparo.
+   */
+  private async groupEta(
+    cartId: string,
+    stores: { storeId: string; latitude: number | null; longitude: number | null; avgPrepMinutes: number }[],
+  ): Promise<Map<string, { etaMinutes: number; distanceKm: number | null }>> {
+    const cart = await this.prisma.cart.findUnique({ where: { id: cartId }, select: { userId: true } });
+    const addr = cart
+      ? await this.prisma.address.findFirst({
+          where: { userId: cart.userId, isDefault: true },
+          select: { latitude: true, longitude: true },
+        })
+      : null;
+    const out = new Map<string, { etaMinutes: number; distanceKm: number | null }>();
+    for (const s of stores) {
+      const hasGeo =
+        addr?.latitude != null && addr.longitude != null && s.latitude != null && s.longitude != null;
+      const distanceKm = hasGeo
+        ? Math.round(haversineKm(addr.latitude!, addr.longitude!, s.latitude!, s.longitude!) * 10) / 10
+        : null;
+      out.set(s.storeId, { etaMinutes: etaMinutes(s.avgPrepMinutes, distanceKm ?? 0), distanceKm });
+    }
+    return out;
   }
 
   private normalizeQty(

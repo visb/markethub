@@ -69,6 +69,8 @@ export interface CartView {
     merchant: string;
     merchantLogoUrl: string | null;
     storeId: string;
+    etaMinutes: number | null;
+    distanceKm: number | null;
     items: CartItemView[];
   }[];
   totals: CartTotals;
@@ -79,9 +81,12 @@ export interface Address {
   label: string;
   street: string;
   number: string;
+  district?: string | null;
   city: string;
   state: string;
   zipCode: string;
+  latitude: number | null;
+  longitude: number | null;
   isDefault: boolean;
 }
 
@@ -186,11 +191,52 @@ export interface FeedItem extends ProductView {
   merchantLogoUrl: string | null;
   deliveryFeeCents: number;
   deliveryEta: string;
+  etaMinutes: number;
   distanceKm: number | null;
 }
 export interface FeedSection {
   category: { id: string; name: string; slug: string };
   items: FeedItem[];
+}
+
+/** Posição + raio (S6.4) anexados às consultas de vitrine. */
+export interface GeoQuery {
+  lat: number;
+  lng: number;
+  radiusKm?: number;
+}
+
+/** Meta da loja na vitrine (S6.4/S6.7). */
+export interface StoreMeta {
+  id: string;
+  name: string;
+  merchantName: string;
+  merchantLogoUrl: string | null;
+  deliveryFeeCents: number;
+  distanceKm: number | null;
+  etaMinutes: number;
+}
+
+/** Favorito de oferta (S6.5). */
+export interface FavoriteView {
+  offerId: string;
+  createdAt: string;
+  priceCents: number;
+  promoPriceCents: number | null;
+  available: boolean;
+  product: {
+    id: string;
+    name: string;
+    imageUrl: string | null;
+    saleType: SaleType;
+    packageSize: string | null;
+  };
+  store: { id: string; name: string; merchantName: string; merchantLogoUrl: string | null };
+}
+
+export interface CoveredCity {
+  city: string;
+  state: string;
 }
 
 export interface ProductDetail {
@@ -203,6 +249,8 @@ export interface ProductDetail {
   description: string | null;
   gtin: string | null;
   category: { name: string } | null;
+  /** Pergunta de preparo do departamento (S6.6); null = sem pergunta. */
+  prepOptions: { label: string; options: string[] } | null;
   offers: {
     id: string;
     priceCents: number;
@@ -222,10 +270,19 @@ export interface PaymentView {
 
 /** Wrapper tipado sobre o ApiClient para o marketplace. */
 export function marketplace(api: ApiClient) {
+  const geoQs = (qs: URLSearchParams, geo?: GeoQuery) => {
+    if (!geo) return qs;
+    qs.set("lat", String(geo.lat));
+    qs.set("lng", String(geo.lng));
+    if (geo.radiusKm != null) qs.set("radiusKm", String(geo.radiusKm));
+    return qs;
+  };
+
   return {
-    feed: () => api.request<FeedSection[]>("/feed"),
-    categoryFeed: (categoryId: string, opts?: { q?: string; storeId?: string }) => {
-      const qs = new URLSearchParams({ pageSize: "50" });
+    feed: (geo?: GeoQuery) =>
+      api.request<FeedSection[]>(`/feed?${geoQs(new URLSearchParams(), geo)}`),
+    categoryFeed: (categoryId: string, opts?: { q?: string; storeId?: string; geo?: GeoQuery }) => {
+      const qs = geoQs(new URLSearchParams({ pageSize: "50" }), opts?.geo);
       if (opts?.q) qs.set("q", opts.q);
       if (opts?.storeId) qs.set("storeId", opts.storeId);
       return api.request<{ category: FeedSection["category"]; items: FeedItem[] }>(
@@ -241,12 +298,13 @@ export function marketplace(api: ApiClient) {
       api.request<Paginated<ProductView>>(
         `/search?storeId=${storeId}&q=${encodeURIComponent(q)}`,
       ),
-    sections: (storeId: string) =>
+    sections: (storeId: string, geo?: GeoQuery) =>
       api.request<{
+        store: StoreMeta;
         featured: ProductView[];
         mostBought: ProductView[];
         recommended: ProductView[];
-      }>(`/stores/${storeId}/sections`),
+      }>(`/stores/${storeId}/sections?${geoQs(new URLSearchParams(), geo)}`),
     categories: () =>
       api.request<{ id: string; name: string; slug: string }[]>(
         "/marketplace-categories",
@@ -266,8 +324,19 @@ export function marketplace(api: ApiClient) {
     addresses: () => api.request<Address[]>("/addresses", { auth: true }),
     addAddress: (body: Partial<Address>) =>
       api.request<Address>("/addresses", { method: "POST", auth: true, body }),
+    updateAddress: (id: string, body: Partial<Address>) =>
+      api.request<Address>(`/addresses/${id}`, { method: "PATCH", auth: true, body }),
+    removeAddress: (id: string) =>
+      api.request<{ id: string }>(`/addresses/${id}`, { method: "DELETE", auth: true }),
     setDefaultAddress: (id: string) =>
       api.request<Address>(`/addresses/${id}/default`, { method: "POST", auth: true }),
+    coverageCities: () => api.request<CoveredCity[]>("/coverage/cities"),
+
+    favorites: () => api.request<FavoriteView[]>("/favorites", { auth: true }),
+    addFavorite: (offerId: string) =>
+      api.request<{ id: string }>("/favorites", { method: "POST", auth: true, body: { offerId } }),
+    removeFavorite: (offerId: string) =>
+      api.request<{ removed: boolean }>(`/favorites/${offerId}`, { method: "DELETE", auth: true }),
 
     slots: (storeId: string) => api.request<SlotView[]>(`/stores/${storeId}/slots`),
     checkout: (body: {

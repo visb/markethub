@@ -22,6 +22,8 @@ class UpdateMktCategoryDto {
   @IsOptional() @IsInt() displayOrder?: number;
   @IsOptional() @IsBoolean() visible?: boolean;
   @IsOptional() @IsString() parentId?: string | null;
+  /** Pergunta de preparo do departamento (S6.6); null remove. */
+  @IsOptional() prepOptions?: { label: string; options: string[] } | null;
 }
 
 class AssignRawDto {

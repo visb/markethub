@@ -1,4 +1,4 @@
-import { PrismaClient, type RoleName } from "@prisma/client";
+import { Prisma, PrismaClient, type RoleName } from "@prisma/client";
 import * as argon2 from "argon2";
 
 const prisma = new PrismaClient();
@@ -65,13 +65,29 @@ async function seedDeliverySlots(): Promise<void> {
   console.log(`Delivery slots ok (${count} slots).`);
 }
 
-// Departamentos curados (aparecem no marketplace) — nome, ordem.
+// Departamentos curados (aparecem no marketplace) — nome, ordem e, quando faz
+// sentido, a pergunta de preparo do departamento (S6.6).
 const CURATED = [
-  { name: "Hortifruti", order: 1 },
-  { name: "Padaria", order: 2 },
-  { name: "Açougue", order: 3 },
-  { name: "Bebidas", order: 4 },
-  { name: "Mercearia", order: 5 },
+  {
+    name: "Hortifruti",
+    order: 1,
+    prepOptions: { label: "Maturação", options: ["Verde (para amadurecer)", "No ponto", "Bem maduro"] },
+  },
+  {
+    name: "Padaria",
+    order: 2,
+    prepOptions: { label: "Ponto do pão", options: ["Mais clarinho", "Normal", "Bem assado"] },
+  },
+  {
+    name: "Açougue",
+    order: 3,
+    prepOptions: {
+      label: "Tipo de corte",
+      options: ["Peça inteira", "Bifes finos", "Bifes grossos", "Em cubos", "Em tiras", "Moído"],
+    },
+  },
+  { name: "Bebidas", order: 4, prepOptions: null },
+  { name: "Mercearia", order: 5, prepOptions: null },
 ] as const;
 
 // Categorias canônicas (departamentos dos screenshots).
@@ -93,10 +109,10 @@ async function seedCatalog(): Promise<void> {
     await prisma.category.upsert({ where: { slug }, update: {}, create: { name, slug } });
   }
 
-  // Merchants + 1 loja cada.
+  // Merchants + 1 loja cada (coordenadas em Curitiba p/ raio e ETA em dev, S6.4/S6.7).
   const merchants = [
-    { name: "Supermercado Europa", city: "Curitiba", state: "PR" },
-    { name: "Supermercado Condor", city: "Curitiba", state: "PR" },
+    { name: "Supermercado Europa", city: "Curitiba", state: "PR", latitude: -25.4284, longitude: -49.2733 },
+    { name: "Supermercado Condor", city: "Curitiba", state: "PR", latitude: -25.4521, longitude: -49.2918 },
   ];
 
   for (const m of merchants) {
@@ -109,13 +125,15 @@ async function seedCatalog(): Promise<void> {
     });
     await prisma.store.upsert({
       where: { merchantId_externalId: { merchantId: merchant.id, externalId: "loja-1" } },
-      update: {},
+      update: { latitude: m.latitude, longitude: m.longitude },
       create: {
         merchantId: merchant.id,
         name: `${m.name} - Centro`,
         externalId: "loja-1",
         city: m.city,
         state: m.state,
+        latitude: m.latitude,
+        longitude: m.longitude,
       },
     });
   }
@@ -132,10 +150,11 @@ async function seedCatalog(): Promise<void> {
 async function seedMarketplaceCategories(): Promise<void> {
   for (const c of CURATED) {
     const slug = slugify(c.name);
+    const prepOptions = c.prepOptions ?? Prisma.JsonNull;
     const mkt = await prisma.marketplaceCategory.upsert({
       where: { slug },
-      update: { displayOrder: c.order },
-      create: { name: c.name, slug, displayOrder: c.order, visible: true },
+      update: { displayOrder: c.order, prepOptions },
+      create: { name: c.name, slug, displayOrder: c.order, visible: true, prepOptions },
     });
     // Liga a categoria crua homônima (se existir) à curada.
     await prisma.category.updateMany({

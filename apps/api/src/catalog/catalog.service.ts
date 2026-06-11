@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
+import { etaMinutes, haversineKm } from "../common/geo";
 import { PrismaService } from "../prisma/prisma.service";
 
 export interface Paginated<T> {
@@ -7,6 +8,13 @@ export interface Paginated<T> {
   page: number;
   pageSize: number;
   total: number;
+}
+
+/** Posição do cliente + raio de busca (S6.4); raio só filtra quando informado. */
+export interface GeoFilter {
+  lat: number;
+  lng: number;
+  radiusKm?: number;
 }
 
 const MAX_PAGE_SIZE = 100;
@@ -135,7 +143,15 @@ export class CatalogService {
     const product = await this.prisma.product.findUnique({
       where: { id: productId },
       include: {
-        category: { select: { id: true, name: true, slug: true } },
+        category: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            // pergunta de preparo do departamento (S6.6)
+            marketplaceCategory: { select: { prepOptions: true } },
+          },
+        },
         offers: {
           where: { available: true },
           select: {
@@ -148,12 +164,36 @@ export class CatalogService {
       },
     });
     if (!product) throw this.notFound("PRODUCT_NOT_FOUND", "Product not found");
-    return product;
+    const { category, ...rest } = product;
+    const prep = category?.marketplaceCategory?.prepOptions as
+      | { label?: string; options?: string[] }
+      | null
+      | undefined;
+    return {
+      ...rest,
+      category: category ? { id: category.id, name: category.name, slug: category.slug } : null,
+      prepOptions:
+        prep && typeof prep.label === "string" && Array.isArray(prep.options) && prep.options.length > 0
+          ? { label: prep.label, options: prep.options.map(String) }
+          : null,
+    };
   }
 
   /** Seções da vitrine (MVP: regras simples). */
-  async storeSections(storeId: string) {
-    await this.assertStore(storeId);
+  async storeSections(storeId: string, geo?: GeoFilter) {
+    const store = await this.prisma.store.findUnique({
+      where: { id: storeId },
+      select: {
+        id: true,
+        name: true,
+        active: true,
+        latitude: true,
+        longitude: true,
+        avgPrepMinutes: true,
+        merchant: { select: { name: true, logoUrl: true, deliveryFeeCents: true } },
+      },
+    });
+    if (!store || !store.active) throw this.notFound("STORE_NOT_FOUND", "Store not found");
     const base: Prisma.OfferWhereInput = { storeId, available: true };
 
     const [featured, mostBought, recommended] = await this.prisma.$transaction([
@@ -177,7 +217,20 @@ export class CatalogService {
       }),
     ]);
 
+    const hasGeo = geo && store.latitude != null && store.longitude != null;
+    const distanceKm = hasGeo
+      ? round1(haversineKm(geo.lat, geo.lng, store.latitude!, store.longitude!))
+      : null;
     return {
+      store: {
+        id: store.id,
+        name: store.name,
+        merchantName: store.merchant.name,
+        merchantLogoUrl: store.merchant.logoUrl,
+        deliveryFeeCents: store.merchant.deliveryFeeCents,
+        distanceKm,
+        etaMinutes: etaMinutes(store.avgPrepMinutes, distanceKm ?? 0),
+      },
       featured: featured.map(toOfferView),
       mostBought: mostBought.map(toOfferView),
       recommended: recommended.map(toOfferView),
@@ -188,7 +241,7 @@ export class CatalogService {
    * Feed da home do marketplace: por departamento curado, produtos de VÁRIOS mercados
    * (cada card traz o mercado + frete + tempo). Proximidade real entra com geo (Fase 4).
    */
-  async feed(opts: { limitPerCategory?: number } = {}) {
+  async feed(opts: { limitPerCategory?: number; geo?: GeoFilter } = {}) {
     const take = Math.min(20, Math.max(1, opts.limitPerCategory ?? 10));
     const cats = await this.prisma.marketplaceCategory.findMany({
       where: { visible: true },
@@ -197,7 +250,10 @@ export class CatalogService {
     });
 
     const sections = await Promise.all(
-      cats.map(async (cat) => ({ category: cat, items: await this.categoryOffers(cat.id, take) })),
+      cats.map(async (cat) => ({
+        category: cat,
+        items: await this.categoryOffers(cat.id, take, 0, { geo: opts.geo }),
+      })),
     );
 
     return sections.filter((s) => s.items.length > 0);
@@ -209,7 +265,7 @@ export class CatalogService {
    */
   async categoryFeed(
     marketplaceCategoryId: string,
-    opts: { page?: number; pageSize?: number; q?: string; storeId?: string } = {},
+    opts: { page?: number; pageSize?: number; q?: string; storeId?: string; geo?: GeoFilter } = {},
   ) {
     const cat = await this.prisma.marketplaceCategory.findUnique({
       where: { id: marketplaceCategoryId },
@@ -220,6 +276,7 @@ export class CatalogService {
     const items = await this.categoryOffers(marketplaceCategoryId, take, skip, {
       q: opts.q,
       storeId: opts.storeId,
+      geo: opts.geo,
     });
     return { category: cat, items, page, pageSize };
   }
@@ -228,7 +285,7 @@ export class CatalogService {
     marketplaceCategoryId: string,
     take: number,
     skip = 0,
-    opts: { q?: string; storeId?: string } = {},
+    opts: { q?: string; storeId?: string; geo?: GeoFilter } = {},
   ) {
     const q = opts.q?.trim();
     const offers = await this.prisma.offer.findMany({
@@ -247,7 +304,8 @@ export class CatalogService {
             : {}),
         },
       },
-      take,
+      // raio (S6.4): busca um excedente p/ compensar lojas filtradas pela distância
+      take: opts.geo?.radiusKm != null ? take * 3 : take,
       skip,
       orderBy: { updatedAt: "desc" },
       select: {
@@ -258,6 +316,9 @@ export class CatalogService {
           select: {
             id: true,
             name: true,
+            latitude: true,
+            longitude: true,
+            avgPrepMinutes: true,
             merchant: { select: { name: true, logoUrl: true, deliveryFeeCents: true } },
           },
         },
@@ -266,7 +327,12 @@ export class CatalogService {
         },
       },
     });
-    return offers.map(toFeedView);
+    const views = offers.map((o) => toFeedView(o, opts.geo));
+    const filtered =
+      opts.geo?.radiusKm != null
+        ? views.filter((v) => v.distanceKm != null && v.distanceKm <= opts.geo!.radiusKm!)
+        : views;
+    return filtered.slice(0, take);
   }
 
   // ─── helpers ───
@@ -339,6 +405,9 @@ type FeedRow = {
   store: {
     id: string;
     name: string;
+    latitude: number | null;
+    longitude: number | null;
+    avgPrepMinutes: number;
     merchant: { name: string; logoUrl: string | null; deliveryFeeCents: number };
   };
   product: {
@@ -351,8 +420,17 @@ type FeedRow = {
   };
 };
 
-/** Card do feed multi-mercado: produto + mercado + frete + tempo. */
-function toFeedView(row: FeedRow) {
+/**
+ * Card do feed multi-mercado: produto + mercado + frete + tempo. Com geo, calcula
+ * distância e ETA real (preparo da loja + deslocamento, S6.7); sem geo, ETA usa só
+ * o preparo (sem distância).
+ */
+function toFeedView(row: FeedRow, geo?: GeoFilter) {
+  const hasGeo = geo && row.store.latitude != null && row.store.longitude != null;
+  const distanceKm = hasGeo
+    ? round1(haversineKm(geo.lat, geo.lng, row.store.latitude!, row.store.longitude!))
+    : null;
+  const eta = etaMinutes(row.store.avgPrepMinutes, distanceKm ?? 0);
   return {
     offerId: row.id,
     priceCents: row.priceCents,
@@ -361,8 +439,11 @@ function toFeedView(row: FeedRow) {
     merchant: row.store.merchant.name,
     merchantLogoUrl: row.store.merchant.logoUrl,
     deliveryFeeCents: row.store.merchant.deliveryFeeCents,
-    deliveryEta: "30 min",
-    distanceKm: null as number | null, // proximidade real: Fase 4 (geo)
+    deliveryEta: `${eta} min`,
+    etaMinutes: eta,
+    distanceKm,
     ...row.product,
   };
 }
+
+const round1 = (n: number) => Math.round(n * 10) / 10;

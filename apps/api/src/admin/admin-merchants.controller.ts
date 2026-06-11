@@ -65,6 +65,8 @@ class UpdateStoreDto {
   @IsOptional() @IsString() zipCode?: string;
   @IsOptional() @IsNumber() latitude?: number;
   @IsOptional() @IsNumber() longitude?: number;
+  /** Tempo médio de preparo (min) — compõe o ETA real (S6.7). */
+  @IsOptional() @IsInt() @Min(1) avgPrepMinutes?: number;
   @IsOptional() @IsBoolean() active?: boolean;
 }
 

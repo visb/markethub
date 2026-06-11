@@ -5,8 +5,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Text, colors, radius, spacing } from "@markethub/ui";
 import { useAuth } from "@/auth-context";
-import { brl, marketplace, type ProductView, type Store } from "@/api/marketplace";
+import { marketplace, type ProductView, type Store } from "@/api/marketplace";
 import { useCart } from "@/use-cart";
+import { CartFab } from "@/components/CartFab";
 import { ProductCard } from "@/components/ProductCard";
 import { BottomTabs } from "@/components/BottomTabs";
 
@@ -82,12 +83,7 @@ export default function ExploreScreen() {
         />
       )}
 
-      {cart.total > 0 && (
-        <Pressable style={styles.fab} onPress={() => router.push("/cart")}>
-          <Ionicons name="cart" size={24} color={colors.white} />
-          <Text style={styles.fabTotal}>{brl(cart.total)}</Text>
-        </Pressable>
-      )}
+      <CartFab totalCents={cart.total} onPress={() => router.push("/cart")} />
       <BottomTabs active="explore" />
     </SafeAreaView>
   );
@@ -107,16 +103,4 @@ const styles = StyleSheet.create({
     height: 48,
   },
   searchInput: { flex: 1, color: colors.text },
-  fab: {
-    position: "absolute",
-    right: spacing.lg,
-    bottom: 84,
-    backgroundColor: colors.primary,
-    borderRadius: radius.full,
-    width: 72,
-    height: 72,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  fabTotal: { color: colors.white, fontSize: 11, fontWeight: "700" },
 });

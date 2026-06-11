@@ -5,10 +5,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Text, colors, radius, spacing } from "@markethub/ui";
 import { useAuth } from "@/auth-context";
-import { brl, marketplace, type FeedItem } from "@/api/marketplace";
+import { marketplace, type FeedItem, type GeoQuery } from "@/api/marketplace";
 import { useCart } from "@/use-cart";
+import { CartFab } from "@/components/CartFab";
 import { ProductCard } from "@/components/ProductCard";
 import { Header } from "@/components/Header";
+import { getRadiusKm } from "@/prefs";
 
 /** Página da categoria: global (multi-mercado) ou de uma loja (storeId). Busca restrita à categoria. */
 export default function CategoryPage() {
@@ -24,7 +26,18 @@ export default function CategoryPage() {
   const fetchItems = useCallback(
     async (q?: string) => {
       if (!id) return;
-      const res = await mkt.categoryFeed(id, { q, storeId: storeId || undefined });
+      // mesmo filtro de raio da home (S6.4)
+      let geo: GeoQuery | undefined;
+      try {
+        const [addrs, km] = await Promise.all([mkt.addresses(), getRadiusKm()]);
+        const addr = addrs.find((a) => a.isDefault) ?? addrs[0] ?? null;
+        if (addr?.latitude != null && addr.longitude != null) {
+          geo = { lat: addr.latitude, lng: addr.longitude, radiusKm: km };
+        }
+      } catch {
+        /* sem endereço → sem filtro */
+      }
+      const res = await mkt.categoryFeed(id, { q, storeId: storeId || undefined, geo });
       setItems(res.items);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -86,6 +99,7 @@ export default function CategoryPage() {
                 !storeId
                   ? {
                       merchant: item.merchant,
+                      logoUrl: item.merchantLogoUrl,
                       eta: item.deliveryEta,
                       distanceKm: item.distanceKm,
                       deliveryFeeCents: item.deliveryFeeCents,
@@ -102,12 +116,7 @@ export default function CategoryPage() {
         />
       )}
 
-      {cart.total > 0 && (
-        <Pressable style={styles.fab} onPress={() => router.push("/cart")}>
-          <Ionicons name="cart" size={24} color={colors.white} />
-          <Text style={styles.fabTotal}>{brl(cart.total)}</Text>
-        </Pressable>
-      )}
+      <CartFab totalCents={cart.total} onPress={() => router.push("/cart")} />
     </SafeAreaView>
   );
 }
@@ -126,16 +135,4 @@ const styles = StyleSheet.create({
     height: 48,
   },
   searchInput: { flex: 1, color: colors.text },
-  fab: {
-    position: "absolute",
-    right: spacing.lg,
-    bottom: spacing.lg,
-    backgroundColor: colors.primary,
-    borderRadius: radius.full,
-    width: 72,
-    height: 72,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  fabTotal: { color: colors.white, fontSize: 11, fontWeight: "700" },
 });

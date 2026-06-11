@@ -49,7 +49,10 @@ export interface CreateStoreInput {
   active?: boolean;
 }
 
-export type UpdateStoreInput = Partial<Omit<CreateStoreInput, "merchantId">>;
+export type UpdateStoreInput = Partial<Omit<CreateStoreInput, "merchantId">> & {
+  /** Tempo médio de preparo (min) — compõe o ETA real (S6.7). */
+  avgPrepMinutes?: number;
+};
 
 const OFFER_LOCKABLE = ["priceCents", "promoPriceCents", "available"] as const;
 const STOCK_LOCKABLE = ["quantity", "available"] as const;
@@ -218,6 +221,9 @@ export class AdminMerchantsService {
         city: true,
         state: true,
         zipCode: true,
+        latitude: true,
+        longitude: true,
+        avgPrepMinutes: true,
         active: true,
         merchant: { select: { id: true, name: true } },
         _count: { select: { offers: true, staff: true, deliverySlots: true } },
@@ -296,6 +302,7 @@ export class AdminMerchantsService {
     if (patch.zipCode !== undefined) data.zipCode = patch.zipCode || null;
     if (patch.latitude !== undefined) data.latitude = patch.latitude;
     if (patch.longitude !== undefined) data.longitude = patch.longitude;
+    if (patch.avgPrepMinutes !== undefined) data.avgPrepMinutes = patch.avgPrepMinutes;
     if (patch.active !== undefined) data.active = patch.active;
     if (Object.keys(data).length === 0) {
       throw new BadRequestException({ code: "NO_FIELDS", message: "Nenhum campo para atualizar" });

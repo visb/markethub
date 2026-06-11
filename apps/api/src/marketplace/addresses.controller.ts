@@ -1,9 +1,11 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
 import { IsBoolean, IsNumber, IsOptional, IsString, MinLength } from "class-validator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { Public } from "../auth/decorators/public.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import type { AuthUser } from "../auth/auth.types";
 import { AddressesService } from "./addresses.service";
+import { COVERED_CITIES } from "./coverage";
 
 class AddressDto {
   @IsString() @MinLength(1) label!: string;
@@ -31,6 +33,16 @@ class UpdateAddressDto {
   @IsOptional() @IsNumber() latitude?: number | null;
   @IsOptional() @IsNumber() longitude?: number | null;
   @IsOptional() @IsBoolean() isDefault?: boolean;
+}
+
+/** Área de cobertura (S6.3): o app valida a cidade antes do submit. */
+@Public()
+@Controller("coverage")
+export class CoverageController {
+  @Get("cities")
+  cities() {
+    return COVERED_CITIES;
+  }
 }
 
 @Roles("customer")

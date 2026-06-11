@@ -88,7 +88,7 @@ export default function CartScreen() {
               <MerchantLogo name={g.merchant} logoUrl={g.merchantLogoUrl} size={24} />
               <Text style={{ flex: 1, fontWeight: "700" }}>{g.merchant}</Text>
               <Text variant="caption" muted>
-                🛵 {gt ? brl(gt.deliveryCents) : "—"} · ⏱ 30 min
+                🛵 {gt ? brl(gt.deliveryCents) : "—"} · ⏱ {g.etaMinutes != null ? `${g.etaMinutes} min` : "30 min"}
               </Text>
             </View>
 

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Image, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -12,7 +12,6 @@ import { QtyStepper } from "@/components/QtyStepper";
 import { Select } from "@/components/Select";
 
 const OUT_OF_STOCK_OPTIONS = ["Prefiro o reembolso", "Trocar por similar", "Cancelar a compra"];
-const MATURITY_OPTIONS = ["Verde", "Maduro", "Bem maduro"];
 
 /** Detalhe do produto (modal full screen): imagem, preço, opções, info, preço em outros mercados. */
 export default function ProductDetailScreen() {
@@ -22,14 +21,29 @@ export default function ProductDetailScreen() {
   const router = useRouter();
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [note, setNote] = useState("");
-  const [maturity, setMaturity] = useState("Maduro");
+  // opção de preparo do departamento (S6.6): rótulo/opções vêm da API
+  const [prep, setPrep] = useState<string | null>(null);
   const [outOfStock, setOutOfStock] = useState(OUT_OF_STOCK_OPTIONS[0]);
   const [qty, setQty] = useState(1);
   const [grams, setGrams] = useState(300);
+  // favorito da oferta principal (S6.5)
+  const [favorite, setFavorite] = useState(false);
+  const [favBusy, setFavBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
-    setProduct(await mkt.productDetail(id));
+    const p = await mkt.productDetail(id);
+    setProduct(p);
+    setPrep(p.prepOptions?.options[0] ?? null);
+    const mainOfferId = p.offers[0]?.id;
+    if (mainOfferId) {
+      try {
+        const favs = await mkt.favorites();
+        setFavorite(favs.some((f) => f.offerId === mainOfferId));
+      } catch {
+        /* sem favoritos */
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -52,7 +66,7 @@ export default function ProductDetailScreen() {
 
   async function addFromOffer(offerId: string) {
     const meta = [
-      isWeight ? `Maturação: ${maturity}` : null,
+      product?.prepOptions && prep ? `${product.prepOptions.label}: ${prep}` : null,
       `Fora de estoque: ${outOfStock}`,
       note.trim() ? `Obs: ${note.trim()}` : null,
     ]
@@ -61,6 +75,22 @@ export default function ProductDetailScreen() {
     if (isWeight) await mkt.addItem({ offerId, weightGrams: grams, note: meta });
     else await mkt.addItem({ offerId, quantity: qty, note: meta });
     router.push("/cart");
+  }
+
+  async function toggleFavorite() {
+    if (!main || favBusy) return;
+    setFavBusy(true);
+    try {
+      if (favorite) {
+        await mkt.removeFavorite(main.id);
+        setFavorite(false);
+      } else {
+        await mkt.addFavorite(main.id);
+        setFavorite(true);
+      }
+    } finally {
+      setFavBusy(false);
+    }
   }
 
   return (
@@ -82,14 +112,24 @@ export default function ProductDetailScreen() {
           </View>
         ) : null}
 
-        <View style={styles.fav}>
-          <Ionicons name="heart-outline" size={18} color={colors.primary} />
-          <Text style={{ color: colors.primary }}>Salvar nos favoritos</Text>
-        </View>
+        <Pressable style={styles.fav} onPress={toggleFavorite} disabled={favBusy}>
+          <Ionicons
+            name={favorite ? "heart" : "heart-outline"}
+            size={18}
+            color={colors.primary}
+          />
+          <Text style={{ color: colors.primary }}>
+            {favorite ? "Salvo nos favoritos" : "Salvar nos favoritos"}
+          </Text>
+        </Pressable>
 
-        {isWeight ? (
-          <Field label="Maturação">
-            <Select value={maturity} options={MATURITY_OPTIONS} onChange={setMaturity} />
+        {product.prepOptions ? (
+          <Field label={product.prepOptions.label}>
+            <Select
+              value={prep ?? product.prepOptions.options[0]}
+              options={product.prepOptions.options}
+              onChange={setPrep}
+            />
           </Field>
         ) : null}
 

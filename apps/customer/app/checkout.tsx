@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -26,7 +26,6 @@ export default function CheckoutScreen() {
   const [when, setWhen] = useState<When>("now");
   const [loading, setLoading] = useState(true);
   const [placing, setPlacing] = useState(false);
-  const [form, setForm] = useState({ label: "Casa", street: "", number: "", city: "", state: "", zipCode: "" });
   // agendamento por slot (S5.3): loja primária do carrinho + slots disponíveis
   const [storeId, setStoreId] = useState<string | null>(null);
   const [slots, setSlots] = useState<SlotView[]>([]);
@@ -57,12 +56,6 @@ export default function CheckoutScreen() {
     void mkt.slots(storeId).then(setSlots);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [when, storeId]);
-
-  async function addAddress() {
-    const a = await mkt.addAddress(form);
-    setAddresses((prev) => [a, ...prev]);
-    setSelected(a.id);
-  }
 
   async function place() {
     if (fulfillment === "delivery" && !selected) return;
@@ -114,7 +107,9 @@ export default function CheckoutScreen() {
               <View style={styles.cardHead}>
                 <Ionicons name="bicycle" size={20} color={colors.primary} />
                 <Text style={{ flex: 1, fontWeight: "700" }}>Entrega</Text>
-                <Text style={styles.link}>alterar endereço</Text>
+                <Pressable onPress={() => router.push("/delivery")}>
+                  <Text style={styles.link}>alterar endereço</Text>
+                </Pressable>
               </View>
               {addr ? (
                 <View style={styles.cardBody}>
@@ -127,18 +122,14 @@ export default function CheckoutScreen() {
                   </Text>
                 </View>
               ) : (
-                <View style={[styles.cardBody, { gap: spacing.sm }]}>
-                  {(["street", "number", "city", "state", "zipCode"] as const).map((f) => (
-                    <TextInput
-                      key={f}
-                      style={styles.input}
-                      placeholder={f}
-                      value={form[f]}
-                      onChangeText={(v) => setForm({ ...form, [f]: v })}
-                      placeholderTextColor={colors.textMuted}
-                    />
-                  ))}
-                  <Button title="Salvar endereço" variant="outline" onPress={addAddress} />
+                <View style={styles.cardBody}>
+                  <Text muted>Nenhum endereço cadastrado.</Text>
+                  <Button
+                    title="Adicionar endereço"
+                    variant="outline"
+                    style={{ marginTop: spacing.sm }}
+                    onPress={() => router.push("/delivery")}
+                  />
                 </View>
               )}
 

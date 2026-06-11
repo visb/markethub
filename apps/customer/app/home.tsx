@@ -1,17 +1,26 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { Text, colors, radius, spacing } from "@markethub/ui";
 import { useAuth } from "@/auth-context";
-import { brl, marketplace, type Address, type FeedSection } from "@/api/marketplace";
+import { marketplace, type Address, type FeedSection, type GeoQuery } from "@/api/marketplace";
 import { useCart } from "@/use-cart";
 import { ProductCard } from "@/components/ProductCard";
 import { BottomTabs } from "@/components/BottomTabs";
+import { CartFab } from "@/components/CartFab";
 import { CategoryMenu } from "@/components/CategoryMenu";
+import { DeliveryConfigSheet } from "@/components/DeliveryConfigSheet";
 import { MerchantLogo } from "@/components/MerchantLogo";
+import { getFulfillmentMode, getRadiusKm, setFulfillmentMode, setRadiusKm, type FulfillmentMode } from "@/prefs";
 import Logo from "@/assets/logo.svg";
+
+/** Geo do feed: endereço padrão + raio escolhido (S6.4). */
+function geoFor(address: Address | null, radiusKm: number): GeoQuery | undefined {
+  if (address?.latitude == null || address.longitude == null) return undefined;
+  return { lat: address.latitude, lng: address.longitude, radiusKm };
+}
 
 export default function MarketplaceHome() {
   const { api } = useAuth();
@@ -22,28 +31,48 @@ export default function MarketplaceHome() {
   const [address, setAddress] = useState<Address | null>(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [mode, setMode] = useState<FulfillmentMode>("deliver");
+  const [radiusKm, setRadius] = useState(13);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setSections(await mkt.feed());
-      const addrs = await mkt.addresses();
-      setAddress(addrs.find((a) => a.isDefault) ?? addrs[0] ?? null);
+      const [addrs, km, m] = await Promise.all([mkt.addresses(), getRadiusKm(), getFulfillmentMode()]);
+      const addr = addrs.find((a) => a.isDefault) ?? addrs[0] ?? null;
+      setAddress(addr);
+      setRadius(km);
+      setMode(m);
+      setSections(await mkt.feed(geoFor(addr, km)));
     } finally {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  // recarrega ao voltar (endereço pode ter mudado na tela de endereços)
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
+
+  async function changeRadius(km: number) {
+    setRadius(km);
+    await setRadiusKm(km);
+    setSections(await mkt.feed(geoFor(address, km)));
+  }
+
+  async function changeMode(m: FulfillmentMode) {
+    setMode(m);
+    await setFulfillmentMode(m);
+  }
 
   return (
     <SafeAreaView style={styles.flex} edges={["top"]}>
       <View style={styles.topbar}>
         <Logo width={130} height={26} />
-        <Pressable style={styles.location} onPress={() => router.push("/delivery")}>
+        <Pressable style={styles.location} onPress={() => setSheetOpen(true)}>
           <Ionicons name="location" size={16} color={colors.primary} />
           <Text variant="caption" numberOfLines={1} style={{ maxWidth: 130 }}>
             {address ? `${address.street}, ${address.number}` : "Definir endereço"}
@@ -121,12 +150,21 @@ export default function MarketplaceHome() {
         </View>
       )}
 
-      {cart.total > 0 && (
-        <Pressable style={styles.fab} onPress={() => router.push("/cart")}>
-          <Ionicons name="cart" size={24} color={colors.white} />
-          <Text style={styles.fabTotal}>{brl(cart.total)}</Text>
-        </Pressable>
-      )}
+      <CartFab totalCents={cart.total} onPress={() => router.push("/cart")} />
+
+      <DeliveryConfigSheet
+        visible={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        mode={mode}
+        onMode={(m) => void changeMode(m)}
+        address={address}
+        onPressAddress={() => {
+          setSheetOpen(false);
+          router.push("/delivery");
+        }}
+        radiusKm={radiusKm}
+        onRadiusKm={(km) => void changeRadius(km)}
+      />
 
       <BottomTabs active="home" />
     </SafeAreaView>
@@ -164,19 +202,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     marginBottom: spacing.sm,
   },
-  fab: {
-    position: "absolute",
-    right: spacing.lg,
-    bottom: 84,
-    backgroundColor: colors.primary,
-    borderRadius: radius.full,
-    width: 72,
-    height: 72,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  fabTotal: { color: colors.white, fontSize: 11, fontWeight: "700" },
-  storeStack: { position: "absolute", right: spacing.lg + 10, bottom: 168, gap: spacing.sm },
+  storeStack: { position: "absolute", right: spacing.lg + 6, bottom: 190, gap: spacing.sm },
   storeFab: {
     borderWidth: 1.5,
     borderColor: colors.primary,

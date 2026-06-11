@@ -34,6 +34,10 @@ export const envSchema = z.object({
   PUSH_PROVIDER: z.enum(["mock", "fcm"]).default("mock"),
   FCM_SERVER_KEY: z.string().optional(),
 
+  // Geocodificação de endereço (S6.2). mock = determinístico em Curitiba (dev).
+  GEOCODING_PROVIDER: z.enum(["mock", "nominatim"]).default("mock"),
+  NOMINATIM_BASE_URL: z.string().default("https://nominatim.openstreetmap.org"),
+
   // Rotas/entrega (Fase 4). mock = haversine local (sem token Google).
   ROUTING_PROVIDER: z.enum(["mock", "google"]).default("mock"),
   GOOGLE_MAPS_API_KEY: z.string().optional(),

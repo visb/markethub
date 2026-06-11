@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import type { FulfillmentType, OrderStatus } from "@prisma/client";
+import { etaMinutes, haversineKm } from "../common/geo";
 import { PrismaService } from "../prisma/prisma.service";
 import { PickingGateway } from "./picking.gateway";
 
@@ -53,7 +54,9 @@ export interface OrderTracking {
   updatedAt: string;
 }
 
-/** Janela estimada quando não há agendamento: criação +30/+60 min. */
+/** Largura da janela exibida ao cliente (ETA real ± apresentação, S6.7). */
+const ETA_WINDOW_MIN = 15;
+/** Fallback quando não dá p/ calcular distância: criação +30/+60 min. */
 const ETA_FROM_MIN = 30;
 const ETA_TO_MIN = 60;
 
@@ -87,7 +90,9 @@ export class OrderTrackingService {
             status: true,
             fulfillment: true,
             subtotalCents: true,
-            store: { select: { name: true } },
+            store: {
+              select: { name: true, latitude: true, longitude: true, avgPrepMinutes: true },
+            },
             merchant: { select: { name: true, logoUrl: true } },
             delivery: {
               select: { status: true, driver: { select: { name: true } } },
@@ -123,20 +128,42 @@ export class OrderTrackingService {
         : null,
     }));
 
-    // Janela: agendamento do checkout, ou estimativa a partir da criação.
-    const etaWindow =
-      order.scheduledFrom && order.scheduledTo
-        ? { from: order.scheduledFrom.toISOString(), to: order.scheduledTo.toISOString() }
-        : {
-            from: new Date(order.createdAt.getTime() + ETA_FROM_MIN * 60_000).toISOString(),
-            to: new Date(order.createdAt.getTime() + ETA_TO_MIN * 60_000).toISOString(),
-          };
-
     const snap = order.addressSnapshot as {
       street?: string;
       number?: string;
       city?: string;
+      latitude?: number | null;
+      longitude?: number | null;
     } | null;
+
+    // Janela: agendamento do checkout > ETA real (preparo + deslocamento, S6.7) > fallback fixo.
+    let etaWindow: { from: string; to: string };
+    if (order.scheduledFrom && order.scheduledTo) {
+      etaWindow = { from: order.scheduledFrom.toISOString(), to: order.scheduledTo.toISOString() };
+    } else {
+      const etas = order.groups
+        .map((g) => {
+          const st = g.store;
+          if (snap?.latitude == null || snap.longitude == null) return null;
+          if (st.latitude == null || st.longitude == null) return null;
+          const dist = haversineKm(snap.latitude, snap.longitude, st.latitude, st.longitude);
+          return etaMinutes(st.avgPrepMinutes, dist);
+        })
+        .filter((e): e is number => e != null);
+      if (etas.length > 0) {
+        // pedido multi-loja chega no ritmo da loja mais demorada
+        const eta = Math.max(...etas);
+        etaWindow = {
+          from: new Date(order.createdAt.getTime() + eta * 60_000).toISOString(),
+          to: new Date(order.createdAt.getTime() + (eta + ETA_WINDOW_MIN) * 60_000).toISOString(),
+        };
+      } else {
+        etaWindow = {
+          from: new Date(order.createdAt.getTime() + ETA_FROM_MIN * 60_000).toISOString(),
+          to: new Date(order.createdAt.getTime() + ETA_TO_MIN * 60_000).toISOString(),
+        };
+      }
+    }
 
     return {
       orderId: order.id,

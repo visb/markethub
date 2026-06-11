@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { slugify } from "../erp/catalog-normalize";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -7,6 +8,8 @@ export interface MktCategoryInput {
   displayOrder?: number;
   visible?: boolean;
   parentId?: string | null;
+  /** Pergunta de preparo do departamento (S6.6); null remove. */
+  prepOptions?: { label: string; options: string[] } | null;
 }
 
 @Injectable()
@@ -53,6 +56,9 @@ export class MarketplaceCategoryService {
         ...(input.displayOrder !== undefined ? { displayOrder: input.displayOrder } : {}),
         ...(input.visible !== undefined ? { visible: input.visible } : {}),
         ...(input.parentId !== undefined ? { parentId: input.parentId } : {}),
+        ...(input.prepOptions !== undefined
+          ? { prepOptions: input.prepOptions ?? Prisma.JsonNull }
+          : {}),
       },
     });
   }

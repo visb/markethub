@@ -1,6 +1,15 @@
 import { Controller, Get, Param, Query } from "@nestjs/common";
 import { Public } from "../auth/decorators/public.decorator";
-import { CatalogService } from "./catalog.service";
+import { CatalogService, type GeoFilter } from "./catalog.service";
+
+/** lat/lng/radiusKm de query string → filtro geo (undefined quando ausentes/inválidos). */
+function parseGeo(lat?: string, lng?: string, radiusKm?: string): GeoFilter | undefined {
+  const la = lat ? Number(lat) : NaN;
+  const ln = lng ? Number(lng) : NaN;
+  if (!Number.isFinite(la) || !Number.isFinite(ln)) return undefined;
+  const r = radiusKm ? Number(radiusKm) : NaN;
+  return { lat: la, lng: ln, ...(Number.isFinite(r) && r > 0 ? { radiusKm: r } : {}) };
+}
 
 /** Catálogo público (vitrine do app cliente). Somente leitura. */
 @Public()
@@ -9,8 +18,12 @@ export class CatalogController {
   constructor(private readonly catalog: CatalogService) {}
 
   @Get("feed")
-  feed() {
-    return this.catalog.feed();
+  feed(
+    @Query("lat") lat?: string,
+    @Query("lng") lng?: string,
+    @Query("radiusKm") radiusKm?: string,
+  ) {
+    return this.catalog.feed({ geo: parseGeo(lat, lng, radiusKm) });
   }
 
   @Get("marketplace-categories/:id/feed")
@@ -20,12 +33,16 @@ export class CatalogController {
     @Query("storeId") storeId?: string,
     @Query("page") page?: string,
     @Query("pageSize") pageSize?: string,
+    @Query("lat") lat?: string,
+    @Query("lng") lng?: string,
+    @Query("radiusKm") radiusKm?: string,
   ) {
     return this.catalog.categoryFeed(id, {
       q,
       storeId,
       page: page ? Number(page) : undefined,
       pageSize: pageSize ? Number(pageSize) : undefined,
+      geo: parseGeo(lat, lng, radiusKm),
     });
   }
 
@@ -61,8 +78,12 @@ export class CatalogController {
   }
 
   @Get("stores/:id/sections")
-  sections(@Param("id") id: string) {
-    return this.catalog.storeSections(id);
+  sections(
+    @Param("id") id: string,
+    @Query("lat") lat?: string,
+    @Query("lng") lng?: string,
+  ) {
+    return this.catalog.storeSections(id, parseGeo(lat, lng, undefined));
   }
 
   @Get("search")
