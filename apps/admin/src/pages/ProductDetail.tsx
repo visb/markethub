@@ -32,25 +32,31 @@ export function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const { api } = useAuth();
   const [product, setProduct] = useState<Product | null>(null);
-  const [form, setForm] = useState({
+  const emptyForm = {
     name: "",
     brand: "",
     packageSize: "",
     saleType: "unit" as SaleType,
     imageUrl: "",
-  });
+  };
+  const [form, setForm] = useState(emptyForm);
+  // Snapshot do valor carregado: o save manda só os campos alterados,
+  // pra não travar (lockedFields) campos que o usuário não tocou.
+  const [loaded, setLoaded] = useState(emptyForm);
   const [msg, setMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const p = await api.request<Product>(`/admin/products/${id}`, { auth: true });
     setProduct(p);
-    setForm({
+    const next = {
       name: p.name,
       brand: p.brand ?? "",
       packageSize: p.packageSize ?? "",
       saleType: p.saleType,
       imageUrl: p.imageUrl ?? "",
-    });
+    };
+    setForm(next);
+    setLoaded(next);
   }, [api, id]);
 
   useEffect(() => {
@@ -59,8 +65,16 @@ export function ProductDetail() {
 
   async function save() {
     setMsg(null);
-    await api.request(`/admin/products/${id}`, { method: "PATCH", auth: true, body: form });
-    setMsg("Salvo (campos travados contra enriquecimento automático).");
+    const body: Partial<typeof form> = {};
+    for (const key of Object.keys(form) as (keyof typeof form)[]) {
+      if (form[key] !== loaded[key]) (body[key] as unknown) = form[key];
+    }
+    if (Object.keys(body).length === 0) {
+      setMsg("Nada alterado.");
+      return;
+    }
+    await api.request(`/admin/products/${id}`, { method: "PATCH", auth: true, body });
+    setMsg("Salvo (campos alterados travados contra enriquecimento automático).");
     await load();
   }
   async function reenrich() {
