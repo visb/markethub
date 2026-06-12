@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import React, { useCallback, useRef, useState } from "react";
+import { FlatList, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -12,7 +12,9 @@ import { BottomTabs } from "@/components/BottomTabs";
 import { CartFab } from "@/components/CartFab";
 import { CategoryMenu } from "@/components/CategoryMenu";
 import { DeliveryConfigSheet } from "@/components/DeliveryConfigSheet";
+import { FeedSkeleton } from "@/components/FeedSkeleton";
 import { MerchantLogo } from "@/components/MerchantLogo";
+import { deviceAddress } from "@/location";
 import { getFulfillmentMode, getRadiusKm, setFulfillmentMode, setRadiusKm, type FulfillmentMode } from "@/prefs";
 import Logo from "@/assets/logo.svg";
 
@@ -34,12 +36,28 @@ export default function MarketplaceHome() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [mode, setMode] = useState<FulfillmentMode>("deliver");
   const [radiusKm, setRadius] = useState(13);
+  // evita repedir localização a cada foco quando o usuário não tem endereço
+  const autoTried = useRef(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const [addrs, km, m] = await Promise.all([mkt.addresses(), getRadiusKm(), getFulfillmentMode()]);
-      const addr = addrs.find((a) => a.isDefault) ?? addrs[0] ?? null;
+      let addr = addrs.find((a) => a.isDefault) ?? addrs[0] ?? null;
+
+      // Primeiro acesso sem endereço: pede localização e cria um automaticamente.
+      if (!addr && !autoTried.current) {
+        autoTried.current = true;
+        const body = await deviceAddress();
+        if (body) {
+          try {
+            addr = await mkt.addAddress(body);
+          } catch {
+            /* falha ao salvar → segue sem endereço, usuário define manualmente */
+          }
+        }
+      }
+
       setAddress(addr);
       setRadius(km);
       setMode(m);
@@ -99,7 +117,7 @@ export default function MarketplaceHome() {
       />
 
       {loading ? (
-        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xxl }} />
+        <FeedSkeleton />
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: spacing.xxl }}>
           {sections.map((sec) => (
