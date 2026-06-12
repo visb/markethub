@@ -14,7 +14,7 @@ Dentro de A, ordem A1→A5. Pegar sempre o menor ID `todo` cuja dependência est
 | id | tipo | escopo | status | tent | commit | nota |
 |----|------|--------|--------|------|--------|------|
 | A1 | infra | API e2e harness (jest-e2e, supertest, test DB, setup/teardown, helpers auth/seed) | done | 1 | b760871 | jest-e2e + supertest; DB markethub_test via db push; helpers app/auth/db; smoke health+auth verde |
-| A2 | infra | Admin vitest + @testing-library/react + jsdom + script test | todo | 0 | | |
+| A2 | infra | Admin vitest + @testing-library/react + jsdom + script test | done | 1 | d432b1e | vitest 4 + RTL + jsdom; config merge do vite (aliases); smoke hasPanelAccess + render Login verde |
 | A3 | infra | Mobile jest-expo nos 3 apps + script test | todo | 0 | | |
 | A4 | infra | Playwright config + start apps modo web + smoke spec por app | todo | 0 | | |
 | A5 | infra | Wiring coverage no turbo + atualizar CI se preciso | todo | 0 | | |
