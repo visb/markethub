@@ -6,7 +6,7 @@ apps mobile React Native (Expo) e painel admin Vite + React.
 ## Stack
 
 - **Monorepo:** Turborepo + pnpm workspaces
-- **Backend:** NestJS + Prisma + PostgreSQL (`apps/api`)
+- **Backend:** NestJS + Prisma + PostgreSQL (`services/api`)
 - **Mobile:** React Native / Expo — cliente, separador, entregador (`apps/customer|picker|driver`)
 - **Admin:** Vite + React SPA (`apps/admin`)
 - **Compartilhado:** `packages/types`, `packages/api-client`, `packages/ui`
@@ -15,7 +15,8 @@ apps mobile React Native (Expo) e painel admin Vite + React.
 ## Estrutura
 
 ```
-apps/        api · customer · picker · driver · admin
+apps/        customer · picker · driver · admin
+services/    api
 packages/    types · api-client · ui
 infra/       docker-compose, CI
 stories/     roadmap e stories por fase
