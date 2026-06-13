@@ -16,7 +16,7 @@ Dentro de A, ordem A1→A5. Pegar sempre o menor ID `todo` cuja dependência est
 | A1 | infra | API e2e harness (jest-e2e, supertest, test DB, setup/teardown, helpers auth/seed) | done | 1 | b760871 | jest-e2e + supertest; DB markethub_test via db push; helpers app/auth/db; smoke health+auth verde |
 | A2 | infra | Admin vitest + @testing-library/react + jsdom + script test | done | 1 | d432b1e | vitest 4 + RTL + jsdom; config merge do vite (aliases); smoke hasPanelAccess + render Login verde |
 | A3 | infra | Mobile jest-expo nos 3 apps + script test | done | 2 | 12aaafe | jest-expo + transformIgnorePatterns pnpm-aware; alias @/; smoke verde nos 3; config.ts picker/driver migrado p/ acesso seguro a process.env (padrão do customer) |
-| A4 | infra | Playwright config + start apps modo web + smoke spec por app | todo | 0 | | |
+| A4 | infra | Playwright config + start apps modo web + smoke spec por app | done | 1 | e7b3ca6 | playwright na raiz; webServer por app filtrado por E2E_APPS/--project; driver ganhou @babel/runtime+react-dom+react-native-web pro web; 4 smokes verdes (rodar e2e fora de sandbox: precisa rede localhost) |
 | A5 | infra | Wiring coverage no turbo + atualizar CI se preciso | todo | 0 | | |
 
 ## Grupo B — Review sweep (auto-fix seguro + REVIEW-FINDINGS.md)
