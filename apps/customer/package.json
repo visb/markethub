@@ -11,7 +11,8 @@
     "build": "echo \"@markethub/customer: use expo build/export\"",
     "typecheck": "tsc --noEmit",
     "lint": "echo \"skip\"",
-    "test": "jest"
+    "test": "jest",
+    "test:coverage": "jest --coverage"
   },
   "jest": {
     "preset": "jest-expo",
