@@ -38,7 +38,7 @@ Dentro de A, ordem A1→A5. Pegar sempre o menor ID `todo` cuja dependência est
 | B13 | review | services/api/src/favorites | done | 1 | | módulo limpo e sem achados: upsert/deleteMany idempotentes, controller fino, codes {code,message} ok. Sem auto-fix |
 | B14 | review | services/api/src/notifications | done | 1 | | módulo limpo: best-effort (falha não quebra fluxo), cleanup de tokens inválidos, provider atrás de interface+mock, batch FCM, controller fino; sem auto-fix. 1 low (unregister apaga token sem checar dono) em REVIEW-FINDINGS |
 | B15 | review | services/api/src/geocoding | done | 1 | | módulo limpo e sem achados: provider atrás de interface+mock determinístico, factory por env, error handling best-effort (retorna null). Sem auto-fix |
-| B16 | review | services/api/src/storage | todo | 0 | | |
+| B16 | review | services/api/src/storage | done | 1 | | módulo limpo e sem achados: SigV4 manual (presign PUT + upload server-side) coerente, helpers de canonicalização corretos, sem segredos hardcoded (tudo via env). Sem auto-fix |
 | B17 | review | services/api/src/queue | todo | 0 | | |
 | B18 | review | services/api/src/admin | todo | 0 | | |
 | B19 | review | services/api/src (common, config, health, prisma, app.module, main) | todo | 0 | | |
