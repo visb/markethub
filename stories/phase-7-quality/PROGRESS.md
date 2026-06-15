@@ -71,7 +71,7 @@ Dentro de A, ordem A1→A5. Pegar sempre o menor ID `todo` cuja dependência est
 | C10 | e2e | auth flow (register/login/refresh/roles guard) | done | 1 | | expandiu auth.e2e-spec: register→/me, login (ok/senha errada 401), refresh (rotação emite novo access + reuso do antigo → 401), RolesGuard em GET admin/merchants (customer 403 / admin 200). 8 testes verdes. NB: confirma B01 — register aceita roles:['admin'] e o guard libera (vuln já em REVIEW-FINDINGS) |
 | C11 | e2e | catalog + admin product PATCH (diff only / lockedFields) | done | 1 | | catalog.e2e-spec: PATCH /admin/products/:id grava só campo enviado + trava (lockedFields), PATCHs sucessivos acumulam sem duplicar, unlock destrava, não-admin → 403, detail reflete edição. Produto criado via prisma no beforeEach. 5 testes verdes |
 | C12 | e2e | cart multi-store → checkout → order creation | done | 1 | | cart-checkout.e2e: agrega 2 lojas em grupos distintos, checkout pickup cria Order + 2 OrderGroups e limpa carrinho, CART_EMPTY, ADDRESS_REQUIRED (delivery sem endereço). Novo helper test/helpers/seed.ts (merchant+store+product+offer). 4 testes verdes |
-| C13 | e2e | pix payment + webhook → order paid | todo | 0 | | |
+| C13 | e2e | pix payment + webhook → order paid | done | 1 | | payment.e2e: pay cria cobrança pendente com QR, webhook paid → payment paid + order preparing (markPaid), idempotência (2º paid não regride), chargeId desconhecido → handled false. provider mock. 4 testes verdes |
 | C14 | e2e | picking session (pick, substitute, handoff) | todo | 0 | | |
 | C15 | e2e | delivery (offer/accept/pickup/confirm) | todo | 0 | | |
 | C16 | e2e | reviews + favorites + scheduling slots | todo | 0 | | |
