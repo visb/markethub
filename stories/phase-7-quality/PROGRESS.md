@@ -30,7 +30,7 @@ Dentro de A, ordem A1→A5. Pegar sempre o menor ID `todo` cuja dependência est
 | B05 | review | services/api/src/enrichment | done | 1 | | auto-fix: `mappings` saiu do controller (Prisma direto) p/ `EnrichmentService.listMappings` — controller fino. Resto limpo (provider/mapper atrás de interface+mock, cache Cosmos, completeness pura, codes ok). 1 med (race P2002 em resolveCategory) em REVIEW-FINDINGS |
 | B06 | review | services/api/src/marketplace | done | 1 | | módulo limpo: pricing/coverage puros e testados, cart/orders/addresses com transações, controllers finos (sem Prisma direto), codes {code,message} ok; sem auto-fix. 2 med (markPaid não-transacional + idempotência por estado do pedido; NaN em orders.list, recorrente) em REVIEW-FINDINGS |
 | B07 | review | services/api/src/merchant | done | 1 | | módulo limpo: controller fino, escopo por manager (managerStoreIds/assertStore) consistente, lockedFields respeitado, codes {code,message} ok; sem auto-fix. 1 med (race P2002 + create de produto não-transacional → órfão se attachOffer falhar) em REVIEW-FINDINGS |
-| B08 | review | services/api/src/picking | todo | 0 | | |
+| B08 | review | services/api/src/picking | done | 1 | | módulo sólido: lock otimista (CAS via updateMany) no assign, transações no handoff/substitution, idempotência consistente, controllers finos, codes ok; sem auto-fix. 1 med (read-modify-write em recalcTotals → lost update no total do Order com 2 pickers) em REVIEW-FINDINGS |
 | B09 | review | services/api/src/driver | todo | 0 | | |
 | B10 | review | services/api/src/payment | todo | 0 | | |
 | B11 | review | services/api/src/scheduling | todo | 0 | | |
