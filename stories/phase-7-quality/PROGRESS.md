@@ -80,7 +80,7 @@ Dentro de A, ordem A1→A5. Pegar sempre o menor ID `todo` cuja dependência est
 | id | tipo | escopo | status | tent | commit | nota |
 |----|------|--------|--------|------|--------|------|
 | C17 | unit | admin hooks (React Query) + queryKeys + api modules | done | 1 | | ESCOPO ADAPTADO: admin não tem React Query/queryKeys/api modules (desvio B20). Testada a unidade de dados real: LocalTokenStore (vazio, setTokens persiste access+refresh, clear remove, chaves fixas compartilhadas). 4 testes (suite admin: 8 verdes) |
-| C18 | unit | admin ProductDetail form (rhf+zod, PATCH diff) | todo | 0 | | |
+| C18 | unit | admin ProductDetail form (rhf+zod, PATCH diff) | done | 1 | | RTL: PATCH manda só o campo alterado (diff-only) + "Nada alterado." sem mudança. Tela usa useState (não rhf+zod — desvio B20); testado o contrato real. Pegadinha: useAuth mock precisa de api com identidade ESTÁVEL senão load() (useCallback[api]) loopa o useEffect infinito → worker OOM. 2 testes verdes |
 | C19 | e2e-web | admin login → catalog → editar produto | todo | 0 | | |
 | C20 | e2e-web | admin orders + operations + merchant area | todo | 0 | | |
 
