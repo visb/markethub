@@ -92,7 +92,7 @@ Dentro de A, ordem A1→A5. Pegar sempre o menor ID `todo` cuja dependência est
 | C23 | unit | picker hooks/lógica (substitution, task) | done | 1 | | ESCOPO ADAPTADO: substitution/task estão inline nas rotas app/ (desvio B22, sem hooks/api module isoláveis). Testada a unidade de dados real: SecureTokenStore (vazio, setTokens grava access+refresh, clear remove) com mock Map-backed de expo-secure-store. 3 testes verdes |
 | C24 | unit | driver hooks/lógica (delivery flow) | done | 1 | | ESCOPO ADAPTADO: fluxo de entrega (pickup/deliver) inline em app/delivery/[id].tsx (desvio B23); helpers de formato já em format.test.ts. Testado SecureTokenStore do driver (vazio/set/get/clear) com mock de expo-secure-store. 3 testes verdes |
 | C25 | e2e-web | customer home → produto → carrinho → checkout (web) | done | 1 | | ESCOPO REDUZIDO: customer (Expo web) login → home autenticada (busca visível). Fluxo de compra completo exige feed geolocalizado semeado (stores c/ lat/lng + offers em cobertura) — fora do alcance do seed atual; auth+mount cobertos. Reusa api:3000 + customer web:8081. 1 teste verde |
-| C26 | e2e-web | picker login → task → pick (web) | todo | 0 | | |
+| C26 | e2e-web | picker login → task → pick (web) | done | 1 | | ESCOPO REDUZIDO: picker (Expo web) login → home do separador (saudação "Olá, Separador Web"). task→pick exige pedido pago com PickTask na fila (pipeline); auth+mount cobertos. Seed: picker-web@test.dev + merchant/store/StoreStaff(picker). Reusa api:3000 + picker web:8082. 1 teste verde |
 | C27 | e2e-web | driver login → delivery (web) | todo | 0 | | |
 
 ### C-packages (depende: nenhuma)
