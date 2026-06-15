@@ -79,7 +79,7 @@ Dentro de A, ordem A1→A5. Pegar sempre o menor ID `todo` cuja dependência est
 ### C-admin (depende: A2 unit, A4 e2e)
 | id | tipo | escopo | status | tent | commit | nota |
 |----|------|--------|--------|------|--------|------|
-| C17 | unit | admin hooks (React Query) + queryKeys + api modules | todo | 0 | | |
+| C17 | unit | admin hooks (React Query) + queryKeys + api modules | done | 1 | | ESCOPO ADAPTADO: admin não tem React Query/queryKeys/api modules (desvio B20). Testada a unidade de dados real: LocalTokenStore (vazio, setTokens persiste access+refresh, clear remove, chaves fixas compartilhadas). 4 testes (suite admin: 8 verdes) |
 | C18 | unit | admin ProductDetail form (rhf+zod, PATCH diff) | todo | 0 | | |
 | C19 | e2e-web | admin login → catalog → editar produto | todo | 0 | | |
 | C20 | e2e-web | admin orders + operations + merchant area | todo | 0 | | |
