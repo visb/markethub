@@ -74,7 +74,7 @@ Dentro de A, ordem A1→A5. Pegar sempre o menor ID `todo` cuja dependência est
 | C13 | e2e | pix payment + webhook → order paid | done | 1 | | payment.e2e: pay cria cobrança pendente com QR, webhook paid → payment paid + order preparing (markPaid), idempotência (2º paid não regride), chargeId desconhecido → handled false. provider mock. 4 testes verdes |
 | C14 | e2e | picking session (pick, substitute, handoff) | done | 1 | | picking.e2e: pedido pago→PickTask queued, picker assume→inicia→separa item (qty)→complete-picking (packed); NOT_TASK_OWNER ao iniciar tarefa de outro; substituição (picker propõe oferta da mesma loja, cliente aprova → item substituted). 3 testes verdes |
 | C15 | e2e | delivery (offer/accept/pickup/confirm) | done | 1 | | delivery.e2e: pedido de entrega separado+ready cria Delivery; loja atribui entregador → coleta (pickupCode) → entrega (deliveryCode) → order delivered. Guards: NOT_STORE_DRIVER (atribuir a não-entregador), DELIVERY_NOT_PICKED_UP (entregar antes de coletar). 3 testes verdes |
-| C16 | e2e | reviews + favorites + scheduling slots | todo | 0 | | |
+| C16 | e2e | reviews + favorites + scheduling slots | done | 1 | | reviews-favorites-scheduling.e2e: favorites add/list/idempotente/remove + OFFER_NOT_FOUND; reviews platform (pedido marcado delivered) + ALREADY_REVIEWED + nota inválida (400 via DTO); scheduling manager cria slot → cliente lista (remaining) → checkout reserva capacidade (slot some + reserved=1), capacidade inválida 400. Nota: INVALID_RATING/INVALID_CAPACITY barrados no DTO antes do service (codes já em unit C09/C08). 6 testes verdes |
 
 ### C-admin (depende: A2 unit, A4 e2e)
 | id | tipo | escopo | status | tent | commit | nota |
