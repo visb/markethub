@@ -46,7 +46,7 @@ Dentro de A, ordem A1→A5. Pegar sempre o menor ID `todo` cuja dependência est
 | B21 | review | apps/customer (app routes, src/api, hooks, components, cart/prefs/location) | done | 1 | | desvio sistêmico (igual B20, menos severo): tem módulo tipado src/api/marketplace.ts, mas falta React Query/RHF/zod (nenhuma no package.json), sem queryKeys.ts, rotas orquestram server-state inline (useState/useEffect). Migração estrutural → não auto-fix. 1 high em REVIEW-FINDINGS |
 | B22 | review | apps/picker (app routes, src/api, hooks, components) | done | 1 | | desvio sistêmico (igual B20/B21): HTTP via client tipado @markethub/api-client (camada válida), mas sem React Query/RHF/zod, sem queryKeys.ts, server-state inline (useState/useEffect). Migração estrutural → não auto-fix. high (B22/B23) em REVIEW-FINDINGS |
 | B23 | review | apps/driver (app routes, src/api, hooks, components) | done | 1 | | idêntico ao picker (B22): HTTP via client tipado @markethub/api-client, sem React Query/RHF/zod, sem queryKeys.ts, server-state inline. Migração estrutural → não auto-fix. high (B22/B23) em REVIEW-FINDINGS |
-| B24 | review | packages/types | todo | 0 | | |
+| B24 | review | packages/types | done | 1 | | pacote limpo: schemas zod + tipos inferidos, error espelha shape {code,message} da API, barrel index. Sem auto-fix. 1 low (registerSchema espelha contrato de roles permissivo — cross-ref B01) em REVIEW-FINDINGS |
 | B25 | review | packages/api-client | todo | 0 | | |
 | B26 | review | packages/ui | todo | 0 | | |
 
