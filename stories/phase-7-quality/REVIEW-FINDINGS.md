@@ -17,6 +17,8 @@ Severidade: `crit` (bug / regra de negócio) · `high` · `med` · `low`.
 
 ## high
 
+- B20 · apps/admin/src/pages/*.tsx · high · O app admin inteiro NÃO segue o padrão obrigatório do CLAUDE.md: nenhuma das libs `@tanstack/react-query`, `react-hook-form`, `zod` está no package.json; todas as páginas fazem `api.request(...)` cru direto na tela com server-state em `useState`/`useEffect`/`useCallback` (ex.: `Orders.tsx:42`), sem `src/lib/queryKeys.ts`, sem módulos tipados em `src/api/`, sem hooks de query/mutation; formulários em `useState` (ex.: `ProductDetail.tsx`, 5x `useState`) em vez de RHF+zod; tipos de resposta redefinidos inline por página em vez de virem de `@markethub/types` · migração estrutural (fora do escopo de auto-fix do sweep, sem testes cobrindo): instalar React Query + RHF + zod, criar `queryKeys.ts` + módulos `src/api/`, extrair hooks e migrar páginas/forms incrementalmente conforme tocadas. Decisão humana / story dedicada.
+
 ## med
 
 - B02 · services/api/src/users/admin-users.service.ts:122 · med · race no createStaff: `findUnique` email + `create` sem tratar `P2002` — criações concorrentes do mesmo email viram 500 em vez de 409 · capturar `P2002` no create e lançar `EMAIL_TAKEN` (mesmo padrão do finding B01 no register).
