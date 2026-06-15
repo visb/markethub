@@ -99,7 +99,7 @@ Dentro de A, ordem A1→A5. Pegar sempre o menor ID `todo` cuja dependência est
 | id | tipo | escopo | status | tent | commit | nota |
 |----|------|--------|--------|------|--------|------|
 | C28 | unit | packages/api-client (request, socket, error mapping) | done | 1 | | infra: vitest (env node) + script test no pacote. client.test: request (URL+prefixo, Authorization, 204→undefined, erro→ApiClientError, body não-JSON→UNKNOWN, 401→refresh→retry com token novo, refresh falho→onAuthError, dedup de refresh concorrente) + MemoryTokenStore + createRealtimeClient stub lança. tsconfig exclui *.test (dist limpo). 10 testes verdes |
-| C29 | unit | packages/types + ui (pure helpers/components) | todo | 0 | | |
+| C29 | unit | packages/types + ui (pure helpers/components) | done | 1 | | infra: vitest (node) + script test em types e ui. types/schemas.test: registerSchema (email/senha≥8/roles enum opcional), loginSchema, roleNameSchema+ROLE_NAMES (5 papéis), apiErrorSchema (code/message obrigatórios). ui/tokens.test: cores da marca, escala de spacing crescente, radius/typography. Componentes RN (render) ficam pros apps. types tsconfig exclui *.test. 11 testes verdes (8+3) |
 
 ---
 
