@@ -36,7 +36,7 @@ Dentro de A, ordem A1→A5. Pegar sempre o menor ID `todo` cuja dependência est
 | B11 | review | services/api/src/scheduling | done | 1 | | módulo limpo: reserva atômica (CAS via updateMany), release com piso 0, validação de janela/capacidade, controller fino, codes ok; sem auto-fix. 1 low (date de query sem validação → Invalid Date → 500) em REVIEW-FINDINGS |
 | B12 | review | services/api/src/reviews | done | 1 | | módulo limpo: ownership + janela de avaliação, validação de rating/eixo, agregações read-only, gorjeta reusa PaymentProvider, controllers finos, codes ok; sem auto-fix. 1 low (race findFirst+create em reviews.create) em REVIEW-FINDINGS |
 | B13 | review | services/api/src/favorites | done | 1 | | módulo limpo e sem achados: upsert/deleteMany idempotentes, controller fino, codes {code,message} ok. Sem auto-fix |
-| B14 | review | services/api/src/notifications | todo | 0 | | |
+| B14 | review | services/api/src/notifications | done | 1 | | módulo limpo: best-effort (falha não quebra fluxo), cleanup de tokens inválidos, provider atrás de interface+mock, batch FCM, controller fino; sem auto-fix. 1 low (unregister apaga token sem checar dono) em REVIEW-FINDINGS |
 | B15 | review | services/api/src/geocoding | todo | 0 | | |
 | B16 | review | services/api/src/storage | todo | 0 | | |
 | B17 | review | services/api/src/queue | todo | 0 | | |
