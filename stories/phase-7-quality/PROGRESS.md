@@ -24,7 +24,7 @@ Dentro de A, ordem A1→A5. Pegar sempre o menor ID `todo` cuja dependência est
 | id | tipo | escopo | status | tent | commit | nota |
 |----|------|--------|--------|------|--------|------|
 | B01 | review | services/api/src/auth | done | 2 | 1713b97 | auto-fix: RolesGuard com shape {code,message}; 1 crit (roles no register) + 3 med + 2 low em REVIEW-FINDINGS |
-| B02 | review | services/api/src/users | todo | 0 | | |
+| B02 | review | services/api/src/users | done | 1 | | módulo limpo (shapes {code,message} ok, controller fino, sem dead code); sem auto-fix; 2 med (race P2002 no createStaff, NaN em page/pageSize) + 1 low (role query sem validação) em REVIEW-FINDINGS |
 | B03 | review | services/api/src/catalog | todo | 0 | | |
 | B04 | review | services/api/src/erp | todo | 0 | | |
 | B05 | review | services/api/src/enrichment | todo | 0 | | |
