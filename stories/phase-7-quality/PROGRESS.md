@@ -98,7 +98,7 @@ Dentro de A, ordem A1→A5. Pegar sempre o menor ID `todo` cuja dependência est
 ### C-packages (depende: nenhuma)
 | id | tipo | escopo | status | tent | commit | nota |
 |----|------|--------|--------|------|--------|------|
-| C28 | unit | packages/api-client (request, socket, error mapping) | todo | 0 | | |
+| C28 | unit | packages/api-client (request, socket, error mapping) | done | 1 | | infra: vitest (env node) + script test no pacote. client.test: request (URL+prefixo, Authorization, 204→undefined, erro→ApiClientError, body não-JSON→UNKNOWN, 401→refresh→retry com token novo, refresh falho→onAuthError, dedup de refresh concorrente) + MemoryTokenStore + createRealtimeClient stub lança. tsconfig exclui *.test (dist limpo). 10 testes verdes |
 | C29 | unit | packages/types + ui (pure helpers/components) | todo | 0 | | |
 
 ---
