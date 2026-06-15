@@ -34,7 +34,7 @@ Dentro de A, ordem A1→A5. Pegar sempre o menor ID `todo` cuja dependência est
 | B09 | review | services/api/src/driver | done | 1 | | módulo limpo: lock otimista nas atribuições, idempotência, reuso do HandoffService, controllers finos, specs presentes, codes ok; sem auto-fix. 1 low (status query sem validação runtime → enum 500, recorrente) em REVIEW-FINDINGS |
 | B10 | review | services/api/src/payment | done | 1 | | refund.pricing/refund.service idempotentes e testados, provider atrás de interface+mock, payment.service idempotente; controllers finos. ACHADO CRIT: webhook PIX não verifica assinatura (parseWebhook ignora signature) → bypass de pagamento. Sem auto-fix (segurança). 1 crit em REVIEW-FINDINGS |
 | B11 | review | services/api/src/scheduling | done | 1 | | módulo limpo: reserva atômica (CAS via updateMany), release com piso 0, validação de janela/capacidade, controller fino, codes ok; sem auto-fix. 1 low (date de query sem validação → Invalid Date → 500) em REVIEW-FINDINGS |
-| B12 | review | services/api/src/reviews | todo | 0 | | |
+| B12 | review | services/api/src/reviews | done | 1 | | módulo limpo: ownership + janela de avaliação, validação de rating/eixo, agregações read-only, gorjeta reusa PaymentProvider, controllers finos, codes ok; sem auto-fix. 1 low (race findFirst+create em reviews.create) em REVIEW-FINDINGS |
 | B13 | review | services/api/src/favorites | todo | 0 | | |
 | B14 | review | services/api/src/notifications | todo | 0 | | |
 | B15 | review | services/api/src/geocoding | todo | 0 | | |
