@@ -61,4 +61,53 @@ describe("computeCart", () => {
     });
     expect(r.discountCents).toBe(1000); // 50% de 2000 (só m1)
   });
+
+  it("cupom fixo limita ao subtotal escopado", () => {
+    // fixo de 99999 não pode descontar mais que o subtotal (4500)
+    const r = computeCart(groups, { coupon: { type: "fixed", value: 99999 } });
+    expect(r.discountCents).toBe(4500);
+  });
+
+  it("cupom fixo abaixo do subtotal desconta o valor cheio", () => {
+    const r = computeCart(groups, { coupon: { type: "fixed", value: 800 } });
+    expect(r.discountCents).toBe(800);
+  });
+
+  it("minOrderCents não atingido → sem desconto", () => {
+    const r = computeCart(groups, {
+      coupon: { type: "percent", value: 10, minOrderCents: 9999 },
+    });
+    expect(r.discountCents).toBe(0);
+  });
+
+  it("minOrderCents atingido → aplica desconto", () => {
+    const r = computeCart(groups, {
+      coupon: { type: "percent", value: 10, minOrderCents: 4500 },
+    });
+    expect(r.discountCents).toBe(450);
+  });
+
+  it("total nunca fica negativo (desconto > total → 0)", () => {
+    const single: CalcGroup[] = [
+      {
+        merchantId: "m1",
+        deliveryFeeCents: 0,
+        prepFeeCents: 0,
+        platformFeeBps: 0,
+        items: [{ saleType: "unit", unitPriceCents: 100, quantity: 1 }],
+      },
+    ];
+    const r = computeCart(single, { coupon: { type: "fixed", value: 100 } });
+    expect(r.totalCents).toBe(0);
+  });
+
+  it("weight com gramas negativo é tratado como 0", () => {
+    expect(
+      computeItemTotal({ saleType: "weight", unitPriceCents: 5000, quantity: 1, weightGrams: -300 }),
+    ).toBe(0);
+  });
+
+  it("quantity negativa em unit é tratada como 0", () => {
+    expect(computeItemTotal({ saleType: "unit", unitPriceCents: 100, quantity: -5 })).toBe(0);
+  });
 });
