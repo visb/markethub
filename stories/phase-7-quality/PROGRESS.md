@@ -87,7 +87,7 @@ Dentro de A, ordem A1→A5. Pegar sempre o menor ID `todo` cuja dependência est
 ### C-mobile (depende: A3 unit, A4 e2e-web)
 | id | tipo | escopo | status | tent | commit | nota |
 |----|------|--------|--------|------|--------|------|
-| C21 | unit | customer use-cart + prefs + location + zod schemas | todo | 0 | | |
+| C21 | unit | customer use-cart + prefs + location + zod schemas | done | 1 | | prefs.test (getRadiusKm clampa MIN/MAX, default p/ vazio/inválido; getFulfillmentMode default deliver) + location.test (deviceAddress: permissão negada→null, nome de estado→UF, UF de 2 letras preservada, sem geocode→null) via jest-expo + mocks expo-secure-store/expo-location. use-cart é hook (deferido) e customer não usa zod (desvio B21). 11 testes verdes |
 | C22 | unit | customer api modules + hooks (mappers, query keys) | todo | 0 | | |
 | C23 | unit | picker hooks/lógica (substitution, task) | todo | 0 | | |
 | C24 | unit | driver hooks/lógica (delivery flow) | todo | 0 | | |
