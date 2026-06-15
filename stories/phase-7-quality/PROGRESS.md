@@ -73,7 +73,7 @@ Dentro de A, ordem A1→A5. Pegar sempre o menor ID `todo` cuja dependência est
 | C12 | e2e | cart multi-store → checkout → order creation | done | 1 | | cart-checkout.e2e: agrega 2 lojas em grupos distintos, checkout pickup cria Order + 2 OrderGroups e limpa carrinho, CART_EMPTY, ADDRESS_REQUIRED (delivery sem endereço). Novo helper test/helpers/seed.ts (merchant+store+product+offer). 4 testes verdes |
 | C13 | e2e | pix payment + webhook → order paid | done | 1 | | payment.e2e: pay cria cobrança pendente com QR, webhook paid → payment paid + order preparing (markPaid), idempotência (2º paid não regride), chargeId desconhecido → handled false. provider mock. 4 testes verdes |
 | C14 | e2e | picking session (pick, substitute, handoff) | done | 1 | | picking.e2e: pedido pago→PickTask queued, picker assume→inicia→separa item (qty)→complete-picking (packed); NOT_TASK_OWNER ao iniciar tarefa de outro; substituição (picker propõe oferta da mesma loja, cliente aprova → item substituted). 3 testes verdes |
-| C15 | e2e | delivery (offer/accept/pickup/confirm) | todo | 0 | | |
+| C15 | e2e | delivery (offer/accept/pickup/confirm) | done | 1 | | delivery.e2e: pedido de entrega separado+ready cria Delivery; loja atribui entregador → coleta (pickupCode) → entrega (deliveryCode) → order delivered. Guards: NOT_STORE_DRIVER (atribuir a não-entregador), DELIVERY_NOT_PICKED_UP (entregar antes de coletar). 3 testes verdes |
 | C16 | e2e | reviews + favorites + scheduling slots | todo | 0 | | |
 
 ### C-admin (depende: A2 unit, A4 e2e)
