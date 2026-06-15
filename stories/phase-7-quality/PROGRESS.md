@@ -48,7 +48,7 @@ Dentro de A, ordem A1→A5. Pegar sempre o menor ID `todo` cuja dependência est
 | B23 | review | apps/driver (app routes, src/api, hooks, components) | done | 1 | | idêntico ao picker (B22): HTTP via client tipado @markethub/api-client, sem React Query/RHF/zod, sem queryKeys.ts, server-state inline. Migração estrutural → não auto-fix. high (B22/B23) em REVIEW-FINDINGS |
 | B24 | review | packages/types | done | 1 | | pacote limpo: schemas zod + tipos inferidos, error espelha shape {code,message} da API, barrel index. Sem auto-fix. 1 low (registerSchema espelha contrato de roles permissivo — cross-ref B01) em REVIEW-FINDINGS |
 | B25 | review | packages/api-client | done | 1 | | ApiClient bem feito: refresh com deduplicação, retry-once no 401, mapeamento p/ ApiClientError, 204 ok, token-store abstrato; sem auto-fix. 1 low (socket client é stub que lança, sem consumidor de realtime apesar do backend emitir) em REVIEW-FINDINGS |
-| B26 | review | packages/ui | todo | 0 | | |
+| B26 | review | packages/ui | done | 1 | | pacote limpo e sem achados: componentes RN tipados (Button/Text/Screen) sobre tokens, accessibilityRole, variantes; barrel index. Sem auto-fix |
 
 ## Grupo C — Testes (depende de A)
 
