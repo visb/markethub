@@ -13,6 +13,7 @@ Severidade: `crit` (bug / regra de negócio) · `high` · `med` · `low`.
 ## crit
 
 - B01 · services/api/src/auth/dto/register.dto.ts:17 · crit · `/auth/register` é público e aceita `roles` com `admin`/`merchant` — escalação de privilégio por self-registration · restringir DTO a roles auto-registráveis (ex.: só `customer`) e criar staff/admin via rota protegida `@Roles("admin")`.
+- B10 · services/api/src/payment/providers/pagarme.payment-provider.ts:108 · crit · `parseWebhook(payload)` ignora o argumento `signature` — não há verificação HMAC contra `PAGARME_WEBHOOK_SECRET` (env existe no CLAUDE.md mas não é usado). O endpoint `/webhooks/pix` é `@Public`, então qualquer um pode POSTar `{type:"charge.paid", data:{id:<chargeId>}}` e marcar um pedido como pago (→ markPaid → preparing → mercadoria liberada sem pagamento). Bypass de pagamento · receber `signature` e o corpo cru, calcular o HMAC com `PAGARME_WEBHOOK_SECRET` e rejeitar (retornar null/401) quando não bater; idem proteger o mock só em dev. Precisa do corpo raw (configurar rawBody no Nest) e de teste cobrindo assinatura inválida.
 
 ## high
 
