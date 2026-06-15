@@ -26,7 +26,7 @@ Dentro de A, ordem A1→A5. Pegar sempre o menor ID `todo` cuja dependência est
 | B01 | review | services/api/src/auth | done | 2 | 1713b97 | auto-fix: RolesGuard com shape {code,message}; 1 crit (roles no register) + 3 med + 2 low em REVIEW-FINDINGS |
 | B02 | review | services/api/src/users | done | 1 | | módulo limpo (shapes {code,message} ok, controller fino, sem dead code); sem auto-fix; 2 med (race P2002 no createStaff, NaN em page/pageSize) + 1 low (role query sem validação) em REVIEW-FINDINGS |
 | B03 | review | services/api/src/catalog | done | 1 | | módulo limpo (shapes {code,message} ok, controllers finos, DTOs validados, sem dead code); sem auto-fix; 1 med (NaN page/pageSize recorrente, igual B02) + 3 low (status sem validação runtime, NAME_REQUIRED como 404, race P2025 em update/remove/assignRaw) em REVIEW-FINDINGS |
-| B04 | review | services/api/src/erp | todo | 0 | | |
+| B04 | review | services/api/src/erp | done | 1 | | auto-fix: `runs` saiu do controller (acesso Prisma direto) p/ `ErpService.listRuns` — controller fino; codes {code,message} ok, connectors atrás de interface+registry. 1 med (race P2002 por GTIN em resolveCanonicalProduct) + 1 low (counters.updated inflado no priceSync) em REVIEW-FINDINGS |
 | B05 | review | services/api/src/enrichment | todo | 0 | | |
 | B06 | review | services/api/src/marketplace | todo | 0 | | |
 | B07 | review | services/api/src/merchant | todo | 0 | | |

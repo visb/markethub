@@ -120,6 +120,15 @@ export class ErpService {
     );
   }
 
+  /** Histórico de SyncRuns (mais recentes), opcionalmente filtrado por loja. */
+  listRuns(storeId?: string) {
+    return this.prisma.syncRun.findMany({
+      where: storeId ? { storeId } : undefined,
+      orderBy: { startedAt: "desc" },
+      take: 50,
+    });
+  }
+
   /** Sync incremental de estoque. */
   async runStockSync(storeId: string, since?: Date): Promise<string> {
     return this.runSync(

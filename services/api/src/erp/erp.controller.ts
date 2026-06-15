@@ -1,7 +1,6 @@
 import { Body, Controller, Get, Post, Query } from "@nestjs/common";
 import { IsBoolean, IsIn, IsOptional, IsString } from "class-validator";
 import { Roles } from "../auth/decorators/roles.decorator";
-import { PrismaService } from "../prisma/prisma.service";
 import { ConnectorRegistry } from "./connector-registry";
 import { ErpService } from "./erp.service";
 import { ErpQueueService } from "./erp.queue";
@@ -28,7 +27,6 @@ export class ErpController {
     private readonly erp: ErpService,
     private readonly queue: ErpQueueService,
     private readonly registry: ConnectorRegistry,
-    private readonly prisma: PrismaService,
     private readonly scheduler: ErpScheduler,
   ) {}
 
@@ -66,10 +64,6 @@ export class ErpController {
 
   @Get("runs")
   runs(@Query("storeId") storeId?: string) {
-    return this.prisma.syncRun.findMany({
-      where: storeId ? { storeId } : undefined,
-      orderBy: { startedAt: "desc" },
-      take: 50,
-    });
+    return this.erp.listRuns(storeId);
   }
 }
