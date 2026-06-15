@@ -88,7 +88,7 @@ Dentro de A, ordem A1→A5. Pegar sempre o menor ID `todo` cuja dependência est
 | id | tipo | escopo | status | tent | commit | nota |
 |----|------|--------|--------|------|--------|------|
 | C21 | unit | customer use-cart + prefs + location + zod schemas | done | 1 | | prefs.test (getRadiusKm clampa MIN/MAX, default p/ vazio/inválido; getFulfillmentMode default deliver) + location.test (deviceAddress: permissão negada→null, nome de estado→UF, UF de 2 letras preservada, sem geocode→null) via jest-expo + mocks expo-secure-store/expo-location. use-cart é hook (deferido) e customer não usa zod (desvio B21). 11 testes verdes |
-| C22 | unit | customer api modules + hooks (mappers, query keys) | todo | 0 | | |
+| C22 | unit | customer api modules + hooks (mappers, query keys) | done | 1 | | marketplace.test: montagem de URL/params do módulo tipado — feed (geoQs com/sem lat/lng/radiusKm), categoryFeed (pageSize+q+storeId), products (paginação), search (encode), addItem (POST auth+body), removeItem (DELETE auth). customer sem React Query/queryKeys (desvio B21). 8 testes verdes |
 | C23 | unit | picker hooks/lógica (substitution, task) | todo | 0 | | |
 | C24 | unit | driver hooks/lógica (delivery flow) | todo | 0 | | |
 | C25 | e2e-web | customer home → produto → carrinho → checkout (web) | todo | 0 | | |
