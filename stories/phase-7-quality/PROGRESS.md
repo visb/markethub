@@ -55,7 +55,7 @@ Dentro de A, ordem A1→A5. Pegar sempre o menor ID `todo` cuja dependência est
 ### C-api unit (depende: nenhuma além de jest já existente)
 | id | tipo | escopo | status | tent | commit | nota |
 |----|------|--------|--------|------|--------|------|
-| C01 | unit | api auth/token + guards | todo | 0 | | |
+| C01 | unit | api auth/token + guards | done | 1 | | TokenService (roundtrip sign/verify refresh, segredos distintos, hash/verifyHash, refreshExpiry) + RolesGuard (sem roles/match/FORBIDDEN_ROLE/sem user) + JwtAuthGuard (bypass @Public); 17 testes verdes |
 | C02 | unit | api catalog service (lockedFields, merge enrichment) | todo | 0 | | |
 | C03 | unit | api erp normalize + price/stock sync | todo | 0 | | |
 | C04 | unit | api enrichment completeness + category mapping | todo | 0 | | |
