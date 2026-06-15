@@ -68,7 +68,7 @@ Dentro de A, ordem A1→A5. Pegar sempre o menor ID `todo` cuja dependência est
 ### C-api e2e (depende: A1)
 | id | tipo | escopo | status | tent | commit | nota |
 |----|------|--------|--------|------|--------|------|
-| C10 | e2e | auth flow (register/login/refresh/roles guard) | todo | 0 | | |
+| C10 | e2e | auth flow (register/login/refresh/roles guard) | done | 1 | | expandiu auth.e2e-spec: register→/me, login (ok/senha errada 401), refresh (rotação emite novo access + reuso do antigo → 401), RolesGuard em GET admin/merchants (customer 403 / admin 200). 8 testes verdes. NB: confirma B01 — register aceita roles:['admin'] e o guard libera (vuln já em REVIEW-FINDINGS) |
 | C11 | e2e | catalog + admin product PATCH (diff only / lockedFields) | todo | 0 | | |
 | C12 | e2e | cart multi-store → checkout → order creation | todo | 0 | | |
 | C13 | e2e | pix payment + webhook → order paid | todo | 0 | | |
