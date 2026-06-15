@@ -39,7 +39,7 @@ Dentro de A, ordem A1→A5. Pegar sempre o menor ID `todo` cuja dependência est
 | B14 | review | services/api/src/notifications | done | 1 | | módulo limpo: best-effort (falha não quebra fluxo), cleanup de tokens inválidos, provider atrás de interface+mock, batch FCM, controller fino; sem auto-fix. 1 low (unregister apaga token sem checar dono) em REVIEW-FINDINGS |
 | B15 | review | services/api/src/geocoding | done | 1 | | módulo limpo e sem achados: provider atrás de interface+mock determinístico, factory por env, error handling best-effort (retorna null). Sem auto-fix |
 | B16 | review | services/api/src/storage | done | 1 | | módulo limpo e sem achados: SigV4 manual (presign PUT + upload server-side) coerente, helpers de canonicalização corretos, sem segredos hardcoded (tudo via env). Sem auto-fix |
-| B17 | review | services/api/src/queue | todo | 0 | | |
+| B17 | review | services/api/src/queue | done | 1 | | módulo de config único e limpo: conexão BullMQ global via REDIS_URL (env), sem achados. Sem auto-fix |
 | B18 | review | services/api/src/admin | todo | 0 | | |
 | B19 | review | services/api/src (common, config, health, prisma, app.module, main) | todo | 0 | | |
 | B20 | review | apps/admin (pages, components, auth, api/hooks, queryKeys) | todo | 0 | | |
