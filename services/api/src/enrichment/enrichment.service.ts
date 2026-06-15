@@ -155,6 +155,15 @@ export class EnrichmentService {
     return { processed: products.length };
   }
 
+  /** Mapeamentos de categoria de origem → canônica (mais recentes), para curadoria. */
+  listMappings() {
+    return this.prisma.categoryMapping.findMany({
+      include: { category: { select: { name: true, slug: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+  }
+
   private async safeEnrich(productId: string): Promise<void> {
     try {
       await this.enrichProduct(productId);
