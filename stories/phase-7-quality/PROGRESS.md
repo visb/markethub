@@ -41,7 +41,7 @@ Dentro de A, ordem A1→A5. Pegar sempre o menor ID `todo` cuja dependência est
 | B16 | review | services/api/src/storage | done | 1 | | módulo limpo e sem achados: SigV4 manual (presign PUT + upload server-side) coerente, helpers de canonicalização corretos, sem segredos hardcoded (tudo via env). Sem auto-fix |
 | B17 | review | services/api/src/queue | done | 1 | | módulo de config único e limpo: conexão BullMQ global via REDIS_URL (env), sem achados. Sem auto-fix |
 | B18 | review | services/api/src/admin | done | 1 | | services limpos: validação + ConflictException no slug, lockedFields respeitado, dashboards read-only, codes ok, controllers finos. Sem auto-fix. 1 med (NaN page recorrente) + 1 low (toDate/status sem validação, race P2002 no slug — tudo admin-only) em REVIEW-FINDINGS |
-| B19 | review | services/api/src (common, config, health, prisma, app.module, main) | todo | 0 | | |
+| B19 | review | services/api/src (common, config, health, prisma, app.module, main) | done | 1 | | infra limpa: guards globais (JWT+Roles), filtro de exceção com shape {code,message,details}, ValidationPipe whitelist+transform, env via zod fail-fast, geo/codes puros. Sem auto-fix. 1 med (código de 4 dígitos sem rate-limit → brute-force) + 1 low (defaults de credencial no env + falta validação cruzada) em REVIEW-FINDINGS |
 | B20 | review | apps/admin (pages, components, auth, api/hooks, queryKeys) | todo | 0 | | |
 | B21 | review | apps/customer (app routes, src/api, hooks, components, cart/prefs/location) | todo | 0 | | |
 | B22 | review | apps/picker (app routes, src/api, hooks, components) | todo | 0 | | |
