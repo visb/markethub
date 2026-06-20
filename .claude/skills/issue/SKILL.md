@@ -1,172 +1,101 @@
 ---
 name: issue
-description: Cria e conduz uma story do início ao fim no monorepo MarketHub — escreve o plano em stories/phase-*/, desenvolve numa branch nova, valida, marca como done e pergunta se deve mergear na main. Stories grandes podem ser quebradas em múltiplas sub-stories dentro de uma subpasta. Use quando o usuário invocar /issue ou pedir para abrir/criar uma nova story/issue/tarefa de desenvolvimento.
+description: Cria uma story de desenvolvimento no monorepo MarketHub — levanta o escopo, escreve o plano em stories/NN-slug.md e commita na main. NÃO implementa, NÃO cria branch, NÃO mergeia. Use quando o usuário invocar /issue ou pedir para abrir/criar uma nova story/issue/tarefa de desenvolvimento.
 ---
 
-# /issue — ciclo de vida de uma story
+# /issue — criar uma story
 
-Skill invocável via `/issue`. Conduz uma unidade de trabalho do plano ao merge.
-Aceita título/descrição como argumento (`/issue corrigir filtro de catálogo`) ou nada
+Skill invocável pelo usuário via `/issue`. **Só cria a story.** Levanta o escopo, escreve o plano e
+commita o `.md` na main. Para aí.
+
+Pode receber um título/descrição como argumento (`/issue corrigir filtro de relatório`) ou nada
 (então levantar o escopo com o usuário).
 
-**Sem Pull Requests.** Fluxo: branch local → merge direto na main, sob confirmação.
-Nunca abrir PR, nunca push automático.
+> **Esta skill NÃO implementa a story.** Implementar é um passo manual separado, feito depois numa
+> branch própria (ver `markethub-workflow`). `/issue` termina assim que a story está commitada na main.
 
-## Convenções do repo (respeitar)
+## Convenções do repo (já existentes — respeitar)
 
-- Stories ficam em `stories/phase-N-<slug>/SX.Y-<slug>.md`. Numeração **por fase**: `S<fase>.<seq>`
-  (ex.: `S6.7`). Roadmap geral em `stories/ROADMAP.md`.
-- **Não há `stories/done/`.** Conclusão = editar o cabeçalho `- **Status:** done` no próprio arquivo
-  e marcar os critérios de aceite (`- [x]`).
-- Formato (seguir as existentes, ex.: `stories/phase-6-customer-refinement/*.md`):
-  ```
-  # SX.Y Título
-  - **Fase:** N
-  - **Epic:** <epic>
-  - **Status:** todo | in progress | done
-  - **Depende de:** — | SX.Z
-
-  ## Objetivo
-  ## User story
-  ## Critérios de aceite      (checklist - [ ])
-  ## Escopo / Fora de escopo
-  ## Notas técnicas
-  ```
-- Commits: Conventional Commits em pt-BR com escopo de story — `feat(S6.7): ...`, `fix(S6.7): ...`,
-  `docs(S6.7): ...`. Assunto curto, imperativo.
+- Stories novas ficam em `stories/NN-slug-em-kebab.md` (flat na raiz de `stories/`), numeração
+  sequencial crescente com **dois dígitos** (`01-slug.md`, `02-slug.md`, ...).
+- Stories legadas vivem em `stories/done/phase-*/` e `stories/phase-7-quality/` no formato antigo
+  (`SN.N-slug.md`). **Não** seguem a numeração flat — não contam para o próximo NN.
+- Concluídas são arquivadas em `stories/done/` (via `git mv`) — isso acontece **depois**, ao
+  concluir a implementação, não nesta skill.
+- Formato de story: título `# Plan: ...`, seção **Context** (o *porquê*, decisões do usuário,
+  trade-offs aceitos), **Desenho/Escopo**, **Validação**, **Fora de escopo**.
+- **A Validação é obrigatória e SEMPRE inclui instruções explícitas de teste** (ver
+  "Validação e gate de cobertura" abaixo). Nenhuma story é escrita sem elas.
+- Commits seguem o CLAUDE.md: Conventional Commits em **pt-BR**, mensagem em português.
 - Co-author: `Claude Opus 4.8 <noreply@anthropic.com>` (ou o modelo corrente).
 
 ## Fluxo
 
 ### 1. Levantar o escopo
 
-- Se `/issue` veio com texto, usar como ponto de partida; senão perguntar o problema/feature.
-- Só perguntar o que muda o resultado (escopo ambíguo, decisão de produto, trade-off). Preencher
-  defaults óbvios e seguir.
-- Capturar o **porquê** e as **decisões travadas** — é o que o git diff não guarda.
-- Regra de domínio envolvida (status, cancelamento, reembolso, picking, delivery, lockedFields)?
-  Cruzar com `BUSINESS_RULES.md` antes de escrever o plano.
+- Se `/issue` veio com texto, usar como ponto de partida; senão perguntar qual o problema/feature.
+- Fazer só as perguntas que mudam o resultado (escopo ambíguo, decisão de produto, trade-off).
+  Não interrogar à toa — preencher defaults óbvios e seguir.
+- Capturar o **porquê** e as **decisões travadas**, não só o quê. É isso que o git diff não guarda.
 
-### 2. Descobrir fase e número
+### 2. Descobrir o próximo número
 
-- Decidir a **fase**: normalmente a fase aberta mais recente (`stories/phase-*` de maior N) ou a que
-  o usuário indicar. Feature de natureza nova pode pedir fase nova (`phase-(N+1)-<slug>`) — confirmar.
-- Varrer os `SX.Y-*.md` da fase alvo; próximo `seq` = maior `.Y` daquela fase + 1.
-- Slug kebab-case curto e descritivo.
+- Varrer **só** `stories/*.md` na raiz (flat); pegar o maior `NN` e somar 1.
+- Se não houver nenhuma story flat ainda, começar em `01`. (Stories legadas em `phase-*/SN.N` e
+  `stories/done/` **não** contam.)
+- Slug em kebab-case curto e descritivo.
 
-### 3. Avaliar tamanho — story única ou dividida
+### 3. Escrever a story
 
-Decidir se cabe numa story só ou se deve **quebrar em sub-stories** (ver "Stories grandes" abaixo).
-Sinais de que deve dividir:
-- Critérios de aceite cobrem áreas independentes (ex.: schema+backend **e** 2 apps **e** admin) que
-  validam e mergeiam separado.
-- Entregáveis sequenciais com dependência clara entre si (S deve vir antes de T).
-- O conjunto não fecha num diff coeso / não dá pra validar de uma vez.
+- Criar `stories/NN-slug.md`.
+- Conteúdo mínimo: **Context** (com decisões do usuário), **Desenho**, **Validação**
+  (quais testes/builds a implementação vai exigir — ver abaixo), **Fora de escopo**.
+- Mostrar o plano ao usuário e confirmar antes de commitar.
 
-Na dúvida, **perguntar ao usuário** se prefere uma story grande ou dividida (em modo autônomo, decidir
-pela divisão quando os sinais acima baterem e registrar a decisão no `_index.md`).
+#### Validação e gate de cobertura (OBRIGATÓRIO em toda story)
 
-### 4. Escrever a story (caso única)
+A seção **Validação** NUNCA pode ser vaga ("rodar os testes"). Ela SEMPRE:
 
-- Criar `stories/phase-N-<slug>/SX.Y-<slug>.md` no formato acima.
-- Conteúdo mínimo: **Objetivo**, **Critérios de aceite** (checklist), **Escopo/Fora de escopo**,
-  **Notas técnicas** (validação: quais builds/testes; migrations; decisões).
-- Mostrar o plano e confirmar antes de codar. Em modo autônomo, travar as decisões na story e seguir.
+1. Lista os **testes específicos** que a implementação exige, por camada tocada:
+   - backend (`services/api`) → `pnpm --filter @markethub/api test` (unit do service) e, se houver
+     fluxo HTTP novo/alterado, `pnpm --filter @markethub/api test:e2e`;
+   - `admin` (Vite) → unit do workspace (`pnpm --filter @markethub/admin test`) + e2e-web
+     (Playwright) dos fluxos afetados via `pnpm test:e2e`;
+   - `customer`/`picker`/`driver` (Expo) → unit do workspace + e2e-web (Playwright) via
+     `pnpm test:e2e` quando o fluxo for tocado;
+   - contratos (`packages/types`, `packages/api-client`) → `pnpm typecheck` + `pnpm build`;
+     se mudou schema Prisma, `pnpm --filter @markethub/api prisma:generate` antes.
+2. Enumera os **casos a cobrir** (caminhos felizes, erros, permissões/roles, validações, ramos
+   novos) — não só "tem teste", mas *o que* o teste prova.
+3. Fecha com um **gate de cobertura** explícito:
+   > **Gate de cobertura (trava a story):** todo caminho novo ou alterado tem teste correspondente
+   > — nenhum código novo entra sem teste. Rodar `pnpm --filter @markethub/api test:coverage` (e o
+   > `pnpm test:coverage` dos apps tocados); **não reduzir** a cobertura dos módulos afetados. Sem
+   > `skip`/`only`/`xfail` sem justificativa no código (CLAUDE.md).
 
-### 5. Branch nova — SEMPRE
+Adaptar o gate ao escopo real: story **frontend-only** cita só `pnpm test:coverage` dos apps tocados
+(sem `--filter @markethub/api test:coverage`); story de backend cita o coverage da api. O princípio
+"código novo sem teste não fecha a story" vale sempre.
 
-- Toda story numa branch nova. Nunca codar direto na main.
-```
-git switch main
-git switch -c <type>/<slug>      # feat/ fix/ chore/ docs/ — casa o commit
-```
-- Commitar a story (o `.md`) primeiro: `docs(SX.Y): plano da story — <título>`.
+### 4. Commitar a story na MAIN
 
-### 6. Implementar
+- A story é commitada **direto na main**. **NUNCA criar branch para a story.**
+- `git add` só do `stories/NN-slug.md`.
+- `git commit -m "docs(stories): plano da story NN — <título>"`.
+- **Não push automático** — só se o usuário pedir.
 
-- Seguir a story à risca. Consultar as skills `markethub-backend`/`-frontend`/`-workflow`/`-project-map`
-  para padrões e localização.
-- Reusar antes de criar (hook/módulo de API/componente) — checklist do `CLAUDE.md`.
-- Schema mudou → `prisma:migrate` (nova migration, nunca editar aplicada) + `prisma:generate`.
-- Contrato de API mudou → atualizar `packages/types` **e** o backend (sem dep compartilhada).
+### 5. Encerrar
 
-### 7. Validar
-
-- Rodar a validação por tipo de mudança da tabela em `markethub-workflow` conforme a área tocada.
-- Backend: `pnpm --filter @markethub/api typecheck` + `build` + `test`. Admin: `pnpm --filter @markethub/admin build`.
-  Mobile: `tsc --noEmit` do app. Cross-cutting: `pnpm typecheck && pnpm build` na raiz.
-- Sem `skip`/`only`/`xfail` sem justificativa no código. Corrigir até verde.
-
-### 8. Commitar a implementação
-
-- `git add` só dos arquivos da story (+ migration/testes). `git commit` na convenção. Commits coesos.
-
-### 9. Marcar como done
-
-- Editar o `.md`: `- **Status:** done` e `- [x]` nos critérios atendidos.
-- Commit: `docs(SX.Y): conclui story — <título>`.
-
-### 10. Perguntar sobre merge na main
-
-Verde e concluída, **perguntar** (não decidir sozinho):
-
-> Story SX.Y pronta na branch `<branch>`, validação verde. Mergear na main agora?
-
-- **Sim** →
-```
-git switch main
-git merge --no-ff <branch> -m "merge: story SX.Y — <título>"
-```
-  Não deletar a branch sem pedido. Não push automático.
-- **Não / depois** → deixar na branch, informar o nome para o usuário mergear quando quiser.
-
-## Stories grandes — dividir em subpasta
-
-Quando a story é grande demais para um diff coeso, vira **guarda-chuva** com sub-stories:
-
-```
-stories/phase-N-<slug>/
-  SX.Y-<slug>/              ← subpasta (mesmo código SX.Y do guarda-chuva)
-    _index.md              ← guarda-chuva: objetivo macro, decisões, ordem das sub-stories + deps
-    SX.Y.1-<slug>.md       ← sub-story 1
-    SX.Y.2-<slug>.md       ← sub-story 2
-    ...
-```
-
-- **`_index.md`**: cabeçalho de story normal (`# SX.Y Título`, `Status`), seção **Objetivo** macro,
-  **Decisões travadas**, e uma **lista ordenada das sub-stories** com `Depende de` entre elas e o
-  estado de cada uma (checkbox). É o mapa do épico.
-- **Cada sub-story** (`SX.Y.K-*.md`): story completa no formato padrão (Objetivo, Critérios,
-  Escopo, Notas técnicas), com `- **Depende de:** SX.Y.(K-1)` quando sequencial.
-- **Numeração das sub-stories**: `SX.Y.1`, `SX.Y.2`, … na ordem de execução.
-
-### Fluxo do guarda-chuva
-
-1. Escrever `_index.md` + todas as sub-stories; confirmar o plano com o usuário.
-2. Commitar o plano numa branch: `docs(SX.Y): plano do épico — <título>` (pode ser branch própria
-   ou a primeira branch de sub-story).
-3. Para **cada** sub-story, rodar o ciclo normal (passos 5–10): branch própria
-   (`<type>/<slug-da-sub>`), implementar, validar, marcar a sub-story como done, perguntar merge.
-   Respeitar a ordem de dependência do `_index.md`.
-4. Ao concluir uma sub-story, marcar seu item no `_index.md` (`- [x] SX.Y.1 …`).
-5. Guarda-chuva vira `Status: done` só quando **todas** as sub-stories estão done — commit
-   `docs(SX.Y): conclui épico — <título>`.
-
-> Cada sub-story é independente para branch/validação/merge. Não acumular tudo numa branch só —
-> o ganho da divisão é poder validar e mergear em pedaços.
-
-## Modo autônomo
-
-Se o usuário pedir execução sem supervisão (várias issues em fila), travar as decisões dentro de cada
-story/`_index.md` e seguir. Sub-agente por story quando útil; `ScheduleWakeup` como fallback de
-continuidade. Mesmo autônomo, **não mergear na main sem confirmação** — a menos que o usuário tenha
-autorizado o merge explicitamente de antemão.
+- Informar ao usuário: story NN criada e commitada na main.
+- **PARAR AQUI.** Não criar branch, não implementar, não rodar testes, não mergear.
+- Se o usuário quiser tocar a implementação, ele pede explicitamente depois (passo separado, em
+  branch própria — ver `markethub-workflow`).
 
 ## Proibido
 
-- Abrir PR (não faz parte do workflow).
-- Codar na main.
+- **Implementar a story** — esta skill só cria o plano. Codar é passo separado, sob pedido explícito.
+- **Criar branch** — a story vai direto na main.
+- Abrir PR (não faz parte do workflow do repo).
 - Push sem pedido explícito.
-- Mergear na main sem confirmação.
-- Editar migration já aplicada.
-- Pular testes ou deletar trabalho não criado nesta story.
+- Mergear qualquer coisa.
+- Continuar para qualquer trabalho além de escrever e commitar o `.md` da story.
