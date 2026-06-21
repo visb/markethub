@@ -8,7 +8,7 @@ Fonte de verdade p/ retomar: **git log + este arquivo**. Story com `feat(story-N
 |----|--------|-----|--------|
 | 01 | Picker: pedidos `queued` no topo da fila | — | OK |
 | 02 | Picker: fila atualiza em tempo real (`subscribe:store`) | 01* | OK |
-| 03 | Picker: autocomplete de substituto + migração da tela p/ React Query | 02 | TODO |
+| 03 | Picker: autocomplete de substituto + migração da tela p/ React Query | 02 | OK |
 | 04 | Backend: `GET /stores/nearby` por viewport (bbox) | — | TODO |
 | 05 | Customer: aba explore vira mapa de mercados (base) | 04 | TODO |
 | 06 | Customer: explore — mercados sob demanda por viewport + loading | 05, 04 | TODO |
@@ -27,6 +27,7 @@ Fonte de verdade p/ retomar: **git log + este arquivo**. Story com `feat(story-N
 <!-- [OK|PARCIAL|BLOQUEADO] NN — testes: <resumo> — commit: <hash> — merge: <hash> — <data> — <bloqueio> -->
 [OK] 01 — testes: picking.service.spec (12/12, suite api 199/199, coverage gate verde) — commit: 5f85276 — merge: 3904eac — 2026-06-21 —
 [OK] 02 — testes: api-client 18/18 (+subscribeStore), picker 16/16 (usePickQueue realtime/polling/cleanup; coverage usePickQueue 97%), typecheck+build verdes — commit: 24c756d — merge: fc6711b — 2026-06-21 —
+[OK] 03 — testes: picker 34/34 (useDebouncedValue fake-timers, useSubstituteSearch gate≥2/debounce, todas as mutations invalidam pick.task; novos arquivos 100% cov), typecheck+build verdes — commit: f75e836 — merge: 1338577 — 2026-06-21 —
 
 ## Resumo final da rodada
 
