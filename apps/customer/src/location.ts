@@ -24,6 +24,23 @@ const normalize = (s: string) =>
  * pronto para `addAddress`, ou `null` se a permissão for negada / falhar.
  * Usado no boot da Home para criar o primeiro endereço automaticamente.
  */
+/**
+ * Posição atual do dispositivo (lat/lng), headless — sem UI e sem reverse geocode.
+ * Usado pelo mapa do explore (story 05) p/ centrar na localização do usuário.
+ * Retorna `null` se a permissão for negada ou a leitura falhar (a tela cai no
+ * fallback de endereço ativo / centro padrão, sem travar).
+ */
+export async function deviceLatLng(): Promise<{ latitude: number; longitude: number } | null> {
+  try {
+    const perm = await Location.requestForegroundPermissionsAsync();
+    if (!perm.granted) return null;
+    const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+    return { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+  } catch {
+    return null;
+  }
+}
+
 export async function deviceAddress(): Promise<Partial<Address> | null> {
   try {
     const perm = await Location.requestForegroundPermissionsAsync();
