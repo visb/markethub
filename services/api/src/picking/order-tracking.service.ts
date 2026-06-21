@@ -1,8 +1,20 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import type { FulfillmentType, OrderStatus } from "@prisma/client";
 import { etaMinutes, haversineKm } from "../common/geo";
 import { PrismaService } from "../prisma/prisma.service";
 import { PickingGateway } from "./picking.gateway";
+
+// Ordem das etapas do pedido — usada p/ derivar o status agregado do Order a
+// partir dos seus grupos (o pedido fica na etapa menos avançada entre as lojas).
+const ORDER_STAGE: OrderStatus[] = [
+  "created",
+  "paid",
+  "preparing",
+  "picking",
+  "ready_for_pickup",
+  "on_the_way",
+  "delivered",
+];
 
 /**
  * Rastreio do pedido por etapas (S5.1). Constrói um snapshot agregado do Order
@@ -62,10 +74,55 @@ const ETA_TO_MIN = 60;
 
 @Injectable()
 export class OrderTrackingService {
+  private readonly logger = new Logger(OrderTrackingService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly gateway: PickingGateway,
   ) {}
+
+  /**
+   * Status do Order = etapa menos avançada entre seus grupos (ignora cancelados).
+   * Recalcula e persiste o Order.status, depois emite o snapshot de rastreio.
+   * Ponto compartilhado pelo módulo picking (HandoffService + PickingSessionService)
+   * — não duplicar a regra de agregação. Idempotente.
+   */
+  async recomputeAndEmit(orderGroupId: string): Promise<void> {
+    const group = await this.prisma.orderGroup.findUniqueOrThrow({
+      where: { id: orderGroupId },
+      select: { orderId: true },
+    });
+    const groups = await this.prisma.orderGroup.findMany({
+      where: { orderId: group.orderId },
+      select: { status: true },
+    });
+    // ignora grupos cancelados ao agregar
+    const ranks = groups
+      .map((g) => ORDER_STAGE.indexOf(g.status))
+      .filter((r) => r >= 0);
+    if (ranks.length === 0) return;
+    const status = ORDER_STAGE[Math.min(...ranks)] ?? "preparing";
+    await this.prisma.order.update({ where: { id: group.orderId }, data: { status } });
+    // rastreio em tempo real (S5.1): emite o snapshot atualizado ao dono do pedido
+    await this.emit(group.orderId);
+  }
+
+  /**
+   * Emite o snapshot atualizado do pedido a partir do orderGroupId. Best-effort:
+   * uma falha no build/emit não derruba a operação de separação que o chamou
+   * (mesmo padrão do refund). Usado nas mudanças de item da separação.
+   */
+  async emitForGroup(orderGroupId: string): Promise<void> {
+    try {
+      const group = await this.prisma.orderGroup.findUniqueOrThrow({
+        where: { id: orderGroupId },
+        select: { orderId: true },
+      });
+      await this.emit(group.orderId);
+    } catch (e) {
+      this.logger.error(`Emit de rastreio do grupo ${orderGroupId} falhou: ${String(e)}`);
+    }
+  }
 
   /** Monta o snapshot de rastreio do pedido (usado no REST e no socket). */
   async build(orderId: string): Promise<OrderTracking> {

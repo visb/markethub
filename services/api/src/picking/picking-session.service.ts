@@ -8,6 +8,7 @@ import {
 import { computeItemTotal } from "../marketplace/pricing";
 import { RefundService } from "../payment/refund.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { OrderTrackingService } from "./order-tracking.service";
 import { PickingEvents } from "./picking.events";
 import { PICK_TASK_INCLUDE, toPickItemDto, toPickTaskDto } from "./picking.mapper";
 
@@ -34,9 +35,14 @@ export class PickingSessionService {
     private readonly prisma: PrismaService,
     private readonly events: PickingEvents,
     private readonly refunds: RefundService,
+    private readonly tracking: OrderTrackingService,
   ) {}
 
-  /** assigned → picking. Só o dono inicia. */
+  /**
+   * assigned → picking. Só o dono inicia. Além da PickTask, transiciona o
+   * OrderGroup → picking (mesma transação) e recomputa/emite o status agregado
+   * do Order, para a tela do cliente acender o passo "Comprando" (story 01).
+   */
   async start(userId: string, taskId: string) {
     const task = await this.requireOwnedTask(userId, taskId);
     if (task.status === "picking") return this.detail(taskId); // idempotente
@@ -46,10 +52,19 @@ export class PickingSessionService {
         message: "Tarefa precisa estar atribuída para iniciar",
       });
     }
-    await this.prisma.pickTask.update({
-      where: { id: taskId },
-      data: { status: "picking", startedAt: new Date() },
-    });
+    await this.prisma.$transaction([
+      this.prisma.pickTask.update({
+        where: { id: taskId },
+        data: { status: "picking", startedAt: new Date() },
+      }),
+      this.prisma.orderGroup.update({
+        where: { id: task.orderGroupId },
+        data: { status: "picking" },
+      }),
+    ]);
+    // recomputa o status agregado do pedido (etapa menos avançada entre os
+    // grupos) e emite o snapshot — multi-loja só vira "picking" quando manda.
+    await this.tracking.recomputeAndEmit(task.orderGroupId);
     return this.afterChange(taskId);
   }
 
@@ -121,6 +136,8 @@ export class PickingSessionService {
       pickItemId: itemId,
       status: updated.status,
     });
+    // snapshot ao dono no canal order: (contadores da separação). Best-effort.
+    await this.tracking.emitForGroup(task.orderGroupId);
     return toPickItemDto(updated);
   }
 
@@ -164,6 +181,9 @@ export class PickingSessionService {
         this.logger.error(`Estorno do pedido ${group.orderId} falhou: ${String(e)}`);
       }
     }
+    // snapshot final da separação ao dono (status segue "picking" até markReady).
+    // Best-effort. Story 01.
+    await this.tracking.emitForGroup(task.orderGroupId);
     return this.afterChange(taskId);
   }
 

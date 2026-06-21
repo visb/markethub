@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { PushService } from "../notifications/push.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { OrderTrackingService } from "./order-tracking.service";
 import { PickingSessionService } from "./picking-session.service";
 import { PickingEvents } from "./picking.events";
 
@@ -29,6 +30,7 @@ export class SubstitutionService {
     private readonly session: PickingSessionService,
     private readonly events: PickingEvents,
     private readonly push: PushService,
+    private readonly tracking: OrderTrackingService,
   ) {}
 
   /** Separador propõe um substituto (Offer da mesma loja) para um PickItem. */
@@ -204,6 +206,8 @@ export class SubstitutionService {
       orderGroupId,
       approvalStatus: decision,
     });
+    // snapshot ao dono no canal order: após resolver a substituição. Best-effort.
+    await this.tracking.emitForGroup(orderGroupId);
     return this.prisma.substitution.findUniqueOrThrow({ where: { id: substitutionId } });
   }
 
