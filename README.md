@@ -19,7 +19,7 @@ apps/        customer · picker · driver · admin
 services/    api
 packages/    types · api-client · ui
 infra/       docker-compose, CI
-stories/     roadmap e stories por fase
+stories/     roadmap e stories (flat: NN-slug.md; concluídas em done/)
 briefing/    screenshots de referência
 ```
 
@@ -50,4 +50,4 @@ pnpm dev
 
 ## Roadmap
 
-Ver `stories/ROADMAP.md`. Desenvolvimento por fases; cada story em `stories/phase-*`.
+Ver `stories/ROADMAP.md`. Cada story em `stories/NN-slug.md` (flat); concluídas em `stories/done/`.

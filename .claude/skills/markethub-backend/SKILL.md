@@ -67,7 +67,7 @@ JWT: access + refresh (`auth/token.service.ts`); segredos via env (`JWT_ACCESS_S
 
 ## Domínio — pontos críticos
 
-**Conferir `BUSINESS_RULES.md` (raiz) antes de mexer em status, cancelamento, reembolso, picking, delivery ou lockedFields** — é a fonte canônica das invariantes, com ponteiro pro código de cada regra. Stories da fase em `stories/phase-*` dão o contexto.
+**Conferir `BUSINESS_RULES.md` (raiz) antes de mexer em status, cancelamento, reembolso, picking, delivery ou lockedFields** — é a fonte canônica das invariantes, com ponteiro pro código de cada regra. As stories em `stories/` (flat `NN-slug.md`; concluídas em `stories/done/`) dão o contexto.
 
 - **saleType** (`unit` | `weight`): peso em **gramas**; dirige preço/quantidade.
 - **lockedFields** (catalog): campos travados contra enriquecimento automático; só os **editados** travam — o `updateProduct` discrimina por `undefined`, gravando/travando apenas o diff.

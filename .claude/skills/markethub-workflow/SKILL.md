@@ -1,6 +1,6 @@
 ---
 name: markethub-workflow
-description: Fluxo de trabalho do monorepo MarketHub — comandos pnpm/turbo por tipo de mudança, o que rodar para validar antes de declarar pronto (typecheck/build/test, prisma generate/migrate), como subir cada app em dev, convenção de commits (Conventional Commits pt-BR com escopo de story) e fluxo de stories por fase. Use ao rodar comandos, validar mudanças, decidir o que testar ou escrever commits neste repo.
+description: Fluxo de trabalho do monorepo MarketHub — comandos pnpm/turbo por tipo de mudança, o que rodar para validar antes de declarar pronto (typecheck/build/test, prisma generate/migrate), como subir cada app em dev, convenção de commits (Conventional Commits pt-BR com escopo de story) e fluxo de stories (flat em stories/NN-slug.md). Use ao rodar comandos, validar mudanças, decidir o que testar ou escrever commits neste repo.
 ---
 
 # Fluxo de trabalho MarketHub para IA
@@ -69,7 +69,7 @@ docs(S6): fase 6 — refinamento do app cliente
 
 ## Fluxo de stories
 
-- Desenvolvimento por fases em `stories/phase-*` (phase-0 a 6); cada story = `.md` com objetivo + checklist. Roadmap: `stories/ROADMAP.md`.
+- Stories flat em `stories/NN-slug.md` (numeração sequencial de 2 dígitos); cada story = `.md` com objetivo + checklist. Concluídas vão para `stories/done/` (flat, `git mv`) — **não** agrupar por `phase-NN`. Roadmap: `stories/ROADMAP.md`. (Stories legadas em `stories/phase-*` / `stories/done/phase-*` ficam onde estão.)
 - Antes de codar a feature: ler a story correspondente. Ao concluir: marcar checklist + registrar arquivos tocados na story.
 - Regra de domínio (status, cancelamento, reembolso, picking, delivery, lockedFields): conferir **`BUSINESS_RULES.md`** antes de mexer.
 

@@ -76,8 +76,8 @@ git switch -c story/NN-{slug}
   (Conventional Commits, escopo da story — ver CLAUDE.md).
 - Merge na main (após suíte verde): `git switch main && git merge --no-ff story/NN-{slug}
   -m "merge: story NN — <título>"`. Sem push. Não deletar a branch.
-- Arquivar a story: `git mv stories/NN-*.md stories/done/phase-8-realtime-tracking/` + commit
-  `docs(stories): arquiva story NN concluida em done/`.
+- Arquivar a story: `git mv stories/NN-*.md stories/done/` (flat — **não** agrupar por `phase-NN`)
+  + commit `docs(stories): arquiva story NN concluida em done/`.
 
 ## Dependências externas — o que fazer SEM credenciais (não perguntar, não inventar)
 
@@ -141,7 +141,7 @@ g. Corrigir até a suíte tocada passar **inteira** (casos novos + sem regressã
 h. `git add` apenas arquivos da story + testes; `git commit` (`feat(story-NN)`).
 i. **Merge na main**: `git switch main && git merge --no-ff story/NN-{slug} -m "merge:
    story NN — <título>"`. Resolver conflito se houver. Sem push, não deletar a branch.
-j. Arquivar: `git mv stories/NN-*.md stories/done/phase-8-realtime-tracking/` + commit de arquivamento.
+j. Arquivar: `git mv stories/NN-*.md stories/done/` (flat — **não** agrupar por `phase-NN`) + commit de arquivamento.
 k. Devolver ao orquestrador: arquivos tocados, testes rodados (unit+e2e), hash do merge, BLOQUEIOS.
 
 ## Registro de progresso

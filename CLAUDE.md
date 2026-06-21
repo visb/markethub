@@ -23,7 +23,7 @@ packages/
   types/      ← contratos/tipos compartilhados (@markethub/types)
   ui/         ← componentes RN compartilhados (source; Metro transpila)
 infra/        ← docker-compose (Postgres, Redis, MinIO)
-stories/      ← roadmap + stories por fase (phase-0..6)
+stories/      ← roadmap + stories flat (stories/NN-slug.md); concluídas em stories/done/
 ```
 
 Regra de boundary: `apps/` só frontend; backend em `services/`. Código cruzando workspaces vai em `packages/` — nunca import relativo atravessando o limite de um app/service.
@@ -174,7 +174,7 @@ Sem segredos no código. Tudo via env — ver `.env.example`. Nunca commitar `.e
 
 - **Commits:** Conventional Commits em **pt-BR**, escopo = story/área: `feat(S6.2): ...`, `fix(admin): ...`, `refactor: ...`. Mensagem em português normal.
 - **TS:** `strict` na base (`tsconfig.base.json`); cada workspace estende. Não relaxar flag global para calar erro local.
-- **Stories:** desenvolvimento por fases em `stories/phase-*`; cada story = `.md` com objetivo + checklist. Ler a story antes de codar a feature; registrar arquivos tocados ao concluir. Roadmap: `stories/ROADMAP.md`.
+- **Stories:** flat em `stories/NN-slug.md` (numeração sequencial de 2 dígitos); cada story = `.md` com objetivo + checklist. Ler a story antes de codar a feature; registrar arquivos tocados ao concluir. Concluídas vão para `stories/done/` (flat, `git mv`) — **não** agrupar por `phase-NN`. Roadmap: `stories/ROADMAP.md`. (Stories legadas em `stories/phase-*` e `stories/done/phase-*` ficam onde estão.)
 - **Commit/push só quando o usuário pedir.** Não misturar mudança não relacionada no mesmo commit.
 
 ---
