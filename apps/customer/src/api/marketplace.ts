@@ -338,7 +338,7 @@ export function marketplace(api: ApiClient) {
     removeFavorite: (offerId: string) =>
       api.request<{ removed: boolean }>(`/favorites/${offerId}`, { method: "DELETE", auth: true }),
 
-    slots: (storeId: string) => api.request<SlotView[]>(`/stores/${storeId}/slots`),
+    slots: (storeId: string) => api.request<SlotView[]>(`/stores/${storeId}/slots`, { auth: true }),
     checkout: (body: {
       fulfillment: "delivery" | "pickup";
       addressId?: string | null;
