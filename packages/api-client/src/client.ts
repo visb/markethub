@@ -5,6 +5,9 @@ import type {
   DeliveryDTO,
   LoginInput,
   MerchantContextDTO,
+  MerchantStoreDetailDTO,
+  MerchantStoreInput,
+  MerchantStoreUpdateInput,
   PickTaskDTO,
   RefreshInput,
   RegisterInput,
@@ -196,6 +199,21 @@ export class ApiClient {
 
   merchantStores(): Promise<PickStore[]> {
     return this.request("/merchant/stores", { auth: true });
+  }
+
+  /** Lista detalhada das lojas visíveis (endereço/coords/active) — story 08. */
+  merchantStoresDetail(): Promise<MerchantStoreDetailDTO[]> {
+    return this.request("/merchant/stores/detail", { auth: true });
+  }
+
+  /** Cria uma loja na rede do dono (owner-only — story 08). */
+  merchantCreateStore(input: MerchantStoreInput): Promise<MerchantStoreDetailDTO> {
+    return this.request("/merchant/stores", { method: "POST", body: input, auth: true });
+  }
+
+  /** Edita uma loja da rede do dono (owner-only — story 08). */
+  merchantUpdateStore(id: string, patch: MerchantStoreUpdateInput): Promise<MerchantStoreDetailDTO> {
+    return this.request(`/merchant/stores/${id}`, { method: "PATCH", body: patch, auth: true });
   }
 
   merchantOffers(params: { storeId?: string; search?: string; categoryId?: string; available?: boolean } = {}): Promise<MerchantOffer[]> {

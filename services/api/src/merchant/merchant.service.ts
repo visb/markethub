@@ -1,5 +1,6 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
+import { GEOCODING_PROVIDER, type GeocodingProvider } from "../geocoding/geocoding-provider.interface";
 import { PrismaService } from "../prisma/prisma.service";
 
 export interface OfferFilters {
@@ -8,6 +9,37 @@ export interface OfferFilters {
   search?: string;
   available?: boolean;
 }
+
+/** Endereço estruturado da loja (campos opcionais; compõem o geocode). */
+export interface StoreAddressInput {
+  street?: string | null;
+  number?: string | null;
+  district?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zipCode?: string | null;
+}
+
+export interface CreateStoreInput extends StoreAddressInput {
+  name: string;
+  merchantId?: string;
+  externalId?: string | null;
+  avgPrepMinutes?: number;
+  active?: boolean;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+export interface UpdateStoreInput extends StoreAddressInput {
+  name?: string;
+  externalId?: string | null;
+  avgPrepMinutes?: number;
+  active?: boolean;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+const ADDRESS_FIELDS = ["street", "number", "district", "city", "state", "zipCode"] as const;
 
 const OFFER_LOCKABLE = ["priceCents", "promoPriceCents", "available"] as const;
 const STOCK_LOCKABLE = ["quantity", "available"] as const;
@@ -19,7 +51,10 @@ const STOCK_LOCKABLE = ["quantity", "available"] as const;
  */
 @Injectable()
 export class MerchantService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(GEOCODING_PROVIDER) private readonly geocoding: GeocodingProvider,
+  ) {}
 
   /**
    * Contexto de identidade do app merchant (story 07). Resolve o papel efetivo:
@@ -66,6 +101,170 @@ export class MerchantService {
       include: { store: { select: { id: true, name: true, merchantId: true } } },
     });
     return staff.map((s) => s.store);
+  }
+
+  // ── Lojas (CRUD — story 08) ──
+
+  /**
+   * Lista detalhada das lojas visíveis ao usuário (story 08). Owner vê todas as
+   * lojas das suas redes; manager vê só as dos vínculos. Inclui endereço/coords.
+   */
+  async listStores(user: { id: string; roles: string[] }) {
+    const scoped = await this.myStores(user.id);
+    if (scoped.length === 0) return [];
+
+    const isOwner = user.roles.includes("merchant");
+    const where: Prisma.StoreWhereInput = isOwner
+      ? { merchantId: { in: [...new Set(scoped.map((s) => s.merchantId))] } }
+      : { id: { in: scoped.map((s) => s.id) } };
+
+    return this.prisma.store.findMany({ where, orderBy: { name: "asc" } });
+  }
+
+  /**
+   * Garante que o usuário é dono da rede (RoleName `merchant`). Criar/editar loja
+   * é owner-only; gerente recebe FORBIDDEN. O backend SEMPRE reforça (CLAUDE.md).
+   */
+  private assertOwner(user: { roles: string[] }) {
+    if (!user.roles.includes("merchant")) {
+      throw new ForbiddenException({
+        code: "NOT_AN_OWNER",
+        message: "Apenas o dono da rede pode gerenciar lojas",
+      });
+    }
+  }
+
+  /** Resolve o merchantId do dono: o informado (se for dele) ou o único da rede. */
+  private async resolveOwnerMerchantId(userId: string, requested?: string): Promise<string> {
+    const stores = await this.myStores(userId);
+    const owned = new Set(stores.map((s) => s.merchantId));
+    if (requested) {
+      if (owned.size > 0 && !owned.has(requested)) {
+        throw new ForbiddenException({
+          code: "MERCHANT_NOT_OWNED",
+          message: "Rede não pertence ao usuário",
+        });
+      }
+      return requested;
+    }
+    if (owned.size === 1) return [...owned][0];
+    if (owned.size === 0) {
+      throw new BadRequestException({
+        code: "MERCHANT_NOT_RESOLVED",
+        message: "Não foi possível determinar a rede; informe merchantId",
+      });
+    }
+    throw new BadRequestException({
+      code: "MERCHANT_AMBIGUOUS",
+      message: "Usuário possui múltiplas redes; informe merchantId",
+    });
+  }
+
+  /** Best-effort geocode do endereço → lat/lng; null quando não resolve (não trava). */
+  private async geocodeAddress(addr: StoreAddressInput): Promise<{ latitude: number; longitude: number } | null> {
+    if (!addr.street || !addr.city || !addr.state) return null;
+    try {
+      return await this.geocoding.geocode({
+        street: addr.street,
+        number: addr.number ?? null,
+        city: addr.city,
+        state: addr.state,
+        zipCode: addr.zipCode ?? null,
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  async createStore(user: { id: string; roles: string[] }, input: CreateStoreInput) {
+    this.assertOwner(user);
+    const merchantId = await this.resolveOwnerMerchantId(user.id, input.merchantId);
+
+    // Override manual de lat/lng tem prioridade; senão geocodifica o endereço.
+    let { latitude, longitude } = input;
+    if (latitude == null || longitude == null) {
+      const geo = await this.geocodeAddress(input);
+      if (geo) {
+        latitude = geo.latitude;
+        longitude = geo.longitude;
+      }
+    }
+
+    return this.prisma.store.create({
+      data: {
+        merchantId,
+        name: input.name,
+        externalId: input.externalId ?? null,
+        street: input.street ?? null,
+        number: input.number ?? null,
+        district: input.district ?? null,
+        city: input.city ?? null,
+        state: input.state ?? null,
+        zipCode: input.zipCode ?? null,
+        latitude: latitude ?? null,
+        longitude: longitude ?? null,
+        avgPrepMinutes: input.avgPrepMinutes ?? 15,
+        active: input.active ?? true,
+      },
+    });
+  }
+
+  async updateStore(user: { id: string; roles: string[] }, storeId: string, patch: UpdateStoreInput) {
+    this.assertOwner(user);
+    const store = await this.prisma.store.findUnique({ where: { id: storeId } });
+    if (!store) {
+      throw new NotFoundException({ code: "STORE_NOT_FOUND", message: "Loja não encontrada" });
+    }
+    await this.assertOwnsStore(user.id, store.merchantId);
+
+    const data: Prisma.StoreUpdateInput = {};
+    if (patch.name !== undefined) data.name = patch.name;
+    if (patch.externalId !== undefined) data.externalId = patch.externalId;
+    if (patch.avgPrepMinutes !== undefined) data.avgPrepMinutes = patch.avgPrepMinutes;
+    if (patch.active !== undefined) data.active = patch.active;
+    for (const f of ADDRESS_FIELDS) {
+      if (patch[f] !== undefined) data[f] = patch[f];
+    }
+
+    // Override manual de lat/lng tem prioridade.
+    if (patch.latitude !== undefined) data.latitude = patch.latitude;
+    if (patch.longitude !== undefined) data.longitude = patch.longitude;
+
+    // Endereço mudou e sem override manual → re-geocodifica (best-effort).
+    const addressChanged = ADDRESS_FIELDS.some((f) => patch[f] !== undefined);
+    if (addressChanged && patch.latitude === undefined && patch.longitude === undefined) {
+      const merged: StoreAddressInput = {
+        street: patch.street !== undefined ? patch.street : store.street,
+        number: patch.number !== undefined ? patch.number : store.number,
+        district: patch.district !== undefined ? patch.district : store.district,
+        city: patch.city !== undefined ? patch.city : store.city,
+        state: patch.state !== undefined ? patch.state : store.state,
+        zipCode: patch.zipCode !== undefined ? patch.zipCode : store.zipCode,
+      };
+      const geo = await this.geocodeAddress(merged);
+      if (geo) {
+        data.latitude = geo.latitude;
+        data.longitude = geo.longitude;
+      }
+    }
+
+    if (Object.keys(data).length === 0) {
+      throw new BadRequestException({ code: "NO_FIELDS", message: "Nenhum campo para atualizar" });
+    }
+
+    return this.prisma.store.update({ where: { id: storeId }, data });
+  }
+
+  /** Garante que a rede da loja pertence ao dono. */
+  private async assertOwnsStore(userId: string, merchantId: string) {
+    const stores = await this.myStores(userId);
+    const owned = new Set(stores.map((s) => s.merchantId));
+    if (owned.size > 0 && !owned.has(merchantId)) {
+      throw new ForbiddenException({
+        code: "STORE_NOT_OWNED",
+        message: "Loja não pertence à rede do usuário",
+      });
+    }
   }
 
   // ── Ofertas ──

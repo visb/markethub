@@ -6,4 +6,7 @@ export const queryKeys = {
   merchant: {
     context: ["merchant", "context"] as const,
   },
+  stores: {
+    all: ["stores"] as const,
+  },
 } as const;
