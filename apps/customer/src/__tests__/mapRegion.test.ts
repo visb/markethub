@@ -116,4 +116,30 @@ describe("regionToBounds", () => {
     expect(bounds.north).toBeGreaterThan(bounds.south);
     expect(bounds.east).toBeGreaterThan(bounds.west);
   });
+
+  it("deltas pequenos (zoom alto) → caixa estreita em torno do centro", () => {
+    const bounds = regionToBounds({
+      latitude: -25.4,
+      longitude: -49.27,
+      latitudeDelta: 0.0002,
+      longitudeDelta: 0.0002,
+    });
+    expect(bounds.north).toBeCloseTo(-25.4 + 0.0001, 6);
+    expect(bounds.south).toBeCloseTo(-25.4 - 0.0001, 6);
+    expect(bounds.east).toBeCloseTo(-49.27 + 0.0001, 6);
+    expect(bounds.west).toBeCloseTo(-49.27 - 0.0001, 6);
+  });
+
+  it("deltas grandes (zoom baixo) → caixa ampla centrada", () => {
+    const bounds = regionToBounds({
+      latitude: 0,
+      longitude: 0,
+      latitudeDelta: 20,
+      longitudeDelta: 40,
+    });
+    expect(bounds.north).toBeCloseTo(10);
+    expect(bounds.south).toBeCloseTo(-10);
+    expect(bounds.east).toBeCloseTo(20);
+    expect(bounds.west).toBeCloseTo(-20);
+  });
 });

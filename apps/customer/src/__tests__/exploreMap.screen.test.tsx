@@ -93,4 +93,10 @@ describe("tela explore — orquestra o hook (não faz fetch inline)", () => {
     expect(screen).toMatch(/useExploreMap/);
     expect(screen).toMatch(/StoreMap/);
   });
+
+  it("encaminha onViewportChange ao mapa e renderiza o overlay de loading (story 06)", () => {
+    expect(screen).toMatch(/onViewportChange/);
+    expect(screen).toMatch(/MapLoadingBadge/);
+    expect(screen).toMatch(/fetching/);
+  });
 });
