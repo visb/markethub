@@ -12,7 +12,8 @@ function makeService(staff: { store: { id: string; name: string; merchantId: str
       findMany: jest.fn().mockResolvedValue(staff),
     },
   } as never;
-  return new MerchantService(prisma);
+  const geocoding = { geocode: jest.fn().mockResolvedValue(null) } as never;
+  return new MerchantService(prisma, geocoding);
 }
 
 const loja = (id: string, merchantId = "m1") => ({

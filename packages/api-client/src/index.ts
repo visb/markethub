@@ -22,4 +22,7 @@ export type {
   MerchantRole,
   MerchantStoreDTO,
   MerchantContextDTO,
+  MerchantStoreDetailDTO,
+  MerchantStoreInput,
+  MerchantStoreUpdateInput,
 } from "@markethub/types";

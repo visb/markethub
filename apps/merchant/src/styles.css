@@ -148,3 +148,60 @@ body {
   padding: 14px 16px;
   font-size: 14px;
 }
+
+/* ─── Lojas (story 08) ─── */
+.page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.page-head .btn-primary {
+  width: auto;
+  padding: 0 16px;
+}
+.store-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.badge-muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+.store-form {
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+.field > span {
+  font-size: 13px;
+  color: var(--muted);
+}
+.field-row {
+  display: flex;
+  gap: 12px;
+}
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+.form-actions .btn-primary {
+  width: auto;
+  padding: 0 24px;
+}

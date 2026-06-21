@@ -8,12 +8,43 @@ import {
   Post,
   Query,
 } from "@nestjs/common";
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Min, MinLength } from "class-validator";
+import { IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, Min, MinLength } from "class-validator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import type { AuthUser } from "../auth/auth.types";
 import { MerchantProductService } from "./merchant-product.service";
 import { MerchantService } from "./merchant.service";
+
+class CreateStoreDto {
+  @IsString() @MinLength(1) name!: string;
+  @IsOptional() @IsString() merchantId?: string;
+  @IsOptional() @IsString() externalId?: string | null;
+  @IsOptional() @IsString() street?: string | null;
+  @IsOptional() @IsString() number?: string | null;
+  @IsOptional() @IsString() district?: string | null;
+  @IsOptional() @IsString() city?: string | null;
+  @IsOptional() @IsString() state?: string | null;
+  @IsOptional() @IsString() zipCode?: string | null;
+  @IsOptional() @IsNumber() latitude?: number | null;
+  @IsOptional() @IsNumber() longitude?: number | null;
+  @IsOptional() @IsInt() @Min(0) avgPrepMinutes?: number;
+  @IsOptional() @IsBoolean() active?: boolean;
+}
+
+class UpdateStoreDto {
+  @IsOptional() @IsString() @MinLength(1) name?: string;
+  @IsOptional() @IsString() externalId?: string | null;
+  @IsOptional() @IsString() street?: string | null;
+  @IsOptional() @IsString() number?: string | null;
+  @IsOptional() @IsString() district?: string | null;
+  @IsOptional() @IsString() city?: string | null;
+  @IsOptional() @IsString() state?: string | null;
+  @IsOptional() @IsString() zipCode?: string | null;
+  @IsOptional() @IsNumber() latitude?: number | null;
+  @IsOptional() @IsNumber() longitude?: number | null;
+  @IsOptional() @IsInt() @Min(0) avgPrepMinutes?: number;
+  @IsOptional() @IsBoolean() active?: boolean;
+}
 
 class UpdateOfferDto {
   @IsOptional() @IsInt() @Min(0) priceCents?: number;
@@ -66,6 +97,25 @@ export class MerchantController {
   @Get("stores")
   stores(@CurrentUser() user: AuthUser) {
     return this.merchant.myStores(user.id);
+  }
+
+  @Get("stores/detail")
+  storesDetail(@CurrentUser() user: AuthUser) {
+    return this.merchant.listStores({ id: user.id, roles: user.roles });
+  }
+
+  @Post("stores")
+  createStore(@CurrentUser() user: AuthUser, @Body() dto: CreateStoreDto) {
+    return this.merchant.createStore({ id: user.id, roles: user.roles }, dto);
+  }
+
+  @Patch("stores/:id")
+  updateStore(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @Body() dto: UpdateStoreDto,
+  ) {
+    return this.merchant.updateStore({ id: user.id, roles: user.roles }, id, dto);
   }
 
   // ── Ofertas ──
