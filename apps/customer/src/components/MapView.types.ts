@@ -1,4 +1,4 @@
-import type { NearbyStoreDTO } from "@/api/marketplace";
+import type { NearbyStoreDTO, ViewportBoundsDTO } from "@/api/marketplace";
 import type { LatLng, MapRegion } from "@/lib/mapRegion";
 
 /**
@@ -14,4 +14,10 @@ export interface StoreMapProps {
   destination: LatLng | null;
   /** Tap num mercado → loja selecionada (a tela decide a navegação). */
   onStorePress?: (store: NearbyStoreDTO) => void;
+  /**
+   * Viewport mudou (fim do gesto): bounds já normalizados (north/south/east/west),
+   * escondendo a diferença de engine — nativo deriva do `onRegionChangeComplete`
+   * (centro ± deltas); web pega de `map.getBounds()` (Leaflet). Story 06.
+   */
+  onViewportChange?: (bounds: ViewportBoundsDTO) => void;
 }

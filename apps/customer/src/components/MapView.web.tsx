@@ -1,8 +1,32 @@
 import React, { useEffect } from "react";
 import L from "leaflet";
-import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
+import { MapContainer, Marker, Popup, TileLayer, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import type { ViewportBoundsDTO } from "@/api/marketplace";
 import type { StoreMapProps } from "./MapView.types";
+
+/**
+ * Escuta o fim do gesto (move/zoom) do Leaflet e emite os bounds já normalizados.
+ * `map.getBounds()` dá north/south/east/west prontos — mesma forma do nativo.
+ * Componente filho do `MapContainer` (precisa do contexto do mapa). Story 06.
+ */
+function ViewportWatcher({ onChange }: { onChange?: (b: ViewportBoundsDTO) => void }) {
+  const emit = (map: L.Map) => {
+    if (!onChange) return;
+    const b = map.getBounds();
+    onChange({
+      north: b.getNorth(),
+      south: b.getSouth(),
+      east: b.getEast(),
+      west: b.getWest(),
+    });
+  };
+  useMapEvents({
+    moveend: (e) => emit(e.target as L.Map),
+    zoomend: (e) => emit(e.target as L.Map),
+  });
+  return null;
+}
 
 /**
  * Mapa web (apenas desenvolvimento) via Leaflet + tiles OpenStreetMap — não exige
@@ -21,7 +45,13 @@ const pinIcon = (color: string) =>
 const STORE_PIN = pinIcon("#E11D2A");
 const DEST_PIN = pinIcon("#00A859");
 
-export function StoreMap({ initialRegion, stores, destination, onStorePress }: StoreMapProps) {
+export function StoreMap({
+  initialRegion,
+  stores,
+  destination,
+  onStorePress,
+  onViewportChange,
+}: StoreMapProps) {
   // Garante 100% de altura do container do mapa no web.
   useEffect(() => {
     const id = "mh-map-style";
@@ -42,6 +72,7 @@ export function StoreMap({ initialRegion, stores, destination, onStorePress }: S
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution="&copy; OpenStreetMap contributors"
       />
+      <ViewportWatcher onChange={onViewportChange} />
       {stores.map((s) => (
         <Marker
           key={s.id}
