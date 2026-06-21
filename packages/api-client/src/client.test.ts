@@ -227,6 +227,13 @@ describe("createRealtimeClient", () => {
     expect(fakeSocket.emit).toHaveBeenCalledWith("subscribe:order", { orderId: "ord_1" });
   });
 
+  it("subscribeStore emite subscribe:store com o storeId", () => {
+    const rt = createRealtimeClient({ url: "x", getToken: () => null });
+    rt.connect();
+    rt.subscribeStore("store_1");
+    expect(fakeSocket.emit).toHaveBeenCalledWith("subscribe:store", { storeId: "store_1" });
+  });
+
   it("emit encaminha evento + payload ao socket", () => {
     const rt = createRealtimeClient({ url: "x", getToken: () => null });
     rt.connect();

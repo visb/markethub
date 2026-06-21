@@ -1,5 +1,11 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { ApiClient, ApiClientError, type AuthUser } from "@markethub/api-client";
+import {
+  ApiClient,
+  ApiClientError,
+  createRealtimeClient,
+  type AuthUser,
+  type RealtimeClient,
+} from "@markethub/api-client";
 import { API_URL, APP_ROLE } from "./config";
 import { SecureTokenStore } from "./token-store";
 
@@ -7,6 +13,8 @@ interface AuthState {
   user: AuthUser | null;
   loading: boolean;
   client: ApiClient;
+  /** Cliente Socket.IO compartilhado (mesma origem/token da API). */
+  realtime: RealtimeClient;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -17,14 +25,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Mesmo token store da API → o socket usa o mesmo JWT no handshake.
+  const tokenStore = useMemo(() => new SecureTokenStore(), []);
+
   const client = useMemo(
     () =>
       new ApiClient({
         baseUrl: API_URL,
-        tokenStore: new SecureTokenStore(),
+        tokenStore,
         onAuthError: () => setUser(null),
       }),
-    [],
+    [tokenStore],
+  );
+
+  const realtime = useMemo(
+    () => createRealtimeClient({ url: API_URL, getToken: () => tokenStore.getAccess() }),
+    [tokenStore],
   );
 
   const loadSession = useCallback(async () => {
@@ -65,8 +81,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [client]);
 
   const value = useMemo(
-    () => ({ user, loading, client, login, logout }),
-    [user, loading, client, login, logout],
+    () => ({ user, loading, client, realtime, login, logout }),
+    [user, loading, client, realtime, login, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
