@@ -7,3 +7,4 @@ export * from "./refund";
 export * from "./delivery";
 export * from "./reviews";
 export * from "./stores";
+export * from "./merchant";
