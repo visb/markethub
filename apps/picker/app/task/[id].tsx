@@ -1,17 +1,20 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import type { PickItemDTO, PickTaskDTO } from "@markethub/api-client";
+import type { PickItemDTO } from "@markethub/api-client";
 import { Button, Text, colors, radius, spacing } from "@markethub/ui";
-import { useAuth } from "@/auth-context";
-
-/** Resultado da busca pública de catálogo (/search) usado p/ propor substituto. */
-interface SubOffer {
-  offerId: string;
-  name: string;
-  priceCents: number;
-  promoPriceCents: number | null;
-}
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import {
+  SUBSTITUTE_MIN_QUERY,
+  usePickCompletePicking,
+  usePickReady,
+  usePickStart,
+  usePickSubstitute,
+  usePickTask,
+  usePickUpdateItem,
+  useStoreHandover,
+  useSubstituteSearch,
+} from "@/api/hooks/usePickTask";
 
 const ITEM_STATUS: Record<string, { label: string; color: string }> = {
   pending: { label: "A separar", color: colors.textMuted },
@@ -22,87 +25,92 @@ const ITEM_STATUS: Record<string, { label: string; color: string }> = {
 
 export default function TaskScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { client } = useAuth();
   const router = useRouter();
-  const [task, setTask] = useState<PickTaskDTO | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  const taskQuery = usePickTask(id);
+  const task = taskQuery.data ?? null;
+
+  // ── mutations da tela (cada uma invalida a query da task) ──
+  const startMut = usePickStart(id);
+  const updateItemMut = usePickUpdateItem(id);
+  const substituteMut = usePickSubstitute(id);
+  const completePickingMut = usePickCompletePicking(id);
+  const readyMut = usePickReady(id);
+  const handoverMut = useStoreHandover(id);
+
+  const busy =
+    startMut.isPending ||
+    updateItemMut.isPending ||
+    substituteMut.isPending ||
+    completePickingMut.isPending ||
+    readyMut.isPending ||
+    handoverMut.isPending;
+
+  const mutationError =
+    startMut.error ??
+    updateItemMut.error ??
+    substituteMut.error ??
+    completePickingMut.error ??
+    readyMut.error ??
+    handoverMut.error;
+  const error = mutationError
+    ? mutationError instanceof Error
+      ? mutationError.message
+      : "Erro"
+    : taskQuery.isError
+      ? "Falha ao carregar a tarefa"
+      : null;
+
+  // ── estado de UI local (não é server-state) ──
   const [pickupCode, setPickupCode] = useState("");
-  // substituição: item em edição + busca de ofertas da mesma loja
   const [subFor, setSubFor] = useState<string | null>(null);
   const [subQuery, setSubQuery] = useState("");
-  const [subResults, setSubResults] = useState<SubOffer[]>([]);
 
-  const load = useCallback(async () => {
-    try {
-      setTask(await client.pickTask(id));
-    } catch {
-      setError("Falha ao carregar a tarefa");
-    } finally {
-      setLoading(false);
-    }
-  }, [client, id]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const run = async (fn: () => Promise<unknown>) => {
-    setBusy(true);
-    setError(null);
-    try {
-      await fn();
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Erro");
-    } finally {
-      setBusy(false);
-    }
-  };
+  // Autocomplete de substituto: busca com debounce + gate de 2 caracteres.
+  const debouncedQuery = useDebouncedValue(subQuery, 300);
+  const searchQuery = useSubstituteSearch(task?.storeId, debouncedQuery);
+  const subResults = searchQuery.data ?? [];
+  const showSearchHint = debouncedQuery.trim().length >= SUBSTITUTE_MIN_QUERY;
 
   const pickItem = (item: PickItemDTO) =>
-    run(() =>
-      client.pickUpdateItem(id, item.id, {
+    updateItemMut.mutate({
+      itemId: item.id,
+      input: {
         action: "pick",
         ...(item.saleType === "weight"
           ? { weightGramsPicked: item.weightGrams ?? 0 }
           : { quantityPicked: item.quantity }),
-      }),
-    );
+      },
+    });
 
   const refuseItem = (item: PickItemDTO) => {
     const doRefuse = (reason: string) =>
-      run(() => client.pickUpdateItem(id, item.id, { action: "refuse", refusalReason: reason }));
+      updateItemMut.mutate({ itemId: item.id, input: { action: "refuse", refusalReason: reason } });
     Alert.alert("Recusar item", "Motivo da recusa", [
-      { text: "Sem estoque", onPress: () => void doRefuse("Sem estoque") },
-      { text: "Avariado", onPress: () => void doRefuse("Avariado") },
+      { text: "Sem estoque", onPress: () => doRefuse("Sem estoque") },
+      { text: "Avariado", onPress: () => doRefuse("Avariado") },
       { text: "Cancelar", style: "cancel" },
     ]);
   };
 
-  // Busca ofertas da mesma loja p/ propor substituto (cliente aprova no app dele).
-  const searchSubs = async (storeId: string) => {
-    const q = subQuery.trim();
-    if (!q) {
-      setSubResults([]);
-      return;
-    }
-    const r = await client.request<{ items: SubOffer[] }>(
-      `/search?storeId=${encodeURIComponent(storeId)}&q=${encodeURIComponent(q)}`,
-    );
-    setSubResults(r.items);
+  const openSubFor = (itemId: string) => {
+    setSubFor(subFor === itemId ? null : itemId);
+    setSubQuery("");
   };
 
-  const proposeSub = (item: PickItemDTO, offerId: string) =>
-    run(async () => {
-      await client.pickSubstitute(id, item.id, offerId);
-      setSubFor(null);
-      setSubQuery("");
-      setSubResults([]);
-    });
+  const proposeSub = (item: PickItemDTO, offerId: string) => {
+    substituteMut.mutate(
+      { itemId: item.id, substituteOfferId: offerId },
+      {
+        onSuccess: () => {
+          setSubFor(null);
+          setSubQuery("");
+        },
+      },
+    );
+  };
 
-  if (loading) {
+  if (taskQuery.isLoading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={colors.primary} />
@@ -135,7 +143,7 @@ export default function TaskScreen() {
       {error && <Text style={{ color: colors.danger, marginVertical: spacing.sm }}>{error}</Text>}
 
       {task.status === "assigned" && (
-        <Button title="Iniciar separação" loading={busy} onPress={() => void run(() => client.pickStart(id))} />
+        <Button title="Iniciar separação" loading={busy} onPress={() => startMut.mutate()} />
       )}
 
       {/* Itens */}
@@ -159,17 +167,9 @@ export default function TaskScreen() {
             </Text>
             {task.status === "picking" && item.status === "pending" && (
               <View style={styles.actions}>
-                <Action label="Separar" onPress={() => void pickItem(item)} disabled={busy} />
+                <Action label="Separar" onPress={() => pickItem(item)} disabled={busy} />
                 <Action label="Recusar" onPress={() => refuseItem(item)} disabled={busy} danger />
-                <Action
-                  label="Substituir"
-                  onPress={() => {
-                    setSubFor(subFor === item.id ? null : item.id);
-                    setSubQuery("");
-                    setSubResults([]);
-                  }}
-                  disabled={busy}
-                />
+                <Action label="Substituir" onPress={() => openSubFor(item.id)} disabled={busy} />
               </View>
             )}
             {subFor === item.id && (
@@ -180,15 +180,14 @@ export default function TaskScreen() {
                   placeholder="Buscar substituto na loja..."
                   placeholderTextColor={colors.textMuted}
                   style={styles.subInput}
-                  returnKeyType="search"
-                  onSubmitEditing={() => void searchSubs(task.storeId)}
+                  autoFocus
                 />
                 {subResults.map((o) => (
                   <Pressable
                     key={o.offerId}
                     style={styles.subResult}
                     disabled={busy}
-                    onPress={() => void proposeSub(item, o.offerId)}
+                    onPress={() => proposeSub(item, o.offerId)}
                   >
                     <Text variant="caption" style={{ flex: 1 }} numberOfLines={1}>
                       {o.name}
@@ -198,9 +197,19 @@ export default function TaskScreen() {
                     </Text>
                   </Pressable>
                 ))}
-                {subResults.length === 0 && subQuery.trim() !== "" && (
+                {showSearchHint && searchQuery.isFetching && subResults.length === 0 && (
                   <Text variant="caption" muted>
-                    Busque e toque no produto para propor ao cliente.
+                    Buscando...
+                  </Text>
+                )}
+                {showSearchHint && !searchQuery.isFetching && subResults.length === 0 && (
+                  <Text variant="caption" muted>
+                    Nenhum produto encontrado.
+                  </Text>
+                )}
+                {!showSearchHint && (
+                  <Text variant="caption" muted>
+                    Digite ao menos {SUBSTITUTE_MIN_QUERY} letras para buscar.
                   </Text>
                 )}
               </View>
@@ -214,7 +223,7 @@ export default function TaskScreen() {
           title={allResolved ? "Concluir separação" : "Resolva todos os itens"}
           variant="outline"
           disabled={!allResolved || busy}
-          onPress={() => void run(() => client.pickCompletePicking(id))}
+          onPress={() => completePickingMut.mutate()}
           style={{ marginTop: spacing.md }}
         />
       )}
@@ -224,7 +233,7 @@ export default function TaskScreen() {
         <Button
           title="Pronto para coleta"
           disabled={busy}
-          onPress={() => void run(() => client.pickReady(id))}
+          onPress={() => readyMut.mutate()}
           style={{ marginTop: spacing.md }}
         />
       )}
@@ -271,11 +280,15 @@ export default function TaskScreen() {
             title="Confirmar retirada"
             disabled={busy || pickupCode.trim().length === 0}
             onPress={() =>
-              void run(async () => {
-                await client.storeHandover(task.orderGroupId, pickupCode.trim());
-                Alert.alert("Retirada concluída", "Pedido entregue ao cliente.");
-                router.back();
-              })
+              handoverMut.mutate(
+                { orderGroupId: task.orderGroupId, code: pickupCode.trim() },
+                {
+                  onSuccess: () => {
+                    Alert.alert("Retirada concluída", "Pedido entregue ao cliente.");
+                    router.back();
+                  },
+                },
+              )
             }
             style={{ marginTop: spacing.sm }}
           />
