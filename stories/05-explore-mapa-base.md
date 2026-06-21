@@ -12,9 +12,14 @@ em fetch legado `useState`/`useEffect`. O BACKLOG pede transformar a aba explore
 **Decisões travadas (refino):**
 - A aba explore passa a ser o **mapa** — o conteúdo de busca de produtos sai (já há busca na
   Home/feed; não duplicar). A `BottomTabs active="explore"` e o `CartFab` permanecem.
-- **Lib: react-native-maps** (decisão do usuário). Provider Google; usa `GOOGLE_MAPS_API_KEY`
-  (já no projeto). Suporte web é fraco — se a explore rodar no web, exibir fallback simples
-  (lista/aviso) em vez de quebrar (detalhe de implementação, não bloqueia mobile).
+- **Lib (mobile nativo): react-native-maps** (decisão do usuário). Provider Google; usa
+  `GOOGLE_MAPS_API_KEY` (já no projeto).
+- **Lib (web): Leaflet** (`react-leaflet` + tiles OpenStreetMap). O modo web é **só para
+  desenvolvimento**, então **não** criar/usar API key do Google no web — Leaflet com tiles OSM
+  não exige key. Selecionar a implementação por plataforma (ex.: `MapView.tsx` nativo +
+  `MapView.web.tsx` com Leaflet, ou guard `Platform.OS === 'web'`), expondo a **mesma interface**
+  (centro inicial, marcadores de mercado, pin do endereço ativo, tap → loja) para a tela não
+  saber qual engine roda por baixo.
 - **Centro inicial = localização do dispositivo** (GPS via `expo-location`/`deviceAddress`
   helper já existente em `src/location.ts`). Se a permissão for negada, **fallback = endereço
   de entrega ativo**; se também faltar, centro padrão (cidade da loja seed) — sem travar a tela.
@@ -31,7 +36,8 @@ em fetch legado `useState`/`useEffect`. O BACKLOG pede transformar a aba explore
 ## Desenho
 
 - **Deps:** add `react-native-maps` ao `apps/customer/package.json` (versão compatível com o
-  SDK Expo); config do provider Google (app config/plugin) com a key de ambiente.
+  SDK Expo) para nativo; config do provider Google (app config/plugin) com a key de ambiente.
+  Para web, add `leaflet` + `react-leaflet` (+ CSS do Leaflet) — sem key.
 - **Camada de dados (React Query — fundação já existe no customer):**
   - `src/lib/queryKeys.ts`: `queryKeys.explore.nearby(bounds)`.
   - `src/api/marketplace.ts`: `storesNearby({north,south,east,west})` →
@@ -40,10 +46,12 @@ em fetch legado `useState`/`useEffect`. O BACKLOG pede transformar a aba explore
   - Endereço ativo: reusar `mkt.addresses()` (já existe) via hook/`useQuery`; selecionar o
     default. (Se não houver hook de addresses, criar `useAddresses` no padrão.)
 - **Tela `explore.tsx` (reescrita):**
-  - `<MapView>` full-screen com `initialRegion` derivada do GPS (ou fallbacks acima).
+  - Componente de mapa abstrato full-screen (react-native-maps nativo / Leaflet web, mesma
+    interface) com `initialRegion` derivada do GPS (ou fallbacks acima).
   - Permissão de localização via `expo-location` (reusar lógica do `deviceAddress`/`location.ts`;
     não acessar a API de location crua na tela — extrair helper se preciso).
-  - `<Marker>` vermelho para cada `NearbyStore`; `<Marker>` distinto para o endereço ativo.
+  - Marcador vermelho para cada `NearbyStore`; marcador distinto para o endereço ativo
+    (`<Marker>` no nativo / `<Marker>` do react-leaflet no web).
   - Tap no marcador do mercado → navega para a loja (`/store/[id]`) ou mostra um callout com
     nome/ETA (callout simples nesta story; bottom-sheet rico fica fora de escopo).
   - Mantém `BottomTabs active="explore"` e `CartFab`.
@@ -59,8 +67,9 @@ Gate de cobertura: **código novo sem teste não fecha a story.** Rodar
   sem endereço com lat/lng → não renderiza o pin de destino (sem crash).
 - **Centro/fallback**: GPS negado → usa endereço ativo; sem ambos → centro padrão (testar a
   função pura de resolução de região, isolada do componente de mapa).
-- Mock de `react-native-maps` no teste (MapView/Marker como stubs) para validar que os
-  marcadores recebem as coordenadas certas.
+- Mock do engine de mapa no teste (MapView/Marker stubs no nativo; `react-leaflet` stub no web)
+  para validar que os marcadores recebem as coordenadas certas — testar via a interface
+  abstrata, independente de plataforma.
 - `pnpm typecheck` + `pnpm build` verdes (nova dep + config do provider).
 
 ## Fora de escopo
