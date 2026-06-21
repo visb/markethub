@@ -4,7 +4,7 @@
  * Usado pelo rastreio de pedido em tempo real (S5.1 / story 02).
  */
 import { io, type Socket } from "socket.io-client";
-import { PICKING_NAMESPACE, ORDER_UPDATED_EVENT } from "@markethub/types";
+import { PICKING_NAMESPACE, ORDER_UPDATED_EVENT, PICK_TASK_UPDATED_EVENT } from "@markethub/types";
 
 export interface RealtimeClient {
   connect(): void;
@@ -13,6 +13,8 @@ export interface RealtimeClient {
   emit(event: string, payload: unknown): void;
   /** Entra no canal de rastreio de um pedido (`order:<orderId>`). */
   subscribeOrder(orderId: string): void;
+  /** Entra no stream de tarefas de uma loja (`store:<storeId>`) — staff/loja. */
+  subscribeStore(storeId: string): void;
   /** `true` enquanto o socket estiver conectado. */
   readonly connected: boolean;
 }
@@ -69,8 +71,11 @@ export function createRealtimeClient(opts: RealtimeOptions): RealtimeClient {
     subscribeOrder(orderId: string) {
       getSocket().emit("subscribe:order", { orderId });
     },
+    subscribeStore(storeId: string) {
+      getSocket().emit("subscribe:store", { storeId });
+    },
   };
 }
 
-/** Reexporta o nome do evento de rastreio para os consumidores não duplicarem o literal. */
-export { ORDER_UPDATED_EVENT };
+/** Reexporta os nomes de evento para os consumidores não duplicarem o literal. */
+export { ORDER_UPDATED_EVENT, PICK_TASK_UPDATED_EVENT };

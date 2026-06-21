@@ -18,6 +18,10 @@ export interface PickingSubscribeMessages {
 export const ORDER_UPDATED_EVENT = "order.updated" as const;
 export type OrderUpdatedEvent = typeof ORDER_UPDATED_EVENT;
 
+/** Nome do evento de tarefa de separação emitido na `store room` (S3.8 / story 02). */
+export const PICK_TASK_UPDATED_EVENT = "pick_task.updated" as const;
+export type PickTaskUpdatedEvent = typeof PICK_TASK_UPDATED_EVENT;
+
 export type PickingServerEvent =
   | "pick_task.assigned"
   | "pick_task.updated"

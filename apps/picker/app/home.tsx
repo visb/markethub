@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useRouter } from "expo-router";
-import type { PickStore, PickTaskDTO } from "@markethub/api-client";
+import type { PickTaskDTO } from "@markethub/api-client";
 import { Button, Screen, Text, colors, radius, spacing } from "@markethub/ui";
 import { APP_TITLE } from "@/config";
 import { useAuth } from "@/auth-context";
+import { usePickStores, usePickQueue, usePickAssign } from "@/api/hooks/usePickQueue";
 
 const STATUS_LABEL: Record<string, string> = {
   queued: "Na fila",
@@ -15,55 +16,33 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default function HomeScreen() {
-  const { user, client, logout } = useAuth();
+  const { user, logout } = useAuth();
   const router = useRouter();
-  const [stores, setStores] = useState<PickStore[]>([]);
+  // Estado de UI local: loja selecionada (server-state vai pra React Query).
   const [storeId, setStoreId] = useState<string | null>(null);
-  const [tasks, setTasks] = useState<PickTaskDTO[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadStores = useCallback(async () => {
-    try {
-      const s = await client.pickStores();
-      setStores(s);
-      setStoreId((cur) => cur ?? s[0]?.id ?? null);
-    } catch {
-      setError("Falha ao carregar lojas");
-    }
-  }, [client]);
+  const storesQuery = usePickStores();
+  const stores = storesQuery.data ?? [];
+  const { tasks, loading, refetch } = usePickQueue(storeId);
+  const assign = usePickAssign(storeId);
 
-  const loadQueue = useCallback(async () => {
-    if (!storeId) {
-      setLoading(false);
-      return;
-    }
-    setError(null);
-    try {
-      setTasks(await client.pickQueue(storeId));
-    } catch {
-      setError("Falha ao carregar a fila");
-    } finally {
-      setLoading(false);
-    }
-  }, [client, storeId]);
-
+  // Seleção default: primeira loja assim que a lista chega (sem sobrescrever escolha).
   useEffect(() => {
-    void loadStores();
-  }, [loadStores]);
-  useEffect(() => {
-    void loadQueue();
-  }, [loadQueue]);
+    if (!storeId && stores.length > 0) setStoreId(stores[0]!.id);
+  }, [storeId, stores]);
 
   const assume = async (task: PickTaskDTO) => {
+    setError(null);
     try {
-      if (task.status === "queued") await client.pickAssign(task.id);
+      if (task.status === "queued") await assign.mutateAsync(task.id);
       router.push(`/task/${task.id}`);
     } catch {
       setError("Não foi possível assumir a tarefa (talvez já assumida)");
-      void loadQueue();
     }
   };
+
+  const storesError = storesQuery.isError ? "Falha ao carregar lojas" : null;
 
   return (
     <Screen>
@@ -97,14 +76,16 @@ export default function HomeScreen() {
         />
       )}
 
-      {error && <Text style={{ color: colors.danger, marginBottom: spacing.sm }}>{error}</Text>}
+      {(error || storesError) && (
+        <Text style={{ color: colors.danger, marginBottom: spacing.sm }}>{error ?? storesError}</Text>
+      )}
 
       {loading ? (
         <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
       ) : (
         <ScrollView
           style={{ flex: 1 }}
-          refreshControl={<RefreshControl refreshing={false} onRefresh={() => void loadQueue()} />}
+          refreshControl={<RefreshControl refreshing={false} onRefresh={() => void refetch()} />}
         >
           {tasks.length === 0 && (
             <Text muted style={{ marginTop: spacing.lg }}>
