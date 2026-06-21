@@ -17,7 +17,17 @@ export interface GeoFilter {
   radiusKm?: number;
 }
 
+/** Bounding box do viewport do mapa (bordas do retângulo visível). */
+export interface ViewportBounds {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+}
+
 const MAX_PAGE_SIZE = 100;
+/** Teto de marcadores por viewport — protege contra zoom-out total. */
+export const NEARBY_STORES_CAP = 200;
 
 @Injectable()
 export class CatalogService {
@@ -46,6 +56,52 @@ export class CatalogService {
       },
       orderBy: { name: "asc" },
     });
+  }
+
+  /**
+   * Lojas ativas dentro do viewport do mapa (bounding box). Filtra lat/lng no range
+   * (descarta nulos), aplica o teto `NEARBY_STORES_CAP` e ordena pela proximidade ao
+   * centro do box. Resposta enxuta (sem produtos) p/ marcadores — stories 05/06.
+   */
+  async listStoresInBounds(bounds: ViewportBounds) {
+    const rows = await this.prisma.store.findMany({
+      where: {
+        active: true,
+        latitude: { not: null, gte: bounds.south, lte: bounds.north },
+        longitude: { not: null, gte: bounds.west, lte: bounds.east },
+      },
+      take: NEARBY_STORES_CAP,
+      select: {
+        id: true,
+        name: true,
+        city: true,
+        state: true,
+        latitude: true,
+        longitude: true,
+        avgPrepMinutes: true,
+        merchant: { select: { name: true, logoUrl: true } },
+      },
+    });
+
+    const centerLat = (bounds.north + bounds.south) / 2;
+    const centerLng = (bounds.east + bounds.west) / 2;
+    return rows
+      .map((s) => ({
+        id: s.id,
+        name: s.name,
+        latitude: s.latitude!,
+        longitude: s.longitude!,
+        city: s.city,
+        state: s.state,
+        avgPrepMinutes: s.avgPrepMinutes,
+        merchantName: s.merchant.name,
+        merchantLogoUrl: s.merchant.logoUrl,
+      }))
+      .sort(
+        (a, b) =>
+          haversineKm(centerLat, centerLng, a.latitude, a.longitude) -
+          haversineKm(centerLat, centerLng, b.latitude, b.longitude),
+      );
   }
 
   /** Categorias com ao menos um produto disponível na loja. */

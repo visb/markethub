@@ -98,3 +98,72 @@ describe("Admin catalog (e2e)", () => {
     expect(res.body.lockedFields).toContain("name");
   });
 });
+
+/**
+ * Story 04: GET /stores/nearby — lojas no viewport (bounding box). Público,
+ * filtra por lat/lng no range (exclui nulos), valida bounds (INVALID_BOUNDS) e
+ * a rota estática `nearby` não é capturada por `stores/:id`.
+ */
+describe("Stores nearby (e2e)", () => {
+  let app: INestApplication;
+  const url = (p: string) => `/${API_PREFIX}${p}`;
+
+  beforeAll(async () => {
+    app = await createTestApp();
+    await resetDatabase(getPrisma(app));
+    const prisma = getPrisma(app);
+    const merchant = await prisma.merchant.create({
+      data: { name: "Rede Nearby", slug: `rede-nearby-${Date.now()}`, deliveryFeeCents: 700 },
+    });
+    await prisma.store.createMany({
+      data: [
+        // dentro do box [-1..1, -1..1]
+        { merchantId: merchant.id, name: "Dentro", latitude: 0.5, longitude: 0.5 },
+        // fora (longitude)
+        { merchantId: merchant.id, name: "Fora", latitude: 0.5, longitude: 50 },
+        // sem coordenadas
+        { merchantId: merchant.id, name: "SemGeo", latitude: null, longitude: null },
+        // inativa, dentro do box
+        { merchantId: merchant.id, name: "Inativa", latitude: 0.2, longitude: 0.2, active: false },
+      ],
+    });
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it("retorna só lojas ativas com geo dentro do box", async () => {
+    const res = await request(app.getHttpServer())
+      .get(url("/stores/nearby?north=1&south=-1&east=1&west=-1"))
+      .expect(200);
+
+    expect(Array.isArray(res.body)).toBe(true);
+    const names = res.body.map((s: { name: string }) => s.name);
+    expect(names).toEqual(["Dentro"]);
+    expect(res.body[0]).toMatchObject({
+      name: "Dentro",
+      latitude: 0.5,
+      longitude: 0.5,
+      merchantName: "Rede Nearby",
+    });
+  });
+
+  it("não é capturada por stores/:id (rota estática casa primeiro)", async () => {
+    // se 'nearby' caísse em stores/:id/... daria 404 STORE_NOT_FOUND, não 200 lista
+    await request(app.getHttpServer())
+      .get(url("/stores/nearby?north=1&south=-1&east=1&west=-1"))
+      .expect(200);
+  });
+
+  it("bounds faltando → 400", async () => {
+    await request(app.getHttpServer()).get(url("/stores/nearby?north=1&south=-1")).expect(400);
+  });
+
+  it("north < south → 400 INVALID_BOUNDS", async () => {
+    const res = await request(app.getHttpServer())
+      .get(url("/stores/nearby?north=-1&south=1&east=1&west=-1"))
+      .expect(400);
+    expect(res.body.code).toBe("INVALID_BOUNDS");
+  });
+});
