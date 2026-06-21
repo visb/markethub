@@ -1,11 +1,11 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Button, Text, colors, radius, spacing } from "@markethub/ui";
-import { useAuth } from "@/auth-context";
-import { brl, marketplace, type OrderTracking, type SubstitutionView } from "@/api/marketplace";
+import { brl, type OrderTracking, type SubstitutionView } from "@/api/marketplace";
+import { useOrderTracking } from "@/api/hooks/useOrderTracking";
 import { Header } from "@/components/Header";
 import { MerchantLogo } from "@/components/MerchantLogo";
 
@@ -29,52 +29,14 @@ function macroSteps(pickupOnly: boolean): { key: MacroKey; label: string; minRan
 
 export default function TrackScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { api } = useAuth();
   const router = useRouter();
-  const mkt = marketplace(api);
-  const [data, setData] = useState<OrderTracking | null>(null);
-  const [subs, setSubs] = useState<SubstitutionView[]>([]);
+  // Rastreio em tempo real (socket + fallback REST) encapsulado no hook.
+  const { tracking: data, substitutions: subs, loading, busy, decideSubstitution, cancelOrder } =
+    useOrderTracking(id);
   const [showItems, setShowItems] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const load = useCallback(async () => {
-    try {
-      const t = await mkt.tracking(id);
-      setData(t);
-      // substituições pendentes ("produto a escolher") só fazem sentido na separação
-      const toApprove = t.groups.some((g) => (g.picking?.toApprove ?? 0) > 0);
-      setSubs(toApprove ? await mkt.substitutions(id) : []);
-      // encerra o polling quando o pedido termina
-      if ((t.status === "delivered" || t.status === "canceled") && timer.current) {
-        clearInterval(timer.current);
-        timer.current = null;
-      }
-    } finally {
-      setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
-
-  useEffect(() => {
-    void load();
-    // poll a cada 8s enquanto a tela estiver aberta (rastreio por status; sem mapa)
-    timer.current = setInterval(() => void load(), 8000);
-    return () => {
-      if (timer.current) clearInterval(timer.current);
-    };
-  }, [load]);
 
   async function decideSub(sub: SubstitutionView, approve: boolean) {
-    setBusy(true);
-    try {
-      if (approve) await mkt.approveSubstitution(id, sub.id);
-      else await mkt.rejectSubstitution(id, sub.id);
-      await load();
-    } finally {
-      setBusy(false);
-    }
+    await decideSubstitution(sub.id, approve);
   }
 
   function confirmCancel() {
@@ -84,14 +46,10 @@ export default function TrackScreen() {
         text: "Cancelar pedido",
         style: "destructive",
         onPress: async () => {
-          setBusy(true);
           try {
-            await mkt.cancelOrder(id);
-            await load();
+            await cancelOrder();
           } catch {
             Alert.alert("Não foi possível cancelar", "A separação já começou.");
-          } finally {
-            setBusy(false);
           }
         },
       },

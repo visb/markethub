@@ -10,7 +10,13 @@ export interface PickingSubscribeMessages {
   "subscribe:store": { storeId: string };
   /** Cliente (dono) ou staff da loja: eventos de um sub-pedido. */
   "subscribe:group": { orderGroupId: string };
+  /** Cliente (dono) ou admin: rastreio de um pedido (canal `order:<orderId>`). */
+  "subscribe:order": { orderId: string };
 }
+
+/** Nome do evento de rastreio do pedido emitido no canal `order:<orderId>` (S5.1). */
+export const ORDER_UPDATED_EVENT = "order.updated" as const;
+export type OrderUpdatedEvent = typeof ORDER_UPDATED_EVENT;
 
 export type PickingServerEvent =
   | "pick_task.assigned"
