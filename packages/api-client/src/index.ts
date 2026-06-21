@@ -19,4 +19,7 @@ export type {
   DeliveryStatusDTO,
   DeliveryDTO,
   StoreDriverDTO,
+  MerchantRole,
+  MerchantStoreDTO,
+  MerchantContextDTO,
 } from "@markethub/types";

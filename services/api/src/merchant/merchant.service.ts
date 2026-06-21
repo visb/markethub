@@ -21,6 +21,35 @@ const STOCK_LOCKABLE = ["quantity", "available"] as const;
 export class MerchantService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Contexto de identidade do app merchant (story 07). Resolve o papel efetivo:
+   * - owner: usuário com RoleName `merchant` → vê todas as lojas das redes que
+   *   possui (vínculo manager nessas redes; MVP usa StoreStaff como posse).
+   * - manager: sem RoleName `merchant`, mas com StoreStaff(manager) ativo → vê
+   *   só as lojas dos vínculos dele.
+   * Nega (FORBIDDEN) quem não é nenhum dos dois.
+   */
+  async getContext(user: {
+    id: string;
+    roles: string[];
+  }): Promise<{ role: "owner" | "manager"; merchantId: string | null; stores: { id: string; name: string; merchantId: string }[] }> {
+    const stores = await this.myStores(user.id);
+    const isOwner = user.roles.includes("merchant");
+
+    if (!isOwner && stores.length === 0) {
+      throw new ForbiddenException({
+        code: "NOT_A_MERCHANT_USER",
+        message: "Usuário não é dono nem gerente de nenhuma loja",
+      });
+    }
+
+    return {
+      role: isOwner ? "owner" : "manager",
+      merchantId: stores[0]?.merchantId ?? null,
+      stores,
+    };
+  }
+
   /** IDs das lojas onde o usuário é manager ativo. */
   async managerStoreIds(userId: string): Promise<string[]> {
     const staff = await this.prisma.storeStaff.findMany({

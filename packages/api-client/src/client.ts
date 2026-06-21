@@ -4,6 +4,7 @@ import type {
   AuthUser,
   DeliveryDTO,
   LoginInput,
+  MerchantContextDTO,
   PickTaskDTO,
   RefreshInput,
   RegisterInput,
@@ -188,6 +189,11 @@ export class ApiClient {
   }
 
   // ─── Merchant / gestão de catálogo (S3.11) ───────────
+  /** Contexto de identidade do app merchant: papel efetivo + lojas (story 07). */
+  merchantContext(): Promise<MerchantContextDTO> {
+    return this.request("/merchant/context", { auth: true });
+  }
+
   merchantStores(): Promise<PickStore[]> {
     return this.request("/merchant/stores", { auth: true });
   }
