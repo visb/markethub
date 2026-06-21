@@ -1,6 +1,7 @@
-import { Controller, Get, Param, Query } from "@nestjs/common";
+import { BadRequestException, Controller, Get, Param, Query } from "@nestjs/common";
 import { Public } from "../auth/decorators/public.decorator";
 import { CatalogService, type GeoFilter } from "./catalog.service";
+import { StoresNearbyQueryDto } from "./dto/stores-nearby.dto";
 
 /** lat/lng/radiusKm de query string → filtro geo (undefined quando ausentes/inválidos). */
 function parseGeo(lat?: string, lng?: string, radiusKm?: string): GeoFilter | undefined {
@@ -54,6 +55,22 @@ export class CatalogController {
   @Get("merchants/:id/stores")
   stores(@Param("id") id: string) {
     return this.catalog.listStores(id);
+  }
+
+  /**
+   * Lojas no viewport do mapa (bounding box). Rota estática registrada ANTES de
+   * `stores/:id/...` p/ o Nest casar a literal `nearby` antes de `:id`.
+   * Bounds inválidos (ordem trocada) → 400 INVALID_BOUNDS.
+   */
+  @Get("stores/nearby")
+  storesNearby(@Query() q: StoresNearbyQueryDto) {
+    if (q.north < q.south || q.east < q.west) {
+      throw new BadRequestException({
+        code: "INVALID_BOUNDS",
+        message: "Bounding box inválido: north ≥ south e east ≥ west.",
+      });
+    }
+    return this.catalog.listStoresInBounds(q);
   }
 
   @Get("stores/:id/categories")
