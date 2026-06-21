@@ -1,4 +1,8 @@
 import type { ApiClient } from "@markethub/api-client";
+import type { NearbyStoreDTO, ViewportBoundsDTO } from "@markethub/types";
+
+// Re-export dos contratos compartilhados do mapa (stories 04/05/06) — fonte única em packages/types.
+export type { NearbyStoreDTO, ViewportBoundsDTO } from "@markethub/types";
 
 export type SaleType = "unit" | "weight";
 
@@ -292,6 +296,11 @@ export function marketplace(api: ApiClient) {
     productDetail: (productId: string) => api.request<ProductDetail>(`/products/${productId}`),
     merchants: () => api.request<Merchant[]>("/merchants"),
     stores: (merchantId: string) => api.request<Store[]>(`/merchants/${merchantId}/stores`),
+    /** Mercados ativos dentro do viewport do mapa (bbox) — explore (stories 04/05/06). */
+    storesNearby: (bounds: ViewportBoundsDTO) =>
+      api.request<NearbyStoreDTO[]>(
+        `/stores/nearby?north=${bounds.north}&south=${bounds.south}&east=${bounds.east}&west=${bounds.west}`,
+      ),
     products: (storeId: string, page = 1) =>
       api.request<Paginated<ProductView>>(`/stores/${storeId}/products?page=${page}&pageSize=30`),
     search: (storeId: string, q: string) =>

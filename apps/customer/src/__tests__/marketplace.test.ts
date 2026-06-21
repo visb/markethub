@@ -69,4 +69,10 @@ describe("marketplace api module", () => {
     await mkt.removeItem("i1");
     expect(request).toHaveBeenCalledWith("/cart/items/i1", { method: "DELETE", auth: true });
   });
+
+  it("storesNearby monta o bbox na querystring (story 05)", async () => {
+    const { request, mkt } = setup();
+    await mkt.storesNearby({ north: 1, south: -1, east: 2, west: -2 });
+    expect(request).toHaveBeenCalledWith("/stores/nearby?north=1&south=-1&east=2&west=-2");
+  });
 });
