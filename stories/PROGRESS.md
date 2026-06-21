@@ -10,7 +10,7 @@ Fonte de verdade p/ retomar: **git log + este arquivo**. Story com `feat(story-N
 | 02 | Picker: fila atualiza em tempo real (`subscribe:store`) | 01* | OK |
 | 03 | Picker: autocomplete de substituto + migração da tela p/ React Query | 02 | OK |
 | 04 | Backend: `GET /stores/nearby` por viewport (bbox) | — | OK |
-| 05 | Customer: aba explore vira mapa de mercados (base) | 04 | TODO |
+| 05 | Customer: aba explore vira mapa de mercados (base) | 04 | OK |
 | 06 | Customer: explore — mercados sob demanda por viewport + loading | 05, 04 | TODO |
 | 07 | App merchant: scaffold (Vite SPA + auth + shell + `merchant/context` + `can`) | — | TODO |
 | 08 | App merchant: CRUD de lojas | 07 | TODO |
@@ -29,6 +29,7 @@ Fonte de verdade p/ retomar: **git log + este arquivo**. Story com `feat(story-N
 [OK] 02 — testes: api-client 18/18 (+subscribeStore), picker 16/16 (usePickQueue realtime/polling/cleanup; coverage usePickQueue 97%), typecheck+build verdes — commit: 24c756d — merge: fc6711b — 2026-06-21 —
 [OK] 03 — testes: picker 34/34 (useDebouncedValue fake-timers, useSubstituteSearch gate≥2/debounce, todas as mutations invalidam pick.task; novos arquivos 100% cov), typecheck+build verdes — commit: f75e836 — merge: 1338577 — 2026-06-21 —
 [OK] 04 — testes: api unit 206/206 (+7: catalog.service.spec bbox/cap/order, catalog.controller.spec INVALID_BOUNDS), e2e 38/38 (+4: nearby in-box/null/inativa, routing, 400), coverage gate exit=0, typecheck+build verdes — commit: c6da560 — merge: 5a68159 — 2026-06-21 —
+[OK] 05 — testes: customer 58/58 (+30: mapRegion centro GPS→endereço→padrão/bounds/endereço ativo, useNearbyStores bounds+enabled, useExploreMap orquestração+pin destino, StoreMap nativo coords, marketplace bbox; coverage gate exit=0, novos hooks+mapRegion 100%), typecheck+build verdes — commit: de39764 — merge: 6ebb650 — 2026-06-21 — mapa nativo react-native-maps usa GOOGLE_MAPS_API_KEY do ambiente (sem key commitada); web usa Leaflet/OSM (sem key) — sem chamada a API real
 
 ## Resumo final da rodada
 
