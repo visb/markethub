@@ -17,6 +17,7 @@ out/
 .env
 .env.*
 !.env.example
+!.env.test.example
 
 # logs
 *.log
@@ -25,6 +26,8 @@ pnpm-debug.log*
 
 # test
 coverage/
+test-results/
+playwright-report/
 
 # os / editor
 .DS_Store

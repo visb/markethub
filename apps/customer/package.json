@@ -10,7 +10,19 @@
     "web": "expo start --web --port 8081",
     "build": "echo \"@markethub/customer: use expo build/export\"",
     "typecheck": "tsc --noEmit",
-    "lint": "echo \"skip\""
+    "lint": "echo \"skip\"",
+    "test": "jest",
+    "test:coverage": "jest --coverage"
+  },
+  "jest": {
+    "preset": "jest-expo",
+    "moduleNameMapper": {
+      "^@/(.*)$": "<rootDir>/src/$1"
+    },
+    "transformIgnorePatterns": [
+      "node_modules/(?!(?:\\.pnpm/[^/]+/node_modules/)?((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|@markethub/.*))",
+      "node_modules/(?:\\.pnpm/[^/]+/node_modules/)?react-native-reanimated/plugin/"
+    ]
   },
   "dependencies": {
     "@babel/runtime": "^7.26.0",
@@ -37,8 +49,13 @@
     "react-native-web": "~0.19.13"
   },
   "devDependencies": {
+    "@types/jest": "^29.5.14",
     "@types/react": "~18.3.12",
+    "@types/react-test-renderer": "~18.3.1",
+    "jest": "^29.7.0",
+    "jest-expo": "~52.0.6",
     "react-native-svg-transformer": "^1.5.0",
+    "react-test-renderer": "18.3.1",
     "typescript": "^5.7.3"
   }
 }

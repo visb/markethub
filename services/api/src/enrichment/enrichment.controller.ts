@@ -1,7 +1,6 @@
 import { Body, Controller, Get, Post } from "@nestjs/common";
 import { IsBoolean, IsOptional, IsString } from "class-validator";
 import { Roles } from "../auth/decorators/roles.decorator";
-import { PrismaService } from "../prisma/prisma.service";
 import { EnrichmentService } from "./enrichment.service";
 import { EnrichmentQueueService } from "./enrichment.queue";
 
@@ -29,7 +28,6 @@ export class EnrichmentController {
   constructor(
     private readonly enrichment: EnrichmentService,
     private readonly queue: EnrichmentQueueService,
-    private readonly prisma: PrismaService,
   ) {}
 
   @Post("product")
@@ -54,10 +52,6 @@ export class EnrichmentController {
 
   @Get("mappings")
   mappings() {
-    return this.prisma.categoryMapping.findMany({
-      include: { category: { select: { name: true, slug: true } } },
-      orderBy: { createdAt: "desc" },
-      take: 100,
-    });
+    return this.enrichment.listMappings();
   }
 }

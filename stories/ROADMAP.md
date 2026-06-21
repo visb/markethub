@@ -34,6 +34,7 @@ briefing/    screenshots de referência
 | 4 | Delivery (entregador) | `phase-4-delivery/` |
 | 5 | Rastreio, avaliações, admin, polish | `phase-5-tracking-reviews-admin/` |
 | 6 | Refinamento do app cliente | `phase-6-customer-refinement/` |
+| 7 | Qualidade (review completo + testes unit/e2e) | `phase-7-quality/` |
 
 Ordem de construção: **Base → catálogo/ERP/enriquecimento → cliente → picking → delivery → polish**.
 
@@ -113,6 +114,11 @@ Ordem de construção: **Base → catálogo/ERP/enriquecimento → cliente → p
 - S6.4 Configuração de entrega: bottom sheet + raio de mercados (slider 5–25 km)
 - S6.5 Favoritos de oferta (produto + loja)
 - S6.6 Opções de preparo por categoria (maturação/corte/ponto do pão)
+
+### Fase 7 — Qualidade
+- SR.1 Code review sweep (auto-fix seguro + REVIEW-FINDINGS.md)
+- SR.2 Cobertura de testes — unit + e2e (backend supertest, frontends modo web)
+- Executada por run autônomo: ledger `PROGRESS.md` + `RUNBOOK.md` (driver headless)
 
 ## Convenção de status
 
