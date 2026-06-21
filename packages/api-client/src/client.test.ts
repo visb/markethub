@@ -149,8 +149,106 @@ describe("MemoryTokenStore", () => {
   });
 });
 
+// ── RealtimeClient (socket.io-client mockado, sem rede) ──
+
+const ioMock = vi.hoisted(() => vi.fn());
+const fakeSocket = vi.hoisted(() => ({
+  on: vi.fn(),
+  emit: vi.fn(),
+  connect: vi.fn(),
+  disconnect: vi.fn(),
+  connected: false,
+}));
+
+vi.mock("socket.io-client", () => ({
+  io: (...args: unknown[]) => {
+    ioMock(...args);
+    return fakeSocket;
+  },
+}));
+
 describe("createRealtimeClient", () => {
-  it("ainda é stub: lança até a Fase 5", () => {
-    expect(() => createRealtimeClient({ url: "x", getToken: () => null })).toThrow(/not implemented/);
+  afterEach(() => {
+    ioMock.mockClear();
+    fakeSocket.on.mockClear();
+    fakeSocket.emit.mockClear();
+    fakeSocket.connect.mockClear();
+    fakeSocket.disconnect.mockClear();
+    fakeSocket.connected = false;
+  });
+
+  it("conecta ao namespace /picking usando o token de getToken", async () => {
+    const rt = createRealtimeClient({ url: "http://api.test", getToken: () => "jwt-123" });
+    rt.connect();
+
+    expect(ioMock).toHaveBeenCalledTimes(1);
+    expect(ioMock.mock.calls[0]![0]).toBe("http://api.test/picking");
+    expect(fakeSocket.connect).toHaveBeenCalled();
+
+    // auth é uma função (resolve o token a cada (re)conexão); deve chamar getToken.
+    const authFn = ioMock.mock.calls[0]![1].auth as (cb: (d: { token: string | null }) => void) => void;
+    let received: { token: string | null } | undefined;
+    authFn((d) => (received = d));
+    await Promise.resolve();
+    expect(received).toEqual({ token: "jwt-123" });
+  });
+
+  it("getToken assíncrono é resolvido para o handshake", async () => {
+    const rt = createRealtimeClient({ url: "http://api.test", getToken: async () => "async-tok" });
+    rt.connect();
+    const authFn = ioMock.mock.calls[0]![1].auth as (cb: (d: { token: string | null }) => void) => void;
+    let received: { token: string | null } | undefined;
+    authFn((d) => (received = d));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(received).toEqual({ token: "async-tok" });
+  });
+
+  it("on encaminha o handler ao socket", () => {
+    const rt = createRealtimeClient({ url: "x", getToken: () => null });
+    const handler = vi.fn();
+    rt.connect();
+    rt.on("order.updated", handler);
+    expect(fakeSocket.on).toHaveBeenCalledWith("order.updated", handler);
+  });
+
+  it("handlers registrados antes do connect são reaplicados ao conectar", () => {
+    const rt = createRealtimeClient({ url: "x", getToken: () => null });
+    const handler = vi.fn();
+    rt.on("order.updated", handler); // antes do connect → socket ainda não existe
+    rt.connect();
+    expect(fakeSocket.on).toHaveBeenCalledWith("order.updated", handler);
+  });
+
+  it("subscribeOrder emite subscribe:order com o orderId", () => {
+    const rt = createRealtimeClient({ url: "x", getToken: () => null });
+    rt.connect();
+    rt.subscribeOrder("ord_1");
+    expect(fakeSocket.emit).toHaveBeenCalledWith("subscribe:order", { orderId: "ord_1" });
+  });
+
+  it("emit encaminha evento + payload ao socket", () => {
+    const rt = createRealtimeClient({ url: "x", getToken: () => null });
+    rt.connect();
+    rt.emit("ping", { a: 1 });
+    expect(fakeSocket.emit).toHaveBeenCalledWith("ping", { a: 1 });
+  });
+
+  it("disconnect desconecta e limpa o socket", () => {
+    const rt = createRealtimeClient({ url: "x", getToken: () => null });
+    rt.connect();
+    rt.disconnect();
+    expect(fakeSocket.disconnect).toHaveBeenCalled();
+    // próximo connect cria um socket novo (io chamado de novo)
+    rt.connect();
+    expect(ioMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("connected reflete o estado do socket", () => {
+    const rt = createRealtimeClient({ url: "x", getToken: () => null });
+    expect(rt.connected).toBe(false);
+    rt.connect();
+    fakeSocket.connected = true;
+    expect(rt.connected).toBe(true);
   });
 });

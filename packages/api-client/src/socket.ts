@@ -1,12 +1,20 @@
 /**
- * Stub do cliente Socket.IO. Implementação real (socket.io-client) entra na Fase 5
- * (rastreio em tempo real, localização do entregador, status de picking).
+ * Cliente Socket.IO compartilhado (realtime). Conecta ao namespace `/picking`
+ * com o JWT no handshake (`auth.token`) — mesmo contrato do PickingGateway.
+ * Usado pelo rastreio de pedido em tempo real (S5.1 / story 02).
  */
+import { io, type Socket } from "socket.io-client";
+import { PICKING_NAMESPACE, ORDER_UPDATED_EVENT } from "@markethub/types";
+
 export interface RealtimeClient {
   connect(): void;
   disconnect(): void;
   on(event: string, handler: (payload: unknown) => void): void;
   emit(event: string, payload: unknown): void;
+  /** Entra no canal de rastreio de um pedido (`order:<orderId>`). */
+  subscribeOrder(orderId: string): void;
+  /** `true` enquanto o socket estiver conectado. */
+  readonly connected: boolean;
 }
 
 export interface RealtimeOptions {
@@ -14,6 +22,55 @@ export interface RealtimeOptions {
   getToken: () => string | null | Promise<string | null>;
 }
 
-export function createRealtimeClient(_opts: RealtimeOptions): RealtimeClient {
-  throw new Error("RealtimeClient not implemented yet — planned for Phase 5");
+export function createRealtimeClient(opts: RealtimeOptions): RealtimeClient {
+  let socket: Socket | null = null;
+  // Handlers registrados antes do connect são reaplicados ao socket criado.
+  const handlers = new Map<string, Set<(payload: unknown) => void>>();
+
+  function getSocket(): Socket {
+    if (socket) return socket;
+    socket = io(`${opts.url}${PICKING_NAMESPACE}`, {
+      // Token resolvido a cada (re)conexão — suporta getToken sync ou async.
+      auth: (cb: (data: { token: string | null }) => void) => {
+        void Promise.resolve(opts.getToken()).then((token) => cb({ token }));
+      },
+      autoConnect: false,
+      transports: ["websocket"],
+    });
+    for (const [event, set] of handlers) {
+      for (const handler of set) socket.on(event, handler);
+    }
+    return socket;
+  }
+
+  return {
+    get connected() {
+      return socket?.connected ?? false;
+    },
+    connect() {
+      getSocket().connect();
+    },
+    disconnect() {
+      socket?.disconnect();
+      socket = null;
+    },
+    on(event, handler) {
+      let set = handlers.get(event);
+      if (!set) {
+        set = new Set();
+        handlers.set(event, set);
+      }
+      set.add(handler);
+      socket?.on(event, handler);
+    },
+    emit(event, payload) {
+      getSocket().emit(event, payload);
+    },
+    subscribeOrder(orderId: string) {
+      getSocket().emit("subscribe:order", { orderId });
+    },
+  };
 }
+
+/** Reexporta o nome do evento de rastreio para os consumidores não duplicarem o literal. */
+export { ORDER_UPDATED_EVENT };
