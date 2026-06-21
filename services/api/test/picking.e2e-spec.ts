@@ -60,7 +60,7 @@ describe("Picking (e2e)", () => {
   }
 
   it("assume → inicia → separa item → conclui (packed)", async () => {
-    const { picker, taskId } = await setupPaidOrder();
+    const { prisma, picker, orderId, taskId } = await setupPaidOrder();
 
     const assigned = await request(app.getHttpServer())
       .post(url(`/pick-tasks/${taskId}/assign`))
@@ -72,6 +72,14 @@ describe("Picking (e2e)", () => {
       .post(url(`/pick-tasks/${taskId}/start`))
       .set(authHeader(picker))
       .expect(201);
+
+    // story 01: iniciar a separação acende "Comprando" — OrderGroup e Order → picking
+    const afterStart = await prisma.order.findUniqueOrThrow({
+      where: { id: orderId },
+      include: { groups: { select: { status: true } } },
+    });
+    expect(afterStart.status).toBe("picking");
+    expect(afterStart.groups.every((g) => g.status === "picking")).toBe(true);
 
     const detail = await request(app.getHttpServer())
       .get(url(`/pick-tasks/${taskId}`))
@@ -91,6 +99,10 @@ describe("Picking (e2e)", () => {
       .set(authHeader(picker))
       .expect(201);
     expect(done.body.status).toBe("packed");
+
+    // story 01: completePicking não introduz status visível novo — segue "picking"
+    const afterComplete = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(afterComplete.status).toBe("picking");
   });
 
   it("não-dono não consegue iniciar a tarefa de outro (NOT_TASK_OWNER)", async () => {

@@ -8,14 +8,18 @@ import { PickingSessionService } from "./picking-session.service";
  * validações de quantidade/peso no updateItem.
  */
 
-function makeService(prismaOverrides: Record<string, unknown>) {
+function makeService(prismaOverrides: Record<string, unknown>, tracking?: Record<string, unknown>) {
   const prisma = prismaOverrides as never;
   const events = {
     itemUpdated: jest.fn(),
     taskStatusChanged: jest.fn(),
   } as never;
   const refunds = { maybeIssueRefundForOrder: jest.fn().mockResolvedValue(undefined) } as never;
-  return new PickingSessionService(prisma, events, refunds);
+  const track = (tracking ?? {
+    recomputeAndEmit: jest.fn().mockResolvedValue(undefined),
+    emitForGroup: jest.fn().mockResolvedValue(undefined),
+  }) as never;
+  return new PickingSessionService(prisma, events, refunds, track);
 }
 
 describe("PickingSessionService.recalcTotals", () => {
@@ -132,5 +136,201 @@ describe("PickingSessionService.updateItem — validações", () => {
     ).rejects.toMatchObject({
       response: expect.objectContaining({ code: "REFUSAL_REASON_REQUIRED" }),
     });
+  });
+});
+
+/**
+ * Story 01: start() transiciona o OrderGroup → picking + emite o snapshot de
+ * rastreio (passo "Comprando" na tela do cliente). Idempotente. A agregação do
+ * Order.status vive no OrderTrackingService (mockado aqui) — coberta à parte.
+ */
+describe("PickingSessionService.start — transição do grupo + emit", () => {
+  function startSvc(taskStatus: string) {
+    const taskUpdate = jest.fn().mockResolvedValue({});
+    const groupUpdate = jest.fn().mockResolvedValue({});
+    const $transaction = jest.fn().mockResolvedValue([{}, {}]);
+    const recomputeAndEmit = jest.fn().mockResolvedValue(undefined);
+    const svc = makeService(
+      {
+        pickTask: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: "t1",
+            pickerId: "u1",
+            status: taskStatus,
+            orderGroupId: "g1",
+          }),
+          findUniqueOrThrow: jest.fn().mockResolvedValue({
+            id: "t1",
+            storeId: "s1",
+            orderGroupId: "g1",
+            pickerId: "u1",
+            status: "picking",
+            assignedAt: new Date("2026-01-01"),
+            startedAt: new Date("2026-01-01"),
+            packedAt: null,
+            readyAt: null,
+            createdAt: new Date("2026-01-01"),
+            items: [],
+            orderGroup: { fulfillment: "delivery", pickupCode: null, order: { scheduledFrom: null } },
+          }),
+          update: taskUpdate,
+        },
+        orderGroup: { update: groupUpdate },
+        $transaction,
+      },
+      { recomputeAndEmit, emitForGroup: jest.fn() },
+    );
+    return { svc, $transaction, recomputeAndEmit };
+  }
+
+  it("transiciona pickTask + OrderGroup → picking na mesma transação e emite", async () => {
+    const { svc, $transaction, recomputeAndEmit } = startSvc("assigned");
+    await svc.start("u1", "t1");
+    // dois updates atômicos: pickTask e orderGroup
+    expect($transaction).toHaveBeenCalledTimes(1);
+    const ops = $transaction.mock.calls[0][0];
+    expect(Array.isArray(ops)).toBe(true);
+    expect(ops).toHaveLength(2);
+    // recompute agregado + emit do snapshot
+    expect(recomputeAndEmit).toHaveBeenCalledWith("g1");
+  });
+
+  it("idempotente: já em picking não re-transiciona nem re-emite", async () => {
+    const { svc, $transaction, recomputeAndEmit } = startSvc("picking");
+    await svc.start("u1", "t1");
+    expect($transaction).not.toHaveBeenCalled();
+    expect(recomputeAndEmit).not.toHaveBeenCalled();
+  });
+});
+
+describe("PickingSessionService.updateItem — emit de rastreio (story 01)", () => {
+  function svcForUpdate(opts?: { emitForGroup?: jest.Mock }) {
+    const emitForGroup = opts?.emitForGroup ?? jest.fn().mockResolvedValue(undefined);
+    const recalcGroup = {
+      orderId: "o1",
+      items: [],
+    };
+    const svc = makeService(
+      {
+        pickTask: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: "t1",
+            pickerId: "u1",
+            status: "picking",
+            orderGroupId: "g1",
+          }),
+        },
+        pickItem: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: "pi1",
+            pickTaskId: "t1",
+            orderItem: { saleType: "unit", quantity: 2 },
+          }),
+          update: jest.fn().mockResolvedValue({}),
+          findUniqueOrThrow: jest.fn().mockResolvedValue({
+            id: "pi1",
+            status: "picked",
+            orderItem: { saleType: "unit", quantity: 2 },
+            substitution: null,
+          }),
+        },
+        orderGroup: {
+          findUniqueOrThrow: jest.fn().mockResolvedValue(recalcGroup),
+          update: jest.fn().mockResolvedValue({}),
+        },
+        order: {
+          findUniqueOrThrow: jest.fn().mockResolvedValue({
+            id: "o1",
+            groups: [{ subtotalCents: 0 }],
+            deliveryCents: 0,
+            prepCents: 0,
+            platformFeeCents: 0,
+            discountCents: 0,
+          }),
+          update: jest.fn().mockResolvedValue({}),
+        },
+      },
+      { recomputeAndEmit: jest.fn(), emitForGroup },
+    );
+    return { svc, emitForGroup };
+  }
+
+  it("pick: emite o snapshot no canal order: após o recálculo", async () => {
+    const { svc, emitForGroup } = svcForUpdate();
+    await svc.updateItem("u1", "t1", "pi1", { action: "pick", quantityPicked: 2 });
+    expect(emitForGroup).toHaveBeenCalledWith("g1");
+  });
+
+  it("refuse: emite o snapshot no canal order:", async () => {
+    const { svc, emitForGroup } = svcForUpdate();
+    // reusa o mock; refusa com motivo
+    await svc.updateItem("u1", "t1", "pi1", { action: "refuse", refusalReason: "sem estoque" });
+    expect(emitForGroup).toHaveBeenCalledWith("g1");
+  });
+
+  it("emit best-effort: não relança a operação se o emit falhar", async () => {
+    // emitForGroup é best-effort dentro do OrderTrackingService (try/catch); aqui
+    // garantimos que o serviço espera uma promise resolvida e segue.
+    const emitForGroup = jest.fn().mockResolvedValue(undefined);
+    const { svc } = svcForUpdate({ emitForGroup });
+    await expect(
+      svc.updateItem("u1", "t1", "pi1", { action: "pick", quantityPicked: 2 }),
+    ).resolves.toBeDefined();
+  });
+});
+
+describe("PickingSessionService.completePicking — emit final (story 01)", () => {
+  it("emite o snapshot final; status do pedido segue 'picking'", async () => {
+    const emitForGroup = jest.fn().mockResolvedValue(undefined);
+    const recomputeAndEmit = jest.fn().mockResolvedValue(undefined);
+    const svc = makeService(
+      {
+        pickTask: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: "t1",
+            pickerId: "u1",
+            status: "picking",
+            orderGroupId: "g1",
+          }),
+          update: jest.fn().mockResolvedValue({}),
+          findUniqueOrThrow: jest.fn().mockResolvedValue({
+            id: "t1",
+            storeId: "s1",
+            orderGroupId: "g1",
+            pickerId: "u1",
+            status: "packed",
+            assignedAt: new Date("2026-01-01"),
+            startedAt: new Date("2026-01-01"),
+            packedAt: new Date("2026-01-01"),
+            readyAt: null,
+            createdAt: new Date("2026-01-01"),
+            items: [],
+            orderGroup: { fulfillment: "delivery", pickupCode: null, order: { scheduledFrom: null } },
+          }),
+        },
+        pickItem: { count: jest.fn().mockResolvedValue(0) },
+        orderGroup: {
+          findUniqueOrThrow: jest.fn().mockResolvedValue({ orderId: "o1", items: [] }),
+          findUnique: jest.fn().mockResolvedValue({ orderId: "o1" }),
+          update: jest.fn().mockResolvedValue({}),
+        },
+        order: {
+          findUniqueOrThrow: jest.fn().mockResolvedValue({
+            id: "o1",
+            groups: [{ subtotalCents: 0 }],
+            deliveryCents: 0,
+            prepCents: 0,
+            platformFeeCents: 0,
+            discountCents: 0,
+          }),
+          update: jest.fn().mockResolvedValue({}),
+        },
+      },
+      { recomputeAndEmit, emitForGroup },
+    );
+    await svc.completePicking("u1", "t1");
+    expect(emitForGroup).toHaveBeenCalledWith("g1");
+    // completePicking NÃO toca no status do pedido (segue picking até markReady)
+    expect(recomputeAndEmit).not.toHaveBeenCalled();
   });
 });

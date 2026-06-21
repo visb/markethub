@@ -4,25 +4,12 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import type { OrderStatus } from "@prisma/client";
 import { shortCode } from "../common/codes";
 import { PushService } from "../notifications/push.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { OrderTrackingService } from "./order-tracking.service";
 import { PickingEvents } from "./picking.events";
 import { PICK_TASK_INCLUDE, toPickTaskDto } from "./picking.mapper";
-
-// Ordem das etapas do pedido — usada p/ derivar o status agregado do Order a
-// partir dos seus grupos (o pedido fica na etapa menos avançada entre as lojas).
-const ORDER_STAGE: OrderStatus[] = [
-  "created",
-  "paid",
-  "preparing",
-  "picking",
-  "ready_for_pickup",
-  "on_the_way",
-  "delivered",
-];
 
 @Injectable()
 export class HandoffService {
@@ -79,7 +66,7 @@ export class HandoffService {
           ]
         : []),
     ]);
-    await this.recomputeOrderStatus(task.orderGroupId);
+    await this.tracking.recomputeAndEmit(task.orderGroupId);
 
     this.events.readyForPickup({
       pickTaskId: task.id,
@@ -169,7 +156,7 @@ export class HandoffService {
       where: { id: task.orderGroupId },
       data: { status: "on_the_way" },
     });
-    await this.recomputeOrderStatus(task.orderGroupId);
+    await this.tracking.recomputeAndEmit(task.orderGroupId);
     await this.pushOwner(task.orderGroupId, {
       title: "A caminho",
       body: "Seu pedido saiu para entrega.",
@@ -209,7 +196,7 @@ export class HandoffService {
       where: { id: orderGroupId },
       data: { status: "delivered" },
     });
-    await this.recomputeOrderStatus(orderGroupId);
+    await this.tracking.recomputeAndEmit(orderGroupId);
     await this.pushOwner(orderGroupId, {
       title: "Pedido entregue",
       body: "Seu pedido foi concluído. Que tal avaliar?",
@@ -228,27 +215,6 @@ export class HandoffService {
         data: { orderId: group.orderId },
       });
     }
-  }
-
-  /** Status do Order = etapa menos avançada entre seus grupos. */
-  private async recomputeOrderStatus(orderGroupId: string) {
-    const group = await this.prisma.orderGroup.findUniqueOrThrow({
-      where: { id: orderGroupId },
-      select: { orderId: true },
-    });
-    const groups = await this.prisma.orderGroup.findMany({
-      where: { orderId: group.orderId },
-      select: { status: true },
-    });
-    // ignora grupos cancelados ao agregar
-    const ranks = groups
-      .map((g) => ORDER_STAGE.indexOf(g.status))
-      .filter((r) => r >= 0);
-    if (ranks.length === 0) return;
-    const status = ORDER_STAGE[Math.min(...ranks)] ?? "preparing";
-    await this.prisma.order.update({ where: { id: group.orderId }, data: { status } });
-    // rastreio em tempo real (S5.1): emite o snapshot atualizado ao dono do pedido
-    await this.tracking.emit(group.orderId);
   }
 
   private async detail(taskId: string) {
