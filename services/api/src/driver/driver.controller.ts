@@ -35,6 +35,18 @@ export class DriverController {
     return this.driver.listAssigned(user.id, { storeId, status });
   }
 
+  /** Pool: entregas prontas e sem entregador nas lojas do entregador. */
+  @Get("deliveries/available")
+  available(@CurrentUser() user: AuthUser, @Query("storeId") storeId?: string) {
+    return this.driver.listAvailable(user.id, { storeId });
+  }
+
+  /** Aceita uma entrega do pool (auto-atribuição). */
+  @Post("deliveries/:id/accept")
+  accept(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.driver.accept(user.id, id);
+  }
+
   /** Coleta na loja: valida o pickupCode. */
   @Post("deliveries/:id/pickup")
   pickup(@CurrentUser() user: AuthUser, @Param("id") id: string, @Body() dto: ConfirmPickupDto) {

@@ -6,20 +6,23 @@ import {
 } from "@nestjs/common";
 import type { DeliveryStatus } from "@prisma/client";
 import { HandoffService } from "../picking/handoff.service";
+import { OrderTrackingService } from "../picking/order-tracking.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { DELIVERY_INCLUDE, toDeliveryDto } from "./delivery.mapper";
 
 /**
  * Entrega própria — lado do entregador. O entregador é vinculado a uma loja
- * (StoreStaff role driver) e só vê as entregas que a loja lhe atribuiu.
- * Coleta: valida o pickupCode (reusa HandoffService). Entrega: valida o
- * deliveryCode do cliente. Sem disponibilidade/geolocalização/ganhos.
+ * (StoreStaff role driver). Pool aberto: ao ficar pronta, a entrega fica
+ * disponível para todos os entregadores da loja; quem aceitar primeiro fica
+ * com ela (lock otimista). Coleta valida o pickupCode (reusa HandoffService);
+ * entrega valida o deliveryCode do cliente.
  */
 @Injectable()
 export class DriverService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly handoff: HandoffService,
+    private readonly tracking: OrderTrackingService,
   ) {}
 
   /** Lojas em que o usuário atua como entregador (para o app escolher a fila). */
@@ -29,6 +32,56 @@ export class DriverService {
       include: { store: { select: { id: true, name: true, merchantId: true } } },
     });
     return staff.map((s) => s.store);
+  }
+
+  /**
+   * Pool aberto: entregas prontas e ainda sem entregador (unassigned) nas lojas
+   * em que o usuário atua. Qualquer um pode aceitar; a primeira aceitação vence.
+   */
+  async listAvailable(userId: string, opts: { storeId?: string } = {}) {
+    const storeIds = await this.myStoreIds(userId);
+    if (storeIds.length === 0) return [];
+    // opts.storeId vem do cliente — só vale se for uma das lojas do entregador.
+    const scope = opts.storeId && storeIds.includes(opts.storeId) ? [opts.storeId] : storeIds;
+    const deliveries = await this.prisma.delivery.findMany({
+      where: { storeId: { in: scope }, status: "unassigned" as DeliveryStatus },
+      orderBy: { createdAt: "asc" },
+      include: DELIVERY_INCLUDE,
+    });
+    return deliveries.map(toDeliveryDto);
+  }
+
+  /**
+   * Aceita uma entrega do pool (auto-atribuição). Lock otimista unassigned →
+   * assigned: se outro entregador já aceitou, falha com DELIVERY_ALREADY_TAKEN.
+   */
+  async accept(userId: string, deliveryId: string) {
+    const delivery = await this.loadDelivery(deliveryId);
+    const isDriver = await this.prisma.storeStaff.findFirst({
+      where: { userId, storeId: delivery.storeId, staffRole: "driver", active: true },
+    });
+    if (!isDriver) {
+      throw new ForbiddenException({
+        code: "NOT_STORE_DRIVER",
+        message: "Você não é entregador desta loja",
+      });
+    }
+    const { count } = await this.prisma.delivery.updateMany({
+      where: { id: deliveryId, status: "unassigned" },
+      data: { status: "assigned", driverId: userId, assignedAt: new Date() },
+    });
+    if (count === 0) {
+      throw new BadRequestException({
+        code: "DELIVERY_ALREADY_TAKEN",
+        message: "Entrega já foi aceita por outro entregador",
+      });
+    }
+    const group = await this.prisma.orderGroup.findUnique({
+      where: { id: delivery.orderGroupId },
+      select: { orderId: true },
+    });
+    if (group) await this.tracking.emit(group.orderId);
+    return this.detail(deliveryId);
   }
 
   /** Entregas atribuídas ao entregador (em aberto por padrão). */
@@ -96,6 +149,24 @@ export class DriverService {
       data: { status: "delivered", deliveredAt: new Date() },
     });
     return this.detail(deliveryId);
+  }
+
+  /** IDs das lojas em que o usuário é entregador ativo. */
+  private async myStoreIds(userId: string): Promise<string[]> {
+    const staff = await this.prisma.storeStaff.findMany({
+      where: { userId, staffRole: "driver", active: true },
+      select: { storeId: true },
+    });
+    return staff.map((s) => s.storeId);
+  }
+
+  /** Carrega a entrega ou 404. */
+  private async loadDelivery(deliveryId: string) {
+    const delivery = await this.prisma.delivery.findUnique({ where: { id: deliveryId } });
+    if (!delivery) {
+      throw new NotFoundException({ code: "DELIVERY_NOT_FOUND", message: "Entrega não encontrada" });
+    }
+    return delivery;
   }
 
   /** Garante que a entrega pertence ao entregador. */

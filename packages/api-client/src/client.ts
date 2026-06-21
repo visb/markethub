@@ -253,6 +253,19 @@ export class ApiClient {
     return this.request(`/driver/deliveries${qs ? `?${qs}` : ""}`, { auth: true });
   }
 
+  /** Pool: entregas prontas e sem entregador nas lojas do entregador. */
+  driverAvailableDeliveries(params: { storeId?: string } = {}): Promise<DeliveryDTO[]> {
+    const q = new URLSearchParams();
+    if (params.storeId) q.set("storeId", params.storeId);
+    const qs = q.toString();
+    return this.request(`/driver/deliveries/available${qs ? `?${qs}` : ""}`, { auth: true });
+  }
+
+  /** Aceita uma entrega do pool (auto-atribuição). */
+  driverAcceptDelivery(id: string): Promise<DeliveryDTO> {
+    return this.request(`/driver/deliveries/${id}/accept`, { method: "POST", auth: true });
+  }
+
   /** Coleta na loja: valida o pickupCode → entrega segue a caminho. */
   driverConfirmPickup(id: string, pickupCode: string): Promise<DeliveryDTO> {
     return this.request(`/driver/deliveries/${id}/pickup`, { method: "POST", body: { pickupCode }, auth: true });

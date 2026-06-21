@@ -21,6 +21,8 @@ export default function HomeScreen() {
   const [stores, setStores] = useState<Store[]>([]);
   const [storeId, setStoreId] = useState<string | null>(null);
   const [deliveries, setDeliveries] = useState<DeliveryDTO[]>([]);
+  const [available, setAvailable] = useState<DeliveryDTO[]>([]);
+  const [accepting, setAccepting] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,7 +33,13 @@ export default function HomeScreen() {
         setStores(myStores);
         const active = sid !== undefined ? sid : (storeId ?? myStores[0]?.id ?? null);
         setStoreId(active);
-        setDeliveries(await client.driverDeliveries(active ? { storeId: active } : {}));
+        const scope = active ? { storeId: active } : {};
+        const [mine, pool] = await Promise.all([
+          client.driverDeliveries(scope),
+          client.driverAvailableDeliveries(scope),
+        ]);
+        setDeliveries(mine);
+        setAvailable(pool);
         setError(null);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Erro ao carregar");
@@ -40,6 +48,21 @@ export default function HomeScreen() {
       }
     },
     [client, storeId],
+  );
+
+  const accept = useCallback(
+    async (id: string) => {
+      setAccepting(id);
+      try {
+        await client.driverAcceptDelivery(id);
+        await load();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Não foi possível aceitar");
+      } finally {
+        setAccepting(null);
+      }
+    },
+    [client, load],
   );
 
   // Recarrega ao focar e a cada 10s.
@@ -91,7 +114,38 @@ export default function HomeScreen() {
         </View>
       )}
 
+      {/* Pool: entregas prontas e sem entregador — qualquer um pode aceitar. */}
       <Text variant="title" style={{ marginTop: spacing.md, marginBottom: spacing.sm }}>
+        Disponíveis
+      </Text>
+      {available.length === 0 ? (
+        <Text muted>Nenhuma entrega disponível.</Text>
+      ) : (
+        available.map((d) => (
+          <View key={d.id} style={styles.row}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontWeight: "600" }}>
+                #{d.orderId.slice(-6)} · {d.customerName}
+              </Text>
+              {d.address && (
+                <Text muted variant="caption">
+                  {d.address}
+                </Text>
+              )}
+              <Text muted variant="caption">
+                {d.itemCount} item(ns)
+              </Text>
+            </View>
+            <Button
+              title={accepting === d.id ? "Aceitando…" : "Aceitar"}
+              onPress={() => void accept(d.id)}
+              disabled={accepting !== null}
+            />
+          </View>
+        ))
+      )}
+
+      <Text variant="title" style={{ marginTop: spacing.lg, marginBottom: spacing.sm }}>
         Minhas entregas
       </Text>
 
