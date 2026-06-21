@@ -134,8 +134,49 @@ model Merchant {
   stores           Store[]
   orderGroups      OrderGroup[]
   coupons          Coupon[]
+  apiKeys          ApiKey[]
+  webhooks         Webhook[]
 
   @@map("merchants")
+}
+
+// Api-key de ENTRADA (sistema do merchant → MarketHub) — story 09.
+// Persistimos só o hash da chave; o valor em claro é revelado UMA vez na criação.
+// `prefix` (primeiros caracteres) identifica a chave na listagem sem expor o valor.
+model ApiKey {
+  id         String    @id @default(cuid())
+  merchant   Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  merchantId String
+  name       String
+  keyHash    String // SHA-256 da chave em claro (nunca o valor)
+  prefix     String // primeiros chars (ex.: "mk_live_a1b2") p/ identificação
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+
+  @@index([merchantId])
+  @@map("api_keys")
+}
+
+// Webhook de SAÍDA (MarketHub → endpoint do merchant) — story 09.
+// O secret assina o corpo (HMAC-SHA256, header X-MarketHub-Signature). Revelado
+// uma vez na criação; depois retornado mascarado. Eventos cobertos no MVP:
+// order.created e order.status_changed.
+model Webhook {
+  id                 String    @id @default(cuid())
+  merchant           Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  merchantId         String
+  url                String
+  secret             String // usado para assinar; mascarado nas leituras
+  events             String[]
+  active             Boolean   @default(true)
+  lastDeliveryStatus String? // ok | failed | pending
+  lastDeliveryAt     DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([merchantId])
+  @@map("webhooks")
 }
 
 // Loja física de um merchant. Origem dos dados do ERP.

@@ -9,4 +9,9 @@ export const queryKeys = {
   stores: {
     all: ["stores"] as const,
   },
+  integration: {
+    erp: ["integration", "erp"] as const,
+    apiKeys: ["integration", "api-keys"] as const,
+    webhooks: ["integration", "webhooks"] as const,
+  },
 } as const;

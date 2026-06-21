@@ -8,6 +8,14 @@ import type {
   MerchantStoreDetailDTO,
   MerchantStoreInput,
   MerchantStoreUpdateInput,
+  ErpConfigDTO,
+  ErpConfigInput,
+  ApiKeyDTO,
+  ApiKeyCreatedDTO,
+  WebhookDTO,
+  WebhookCreatedDTO,
+  CreateWebhookInput,
+  UpdateWebhookInput,
   PickTaskDTO,
   RefreshInput,
   RegisterInput,
@@ -214,6 +222,53 @@ export class ApiClient {
   /** Edita uma loja da rede do dono (owner-only — story 08). */
   merchantUpdateStore(id: string, patch: MerchantStoreUpdateInput): Promise<MerchantStoreDetailDTO> {
     return this.request(`/merchant/stores/${id}`, { method: "PATCH", body: patch, auth: true });
+  }
+
+  // ─── Merchant / integração (story 09, owner-only) ───────────
+
+  /** Config de ERP (saída) com segredos mascarados + tipos de conector. */
+  merchantErpConfig(): Promise<ErpConfigDTO> {
+    return this.request("/merchant/integration/erp", { auth: true });
+  }
+
+  /** Grava connectorType + connectorConfig (valida por tipo). */
+  merchantPutErpConfig(input: ErpConfigInput): Promise<ErpConfigDTO> {
+    return this.request("/merchant/integration/erp", { method: "PUT", body: input, auth: true });
+  }
+
+  merchantApiKeys(): Promise<ApiKeyDTO[]> {
+    return this.request("/merchant/integration/api-keys", { auth: true });
+  }
+
+  /** Cria api-key de entrada; a chave em claro volta UMA única vez. */
+  merchantCreateApiKey(name: string): Promise<ApiKeyCreatedDTO> {
+    return this.request("/merchant/integration/api-keys", { method: "POST", body: { name }, auth: true });
+  }
+
+  merchantRevokeApiKey(id: string): Promise<{ id: string; revokedAt: string | null }> {
+    return this.request(`/merchant/integration/api-keys/${id}`, { method: "DELETE", auth: true });
+  }
+
+  merchantWebhooks(): Promise<WebhookDTO[]> {
+    return this.request("/merchant/integration/webhooks", { auth: true });
+  }
+
+  /** Cria webhook; o secret de assinatura volta UMA única vez. */
+  merchantCreateWebhook(input: CreateWebhookInput): Promise<WebhookCreatedDTO> {
+    return this.request("/merchant/integration/webhooks", { method: "POST", body: input, auth: true });
+  }
+
+  merchantUpdateWebhook(id: string, patch: UpdateWebhookInput): Promise<WebhookDTO> {
+    return this.request(`/merchant/integration/webhooks/${id}`, { method: "PATCH", body: patch, auth: true });
+  }
+
+  merchantDeleteWebhook(id: string): Promise<{ id: string }> {
+    return this.request(`/merchant/integration/webhooks/${id}`, { method: "DELETE", auth: true });
+  }
+
+  /** Enfileira um ping assinado p/ o webhook (botão "testar"). */
+  merchantTestWebhook(id: string): Promise<{ enqueued: boolean }> {
+    return this.request(`/merchant/integration/webhooks/${id}/test`, { method: "POST", auth: true });
   }
 
   merchantOffers(params: { storeId?: string; search?: string; categoryId?: string; available?: boolean } = {}): Promise<MerchantOffer[]> {

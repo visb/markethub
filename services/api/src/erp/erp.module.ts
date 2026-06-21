@@ -32,6 +32,6 @@ import { ErpService } from "./erp.service";
       inject: [CsvErpConnector],
     },
   ],
-  exports: [ErpService, ErpQueueService],
+  exports: [ErpService, ErpQueueService, ConnectorRegistry],
 })
 export class ErpModule {}

@@ -25,4 +25,13 @@ export type {
   MerchantStoreDetailDTO,
   MerchantStoreInput,
   MerchantStoreUpdateInput,
+  WebhookEvent,
+  ErpConfigDTO,
+  ErpConfigInput,
+  ApiKeyDTO,
+  ApiKeyCreatedDTO,
+  WebhookDTO,
+  WebhookCreatedDTO,
+  CreateWebhookInput,
+  UpdateWebhookInput,
 } from "@markethub/types";

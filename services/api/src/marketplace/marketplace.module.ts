@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ErpModule } from "../erp/erp.module";
 import { GeocodingModule } from "../geocoding/geocoding.module";
+import { IntegrationModule } from "../integration/integration.module";
 import { RefundModule } from "../payment/refund.module";
 import { PickingModule } from "../picking/picking.module";
 import { SchedulingModule } from "../scheduling/scheduling.module";
@@ -13,7 +14,7 @@ import { OrdersController } from "./orders.controller";
 import { OrdersService } from "./orders.service";
 
 @Module({
-  imports: [ErpModule, GeocodingModule, PickingModule, RefundModule, SchedulingModule],
+  imports: [ErpModule, GeocodingModule, IntegrationModule, PickingModule, RefundModule, SchedulingModule],
   controllers: [
     AddressesController,
     CoverageController,
