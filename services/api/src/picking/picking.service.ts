@@ -61,11 +61,15 @@ export class PickingService {
       include: PICK_TASK_INCLUDE,
     });
 
-    // FIFO por tempo efetivo: agendados respeitam a janela (scheduledFrom),
-    // demais usam createdAt. (S2.5)
+    // Ordenação (story 01): tarefas não atribuídas (queued) vêm antes das já
+    // assumidas pelo separador; DENTRO de cada grupo mantém o FIFO por tempo
+    // efetivo (agendados respeitam a janela scheduledFrom, demais usam
+    // createdAt — S2.5). Assim o novo pedido a puxar fica no topo sem quebrar
+    // o SLA de picking (mais antigo primeiro dentro do grupo).
     const effective = (t: (typeof tasks)[number]) =>
       t.orderGroup.order.scheduledFrom?.getTime() ?? t.createdAt.getTime();
-    tasks.sort((a, b) => effective(a) - effective(b));
+    const statusGroup = (t: (typeof tasks)[number]) => (t.status === "queued" ? 0 : 1);
+    tasks.sort((a, b) => statusGroup(a) - statusGroup(b) || effective(a) - effective(b));
 
     return tasks.map(toPickTaskDto);
   }

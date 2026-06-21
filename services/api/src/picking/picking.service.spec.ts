@@ -26,14 +26,17 @@ function makeService(opts: {
   task?: Record<string, unknown> | null;
   staff?: unknown;
   updateManyCount?: number;
+  findMany?: unknown[];
 }) {
   const taskStatusChanged = jest.fn();
   const updateMany = jest.fn().mockResolvedValue({ count: opts.updateManyCount ?? 1 });
   const update = jest.fn().mockResolvedValue({});
+  const findMany = jest.fn().mockResolvedValue(opts.findMany ?? []);
   const prisma = {
     pickTask: {
       findUnique: jest.fn().mockResolvedValue("task" in opts ? opts.task : { ...TASK_WITH_RELS }),
       findUniqueOrThrow: jest.fn().mockResolvedValue(TASK_WITH_RELS),
+      findMany,
       updateMany,
       update,
     },
@@ -43,7 +46,28 @@ function makeService(opts: {
   } as never;
   const events = { taskStatusChanged } as never;
   const svc = new PickingService(prisma, events);
-  return { svc, updateMany, update, taskStatusChanged };
+  return { svc, updateMany, update, findMany, taskStatusChanged };
+}
+
+/** Cria uma PickTask-like p/ os testes de ordenação de listQueue. */
+function makeTask(opts: {
+  id: string;
+  status?: string;
+  pickerId?: string | null;
+  createdAt: string;
+  scheduledFrom?: string | null;
+}) {
+  return {
+    ...TASK_WITH_RELS,
+    id: opts.id,
+    status: opts.status ?? "queued",
+    pickerId: opts.pickerId ?? null,
+    createdAt: new Date(opts.createdAt),
+    orderGroup: {
+      ...TASK_WITH_RELS.orderGroup,
+      order: { scheduledFrom: opts.scheduledFrom ? new Date(opts.scheduledFrom) : null },
+    },
+  };
 }
 
 describe("PickingService.assign", () => {
@@ -85,6 +109,59 @@ describe("PickingService.assign", () => {
     });
     expect(taskStatusChanged).toHaveBeenCalled();
     expect(dto.id).toBe("t1");
+  });
+});
+
+describe("PickingService.listQueue — ordenação (story 01)", () => {
+  it("queued (mais nova) vem antes de assigned minha (mais antiga): status manda entre grupos", async () => {
+    const { svc } = makeService({
+      findMany: [
+        makeTask({ id: "mine", status: "assigned", pickerId: "u1", createdAt: "2026-01-01T08:00:00Z" }),
+        makeTask({ id: "new", status: "queued", createdAt: "2026-01-01T10:00:00Z" }),
+      ],
+    });
+    const queue = await svc.listQueue("u1", "s1");
+    expect(queue.map((t) => t.id)).toEqual(["new", "mine"]);
+  });
+
+  it("duas queued: FIFO interno preservado (mais antiga primeiro)", async () => {
+    const { svc } = makeService({
+      findMany: [
+        makeTask({ id: "newer", status: "queued", createdAt: "2026-01-01T10:00:00Z" }),
+        makeTask({ id: "older", status: "queued", createdAt: "2026-01-01T08:00:00Z" }),
+      ],
+    });
+    const queue = await svc.listQueue("u1", "s1");
+    expect(queue.map((t) => t.id)).toEqual(["older", "newer"]);
+  });
+
+  it("duas assigned minhas: FIFO interno preservado", async () => {
+    const { svc } = makeService({
+      findMany: [
+        makeTask({ id: "newer", status: "assigned", pickerId: "u1", createdAt: "2026-01-01T10:00:00Z" }),
+        makeTask({ id: "older", status: "assigned", pickerId: "u1", createdAt: "2026-01-01T08:00:00Z" }),
+      ],
+    });
+    const queue = await svc.listQueue("u1", "s1");
+    expect(queue.map((t) => t.id)).toEqual(["older", "newer"]);
+  });
+
+  it("dentro do grupo queued respeita effective (scheduledFrom) vs createdAt", async () => {
+    const { svc } = makeService({
+      findMany: [
+        // imediata: createdAt cedo, sem janela
+        makeTask({ id: "immediate", status: "queued", createdAt: "2026-01-01T09:00:00Z" }),
+        // agendada: createdAt depois, mas janela ainda mais cedo → vem antes
+        makeTask({
+          id: "scheduled",
+          status: "queued",
+          createdAt: "2026-01-01T11:00:00Z",
+          scheduledFrom: "2026-01-01T07:00:00Z",
+        }),
+      ],
+    });
+    const queue = await svc.listQueue("u1", "s1");
+    expect(queue.map((t) => t.id)).toEqual(["scheduled", "immediate"]);
   });
 });
 
