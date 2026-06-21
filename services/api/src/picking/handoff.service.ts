@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { shortCode } from "../common/codes";
+import { IntegrationService } from "../integration/integration.service";
 import { PushService } from "../notifications/push.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { OrderTrackingService } from "./order-tracking.service";
@@ -18,7 +19,26 @@ export class HandoffService {
     private readonly events: PickingEvents,
     private readonly tracking: OrderTrackingService,
     private readonly push: PushService,
+    private readonly integration: IntegrationService,
   ) {}
+
+  /**
+   * Emite webhook order.status_changed para o merchant do grupo (story 09).
+   * Best-effort: carrega merchantId/storeId/orderId do grupo e enfileira.
+   */
+  private async emitGroupStatus(orderGroupId: string, status: string) {
+    const g = await this.prisma.orderGroup.findUnique({
+      where: { id: orderGroupId },
+      select: { merchantId: true, storeId: true, orderId: true },
+    });
+    if (!g) return;
+    void this.integration.emit(g.merchantId, "order.status_changed", {
+      orderId: g.orderId,
+      merchantId: g.merchantId,
+      storeId: g.storeId,
+      status,
+    });
+  }
 
   /**
    * Handoff (S3.6): packed → ready_for_pickup. Transiciona OrderGroup →
@@ -67,6 +87,7 @@ export class HandoffService {
         : []),
     ]);
     await this.tracking.recomputeAndEmit(task.orderGroupId);
+    await this.emitGroupStatus(task.orderGroupId, "ready_for_pickup");
 
     this.events.readyForPickup({
       pickTaskId: task.id,
@@ -157,6 +178,7 @@ export class HandoffService {
       data: { status: "on_the_way" },
     });
     await this.tracking.recomputeAndEmit(task.orderGroupId);
+    await this.emitGroupStatus(task.orderGroupId, "on_the_way");
     await this.pushOwner(task.orderGroupId, {
       title: "A caminho",
       body: "Seu pedido saiu para entrega.",
@@ -197,6 +219,7 @@ export class HandoffService {
       data: { status: "delivered" },
     });
     await this.tracking.recomputeAndEmit(orderGroupId);
+    await this.emitGroupStatus(orderGroupId, "delivered");
     await this.pushOwner(orderGroupId, {
       title: "Pedido entregue",
       body: "Seu pedido foi concluído. Que tal avaliar?",

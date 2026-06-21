@@ -15,6 +15,7 @@ import { MarketplaceModule } from "./marketplace/marketplace.module";
 import { PaymentModule } from "./payment/payment.module";
 import { PickingModule } from "./picking/picking.module";
 import { MerchantModule } from "./merchant/merchant.module";
+import { IntegrationModule } from "./integration/integration.module";
 import { DriverModule } from "./driver/driver.module";
 import { ReviewsModule } from "./reviews/reviews.module";
 import { SchedulingModule } from "./scheduling/scheduling.module";
@@ -40,6 +41,7 @@ import { RolesGuard } from "./auth/guards/roles.guard";
     PaymentModule,
     PickingModule,
     MerchantModule,
+    IntegrationModule,
     DriverModule,
     ReviewsModule,
     SchedulingModule,

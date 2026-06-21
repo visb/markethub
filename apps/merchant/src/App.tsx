@@ -6,6 +6,7 @@ import { RequireCapability } from "@/components/RequireCapability";
 import { Layout } from "@/components/Layout";
 import { Login } from "@/pages/Login";
 import { Stores } from "@/pages/Stores";
+import { Integration } from "@/pages/Integration";
 import { Placeholder } from "@/pages/Placeholder";
 
 const queryClient = new QueryClient({
@@ -24,7 +25,7 @@ export function App() {
                 <Route index element={<Stores />} />
                 {/* Só dono (owner) cria/edita lojas e gere integração. */}
                 <Route element={<RequireCapability capability="integration.manage" />}>
-                  <Route path="integration" element={<Placeholder title="Integração" story="story 09" />} />
+                  <Route path="integration" element={<Integration />} />
                 </Route>
                 <Route element={<RequireCapability capability="staff.manage" />}>
                   <Route path="staff" element={<Placeholder title="Colaboradores" story="story 10" />} />

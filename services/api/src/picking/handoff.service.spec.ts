@@ -50,8 +50,10 @@ function makeService(taskStatus: string) {
   const events = { readyForPickup: jest.fn() } as never;
   const tracking = { recomputeAndEmit } as never;
   const push = { sendToUser: jest.fn().mockResolvedValue(undefined) } as never;
-  const svc = new HandoffService(prisma, events, tracking, push);
-  return { svc, $transaction, recomputeAndEmit, events };
+  const emit = jest.fn().mockResolvedValue(undefined);
+  const integration = { emit } as never;
+  const svc = new HandoffService(prisma, events, tracking, push, integration);
+  return { svc, $transaction, recomputeAndEmit, events, emit };
 }
 
 describe("HandoffService.markReady — regressão story 01", () => {

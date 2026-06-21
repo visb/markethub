@@ -65,3 +65,71 @@ export const merchantStoreInputSchema = z.object({
 });
 export type MerchantStoreInput = z.infer<typeof merchantStoreInputSchema>;
 export type MerchantStoreUpdateInput = Partial<MerchantStoreInput>;
+
+// ── Integração (story 09) ──
+
+/** Eventos de pedido cobertos pelos webhooks no MVP. */
+export const webhookEventSchema = z.enum(["order.created", "order.status_changed"]);
+export type WebhookEvent = z.infer<typeof webhookEventSchema>;
+
+/** Config de ERP (saída) — segredos vêm MASCARADOS na leitura. */
+export const erpConfigSchema = z.object({
+  connectorType: z.string().nullable(),
+  connectorConfig: z.record(z.unknown()),
+  availableTypes: z.array(z.string()),
+});
+export type ErpConfigDTO = z.infer<typeof erpConfigSchema>;
+
+export const erpConfigInputSchema = z.object({
+  connectorType: z.string().min(1),
+  connectorConfig: z.record(z.unknown()),
+});
+export type ErpConfigInput = z.infer<typeof erpConfigInputSchema>;
+
+/** Api-key de entrada — metadados; o valor em claro só aparece na criação. */
+export const apiKeySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  prefix: z.string(),
+  createdAt: z.string(),
+  lastUsedAt: z.string().nullable(),
+  revokedAt: z.string().nullable(),
+});
+export type ApiKeyDTO = z.infer<typeof apiKeySchema>;
+
+/** Resposta da criação de api-key: inclui a chave em claro UMA única vez. */
+export const apiKeyCreatedSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  prefix: z.string(),
+  createdAt: z.string(),
+  key: z.string(),
+});
+export type ApiKeyCreatedDTO = z.infer<typeof apiKeyCreatedSchema>;
+
+/** Webhook — secret sempre mascarado na leitura (`secretMasked`). */
+export const webhookSchema = z.object({
+  id: z.string(),
+  url: z.string(),
+  events: z.array(z.string()),
+  active: z.boolean(),
+  secretMasked: z.string(),
+  lastDeliveryStatus: z.string().nullable(),
+  lastDeliveryAt: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type WebhookDTO = z.infer<typeof webhookSchema>;
+
+/** Resposta da criação de webhook: inclui o secret em claro UMA única vez. */
+export type WebhookCreatedDTO = WebhookDTO & { secret: string };
+
+export const createWebhookInputSchema = z.object({
+  url: z.string().min(1),
+  events: z.array(z.string()).optional(),
+});
+export type CreateWebhookInput = z.infer<typeof createWebhookInputSchema>;
+export type UpdateWebhookInput = Partial<{
+  url: string;
+  events: string[];
+  active: boolean;
+}>;
