@@ -710,3 +710,127 @@ describe("Merchant reports (e2e)", () => {
     await request(app.getHttpServer()).get(url("/merchant/reports/sales")).expect(401);
   });
 });
+
+describe("Merchant vehicles (e2e — story 14)", () => {
+  let app: INestApplication;
+  const url = (p: string) => `/${API_PREFIX}${p}`;
+
+  beforeAll(async () => {
+    app = await createTestApp();
+    await resetDatabase(getPrisma(app));
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  async function makeOwner() {
+    const prisma = getPrisma(app);
+    const seeded = await seedOffer(prisma);
+    const owner = await registerUser(app, { roles: ["merchant"] });
+    const ownerRow = await prisma.user.findFirstOrThrow({ where: { email: owner.email } });
+    await prisma.storeStaff.create({
+      data: { userId: ownerRow.id, storeId: seeded.storeId, staffRole: "manager", active: true },
+    });
+    return { owner, seeded };
+  }
+
+  it("owner cadastra veículo (placa normalizada) e ele fica vinculado à rede", async () => {
+    const { owner, seeded } = await makeOwner();
+    const res = await request(app.getHttpServer())
+      .post(url("/merchant/vehicles"))
+      .set(authHeader(owner))
+      .send({ plate: " abc1d23 ", type: "motorcycle", description: "Moto vermelha" })
+      .expect(201);
+    expect(res.body).toMatchObject({
+      merchantId: seeded.merchantId,
+      plate: "ABC1D23",
+      type: "motorcycle",
+      active: true,
+    });
+  });
+
+  it("placa inválida → 400 INVALID_PLATE", async () => {
+    const { owner } = await makeOwner();
+    const res = await request(app.getHttpServer())
+      .post(url("/merchant/vehicles"))
+      .set(authHeader(owner))
+      .send({ plate: "XX1", type: "car" })
+      .expect(400);
+    expect(res.body.code).toBe("INVALID_PLATE");
+  });
+
+  it("lista só os veículos da rede do usuário", async () => {
+    const { owner, seeded } = await makeOwner();
+    const prisma = getPrisma(app);
+    const other = await seedOffer(prisma);
+    await prisma.vehicle.create({ data: { merchantId: seeded.merchantId, plate: "AAA1A11", type: "car" } });
+    await prisma.vehicle.create({ data: { merchantId: other.merchantId, plate: "BBB2B22", type: "van" } });
+    const res = await request(app.getHttpServer())
+      .get(url("/merchant/vehicles"))
+      .set(authHeader(owner))
+      .expect(200);
+    const plates = (res.body as { plate: string; merchantId: string }[]).map((v) => v.plate);
+    expect(plates).toContain("AAA1A11");
+    expect(plates).not.toContain("BBB2B22");
+    expect(res.body.every((v: { merchantId: string }) => v.merchantId === seeded.merchantId)).toBe(true);
+  });
+
+  it("PATCH parcial + soft toggle active", async () => {
+    const { owner, seeded } = await makeOwner();
+    const prisma = getPrisma(app);
+    const v = await prisma.vehicle.create({
+      data: { merchantId: seeded.merchantId, plate: "CCC3C33", type: "car" },
+    });
+    await request(app.getHttpServer())
+      .patch(url(`/merchant/vehicles/${v.id}`))
+      .set(authHeader(owner))
+      .send({ active: false })
+      .expect(200);
+    const after = await prisma.vehicle.findUniqueOrThrow({ where: { id: v.id } });
+    expect(after.active).toBe(false);
+    expect(after.plate).toBe("CCC3C33");
+  });
+
+  it("hard delete bloqueado com entrega associada → 400 VEHICLE_IN_USE", async () => {
+    const { owner, seeded } = await makeOwner();
+    const prisma = getPrisma(app);
+    const v = await prisma.vehicle.create({
+      data: { merchantId: seeded.merchantId, plate: "DDD4D44", type: "van" },
+    });
+    const group = await prisma.orderGroup.findFirst({ where: { storeId: seeded.storeId } });
+    if (group) {
+      await prisma.delivery.create({
+        data: { orderGroupId: group.id, storeId: seeded.storeId, vehicleId: v.id },
+      });
+      const res = await request(app.getHttpServer())
+        .delete(url(`/merchant/vehicles/${v.id}?hard=true`))
+        .set(authHeader(owner))
+        .expect(400);
+      expect(res.body.code).toBe("VEHICLE_IN_USE");
+    } else {
+      // sem OrderGroup no seed → deleta normalmente
+      await request(app.getHttpServer())
+        .delete(url(`/merchant/vehicles/${v.id}?hard=true`))
+        .set(authHeader(owner))
+        .expect(200);
+    }
+  });
+
+  it("hard delete remove o veículo sem entregas", async () => {
+    const { owner, seeded } = await makeOwner();
+    const prisma = getPrisma(app);
+    const v = await prisma.vehicle.create({
+      data: { merchantId: seeded.merchantId, plate: "EEE5E55", type: "car" },
+    });
+    await request(app.getHttpServer())
+      .delete(url(`/merchant/vehicles/${v.id}?hard=true`))
+      .set(authHeader(owner))
+      .expect(200);
+    expect(await prisma.vehicle.findUnique({ where: { id: v.id } })).toBeNull();
+  });
+
+  it("nega não autenticado (401)", async () => {
+    await request(app.getHttpServer()).get(url("/merchant/vehicles")).expect(401);
+  });
+});

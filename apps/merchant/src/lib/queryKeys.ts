@@ -18,6 +18,10 @@ export const queryKeys = {
     all: ["staff"] as const,
     byStore: (storeId: string | undefined) => ["staff", storeId ?? "all"] as const,
   },
+  vehicles: {
+    all: ["vehicles"] as const,
+    byMerchant: (merchantId: string | undefined) => ["vehicles", merchantId ?? "all"] as const,
+  },
   catalog: {
     offers: (filters: { storeId?: string; categoryId?: string; search?: string; available?: boolean } = {}) =>
       ["catalog", "offers", filters] as const,

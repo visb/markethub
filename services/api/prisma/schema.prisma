@@ -79,6 +79,33 @@ enum StaffRole {
   driver // entregador da loja (entrega própria, SF-delivery)
 }
 
+// Tipo do veículo de entrega da frota da rede (story 14).
+enum VehicleType {
+  motorcycle // moto
+  car // carro
+  van // utilitário/van
+}
+
+// Veículo de entrega da frota da rede (story 14). Pertence ao MERCHANT (rede),
+// não à loja: a frota é compartilhada entre as lojas; o entregador (que pertence a
+// uma loja) escolhe entre os veículos da rede dona da loja (story 15). Desativação
+// é soft (`active=false`) para preservar histórico de quem entregou com qual veículo.
+model Vehicle {
+  id          String      @id @default(cuid())
+  merchant    Merchant    @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  merchantId  String
+  plate       String // placa
+  type        VehicleType
+  description String? // texto livre, ex.: "Fiorino branca"
+  active      Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  deliveries  Delivery[]
+
+  @@index([merchantId])
+  @@map("vehicles")
+}
+
 // Vínculo de um usuário (funcionário) a uma loja específica, com papel operacional.
 model StoreStaff {
   id        String    @id @default(cuid())
@@ -136,6 +163,7 @@ model Merchant {
   coupons          Coupon[]
   apiKeys          ApiKey[]
   webhooks         Webhook[]
+  vehicles         Vehicle[]
 
   @@map("merchants")
 }
@@ -795,6 +823,10 @@ model Delivery {
   storeId      String // denormalizado p/ fila por loja
   driver       User?          @relation("DriverDeliveries", fields: [driverId], references: [id])
   driverId     String?
+  // Veículo usado nesta entrega (story 14): histórico de qual veículo da frota fez a
+  // entrega. Opcional; só é preenchido a partir da story 15 (seleção pelo entregador).
+  vehicle      Vehicle?       @relation(fields: [vehicleId], references: [id])
+  vehicleId    String?
   status       DeliveryStatus @default(unassigned)
   assignedAt   DateTime?
   pickedUpAt   DateTime?

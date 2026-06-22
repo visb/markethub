@@ -172,6 +172,42 @@ export type UpdateMerchantStaffInput = Partial<{
   staffRole: StaffRoleName;
 }>;
 
+// ── Veículos de entrega (story 14) ──
+
+/** Tipo do veículo da frota da rede. */
+export const vehicleTypeSchema = z.enum(["motorcycle", "car", "van"]);
+export type VehicleType = z.infer<typeof vehicleTypeSchema>;
+
+/** Veículo da frota da rede (merchant). Desativação é soft (`active`). */
+export const vehicleSchema = z.object({
+  id: z.string(),
+  merchantId: z.string(),
+  plate: z.string(),
+  type: vehicleTypeSchema,
+  description: z.string().nullable(),
+  active: z.boolean(),
+  createdAt: z.string(),
+});
+export type VehicleDTO = z.infer<typeof vehicleSchema>;
+
+/** Payload de criação de veículo (merchantId resolvido pelo backend se omitido). */
+export const createVehicleInputSchema = z.object({
+  plate: z.string().min(1),
+  type: vehicleTypeSchema,
+  description: z.string().nullable().optional(),
+  active: z.boolean().optional(),
+  merchantId: z.string().optional(),
+});
+export type CreateVehicleInput = z.infer<typeof createVehicleInputSchema>;
+
+/** Patch de veículo: campos parciais (placa/tipo/descrição/active). */
+export type UpdateVehicleInput = Partial<{
+  plate: string;
+  type: VehicleType;
+  description: string | null;
+  active: boolean;
+}>;
+
 // ── Pedidos em tempo real (story 12) ──
 
 /** Status de cumprimento de um OrderGroup (mesmas etapas do OrderStatus). */
