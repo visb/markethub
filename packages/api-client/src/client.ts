@@ -19,6 +19,9 @@ import type {
   MerchantStaffDTO,
   CreateMerchantStaffInput,
   UpdateMerchantStaffInput,
+  VehicleDTO,
+  CreateVehicleInput,
+  UpdateVehicleInput,
   MerchantOrderDTO,
   MerchantReportQuery,
   SalesReportDTO,
@@ -302,6 +305,34 @@ export class ApiClient {
   /** Remove o colaborador. Padrão: desativa; `hard` (owner-only): deleta o vínculo. */
   merchantRemoveStaff(id: string, hard = false): Promise<{ id: string; active?: boolean; removed?: boolean }> {
     return this.request(`/merchant/staff/${id}${hard ? "?hard=true" : ""}`, {
+      method: "DELETE",
+      auth: true,
+    });
+  }
+
+  // ─── Merchant / veículos (frota da rede — story 14) ─────────────
+
+  /** Lista os veículos das redes no escopo do usuário (opcionalmente por rede). */
+  merchantVehicles(merchantId?: string): Promise<VehicleDTO[]> {
+    return this.request(
+      `/merchant/vehicles${merchantId ? `?merchantId=${encodeURIComponent(merchantId)}` : ""}`,
+      { auth: true },
+    );
+  }
+
+  /** Cadastra um veículo na rede do escopo (merchantId resolvido pelo backend). */
+  merchantCreateVehicle(input: CreateVehicleInput): Promise<VehicleDTO> {
+    return this.request("/merchant/vehicles", { method: "POST", body: input, auth: true });
+  }
+
+  /** Atualiza parcialmente um veículo (placa/tipo/descrição/active). */
+  merchantUpdateVehicle(id: string, patch: UpdateVehicleInput): Promise<VehicleDTO> {
+    return this.request(`/merchant/vehicles/${id}`, { method: "PATCH", body: patch, auth: true });
+  }
+
+  /** Remove o veículo. Padrão: desativa; `hard` deleta (bloqueado se em uso). */
+  merchantRemoveVehicle(id: string, hard = false): Promise<{ id: string; active?: boolean; removed?: boolean }> {
+    return this.request(`/merchant/vehicles/${id}${hard ? "?hard=true" : ""}`, {
       method: "DELETE",
       auth: true,
     });

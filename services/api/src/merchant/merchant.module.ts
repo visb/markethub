@@ -9,6 +9,8 @@ import { MerchantReportsController } from "./merchant-reports.controller";
 import { MerchantReportsService } from "./merchant-reports.service";
 import { MerchantStaffController } from "./merchant-staff.controller";
 import { MerchantStaffService } from "./merchant-staff.service";
+import { MerchantVehiclesController } from "./merchant-vehicles.controller";
+import { MerchantVehiclesService } from "./merchant-vehicles.service";
 import { MerchantController } from "./merchant.controller";
 import { MerchantService } from "./merchant.service";
 
@@ -17,11 +19,18 @@ import { MerchantService } from "./merchant.service";
   controllers: [
     MerchantContextController,
     MerchantStaffController,
+    MerchantVehiclesController,
     MerchantOrdersController,
     MerchantReportsController,
     MerchantController,
   ],
-  providers: [MerchantService, MerchantProductService, MerchantStaffService, MerchantReportsService],
+  providers: [
+    MerchantService,
+    MerchantProductService,
+    MerchantStaffService,
+    MerchantVehiclesService,
+    MerchantReportsService,
+  ],
   exports: [MerchantService],
 })
 export class MerchantModule {}

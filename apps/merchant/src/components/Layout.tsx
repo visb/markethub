@@ -14,6 +14,7 @@ const NAV: NavItem[] = [
   { to: "/", label: "Lojas", capability: "stores.view", end: true },
   { to: "/integration", label: "Integração", capability: "integration.manage" },
   { to: "/staff", label: "Colaboradores", capability: "staff.manage" },
+  { to: "/vehicles", label: "Veículos", capability: "vehicles.manage" },
   { to: "/catalog", label: "Catálogo", capability: "catalog.manage" },
   { to: "/orders", label: "Pedidos", capability: "orders.view" },
   { to: "/reports", label: "Relatórios", capability: "reports.view" },

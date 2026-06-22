@@ -8,6 +8,7 @@ import { Login } from "@/pages/Login";
 import { Stores } from "@/pages/Stores";
 import { Integration } from "@/pages/Integration";
 import { Staff } from "@/pages/Staff";
+import { Vehicles } from "@/pages/Vehicles";
 import { Catalog } from "@/pages/Catalog";
 import { Orders } from "@/pages/Orders";
 import { Reports } from "@/pages/Reports";
@@ -32,6 +33,9 @@ export function App() {
                 </Route>
                 <Route element={<RequireCapability capability="staff.manage" />}>
                   <Route path="staff" element={<Staff />} />
+                </Route>
+                <Route element={<RequireCapability capability="vehicles.manage" />}>
+                  <Route path="vehicles" element={<Vehicles />} />
                 </Route>
                 <Route element={<RequireCapability capability="catalog.manage" />}>
                   <Route path="catalog" element={<Catalog />} />
