@@ -34,6 +34,10 @@ model User {
   tipsReceived     Tip[]         @relation("DriverTips")
   deviceTokens     DeviceToken[]
   favorites        Favorite[]
+  // Veículo da frota que o entregador selecionou para o turno corrente (story 15).
+  // Opcional; relação fraca (SetNull) para não bloquear soft-delete de veículo.
+  activeVehicle    Vehicle?      @relation("DriverActiveVehicle", fields: [activeVehicleId], references: [id], onDelete: SetNull)
+  activeVehicleId  String?
 
   @@map("users")
 }
@@ -101,6 +105,8 @@ model Vehicle {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   deliveries  Delivery[]
+  // Entregadores que selecionaram este veículo como ativo no turno (story 15).
+  activeDrivers User[]    @relation("DriverActiveVehicle")
 
   @@index([merchantId])
   @@map("vehicles")

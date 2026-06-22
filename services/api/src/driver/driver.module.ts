@@ -3,13 +3,14 @@ import { JwtModule } from "@nestjs/jwt";
 import { PickingModule } from "../picking/picking.module";
 import { DriverController } from "./driver.controller";
 import { DriverService } from "./driver.service";
+import { DriverVehicleService } from "./driver-vehicle.service";
 import { StoreDeliveryService } from "./store-delivery.service";
 import { StoreDeliveriesController } from "./store-deliveries.controller";
 
 @Module({
   imports: [JwtModule.register({}), PickingModule],
   controllers: [DriverController, StoreDeliveriesController],
-  providers: [DriverService, StoreDeliveryService],
-  exports: [DriverService, StoreDeliveryService],
+  providers: [DriverService, DriverVehicleService, StoreDeliveryService],
+  exports: [DriverService, DriverVehicleService, StoreDeliveryService],
 })
 export class DriverModule {}

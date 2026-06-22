@@ -4,6 +4,8 @@ import { useFocusEffect, useRouter } from "expo-router";
 import type { DeliveryDTO } from "@markethub/api-client";
 import { Button, Text, colors, radius, spacing } from "@markethub/ui";
 import { useAuth } from "@/auth-context";
+import { VehicleIndicator } from "@/components/VehicleIndicator";
+import { useCurrentVehicle } from "@/api/hooks/useDriverVehicle";
 
 interface Store {
   id: string;
@@ -18,6 +20,7 @@ const STATUS_LABEL: Record<string, string> = {
 export default function HomeScreen() {
   const { user, client, logout } = useAuth();
   const router = useRouter();
+  const currentVehicle = useCurrentVehicle();
   const [stores, setStores] = useState<Store[]>([]);
   const [storeId, setStoreId] = useState<string | null>(null);
   const [deliveries, setDeliveries] = useState<DeliveryDTO[]>([]);
@@ -95,6 +98,14 @@ export default function HomeScreen() {
           Entregador
         </Text>
         <Text variant="h1">Olá, {user?.name ?? "—"}</Text>
+      </View>
+
+      {/* Indicador do veículo do turno — tocável, abre o seletor (≤2 cliques). */}
+      <View style={{ marginBottom: spacing.md }}>
+        <VehicleIndicator
+          vehicle={currentVehicle.data ?? null}
+          onPress={() => router.push("/select-vehicle")}
+        />
       </View>
 
       {error && <Text style={{ color: colors.danger, marginBottom: spacing.sm }}>{error}</Text>}
