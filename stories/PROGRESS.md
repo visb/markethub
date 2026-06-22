@@ -58,8 +58,9 @@ Reproduzir os gates por área:
 - picker/customer/merchant: `pnpm --filter @markethub/<app> test` (gate `test:coverage`)
 - geral antes de pronto: `pnpm typecheck` + `pnpm build`
 
-Lint pré-existente vermelho (NÃO tocado nesta rodada): unused imports em
+Lint do `@markethub/api` agora **verde**: removidos os unused imports em
 `services/api/src/{reviews/reviews.service.spec, merchant/merchant-product.service.spec,
-merchant/merchant-staff.service.spec}.ts`.
+merchant/merchant-staff.service.spec}.ts` (commit `78b1f7f` na main; 2 eram
+pré-existentes, 1 introduzido pela story 10).
 
 Serviços de pé: docker infra (Postgres :5433/test, Redis, MinIO).
