@@ -22,6 +22,28 @@ export type OrderUpdatedEvent = typeof ORDER_UPDATED_EVENT;
 export const PICK_TASK_UPDATED_EVENT = "pick_task.updated" as const;
 export type PickTaskUpdatedEvent = typeof PICK_TASK_UPDATED_EVENT;
 
+/**
+ * Eventos de pedido (OrderGroup) emitidos na `store room` para o app merchant
+ * acompanhar pedidos em tempo real (story 12). `order.created` ao surgir o grupo
+ * na loja; `order.status_changed` a cada transição de status do OrderGroup. São
+ * os MESMOS pontos de emissão que a story 09 usa p/ webhooks (mesmo nome de
+ * evento) — aqui o transporte é socket à store room.
+ */
+export const ORDER_CREATED_EVENT = "order.created" as const;
+export type OrderCreatedEvent = typeof ORDER_CREATED_EVENT;
+
+export const ORDER_STATUS_CHANGED_EVENT = "order.status_changed" as const;
+export type OrderStatusChangedEvent = typeof ORDER_STATUS_CHANGED_EVENT;
+
+/** Payload dos eventos de pedido na store room. */
+export interface OrderStoreEventPayload {
+  v: number;
+  orderId: string;
+  merchantId: string;
+  storeId: string;
+  status: string;
+}
+
 export type PickingServerEvent =
   | "pick_task.assigned"
   | "pick_task.updated"

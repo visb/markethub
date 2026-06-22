@@ -26,6 +26,16 @@ vi.mock("@markethub/api-client", () => {
   return {
     ApiClient: FakeApiClient,
     ApiClientError: FakeApiClientError,
+    // story 12: o auth-context cria o cliente de socket; mock sem rede.
+    createRealtimeClient: () => ({
+      connected: false,
+      on: vi.fn(),
+      emit: vi.fn(),
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+      subscribeStore: vi.fn(),
+      subscribeOrder: vi.fn(),
+    }),
   };
 });
 

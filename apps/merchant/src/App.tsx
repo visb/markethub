@@ -9,6 +9,7 @@ import { Stores } from "@/pages/Stores";
 import { Integration } from "@/pages/Integration";
 import { Staff } from "@/pages/Staff";
 import { Catalog } from "@/pages/Catalog";
+import { Orders } from "@/pages/Orders";
 import { Placeholder } from "@/pages/Placeholder";
 
 const queryClient = new QueryClient({
@@ -36,7 +37,7 @@ export function App() {
                   <Route path="catalog" element={<Catalog />} />
                 </Route>
                 <Route element={<RequireCapability capability="orders.view" />}>
-                  <Route path="orders" element={<Placeholder title="Pedidos" story="story 12" />} />
+                  <Route path="orders" element={<Orders />} />
                 </Route>
                 <Route element={<RequireCapability capability="reports.view" />}>
                   <Route path="reports" element={<Placeholder title="Relatórios" story="story 13" />} />

@@ -170,6 +170,29 @@ body {
   color: var(--muted);
   font-size: 12px;
 }
+/* Pedidos em tempo real (story 12) */
+.badge-live {
+  color: #0a7d33;
+  font-size: 12px;
+  font-weight: 600;
+}
+.board {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  align-items: flex-start;
+}
+.board-col {
+  min-width: 220px;
+  flex: 0 0 220px;
+}
+.board-col-head {
+  font-size: 14px;
+  margin: 0 0 8px;
+}
+.order-card {
+  display: block;
+}
 .store-form {
   max-width: 560px;
   display: flex;

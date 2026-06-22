@@ -107,7 +107,22 @@ export class PickingGateway implements OnGatewayConnection {
       where: { userId: user.id, storeId, active: true },
       select: { id: true },
     });
-    return !!staff;
+    if (staff) return true;
+    // Dono da rede (RoleName merchant) que possui a loja — app merchant (story 12).
+    // MVP: posse = ter vínculo StoreStaff(manager) ativo em alguma loja da mesma rede.
+    if (user.roles.includes("merchant")) {
+      const store = await this.prisma.store.findUnique({
+        where: { id: storeId },
+        select: { merchantId: true },
+      });
+      if (!store) return false;
+      const owned = await this.prisma.storeStaff.findFirst({
+        where: { userId: user.id, active: true, store: { merchantId: store.merchantId } },
+        select: { id: true },
+      });
+      return !!owned;
+    }
+    return false;
   }
 
   private async canAccessGroup(user: SocketUser, orderGroupId: string): Promise<boolean> {

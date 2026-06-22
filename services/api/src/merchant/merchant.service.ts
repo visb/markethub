@@ -267,6 +267,75 @@ export class MerchantService {
     }
   }
 
+  // ── Pedidos (story 12) ──
+
+  /**
+   * Lojas no escopo do usuário (owner: todas as lojas das redes que possui;
+   * manager: só as dos vínculos). Reusa `myStores` (posse = StoreStaff manager).
+   * Vazio quando o usuário não tem vínculo.
+   */
+  private async scopedStoreIds(user: { id: string; roles: string[] }): Promise<string[]> {
+    const scoped = await this.myStores(user.id);
+    if (scoped.length === 0) return [];
+    if (user.roles.includes("merchant")) {
+      const merchantIds = [...new Set(scoped.map((s) => s.merchantId))];
+      const stores = await this.prisma.store.findMany({
+        where: { merchantId: { in: merchantIds } },
+        select: { id: true },
+      });
+      return stores.map((s) => s.id);
+    }
+    return scoped.map((s) => s.id);
+  }
+
+  /**
+   * Lista os sub-pedidos (OrderGroup) das lojas no escopo (story 12). Filtra por
+   * loja (validando o escopo) e por status. Card resumido p/ o board: nº/loja/
+   * itens/total/horário/status/pickupCode. Usuário sem vínculo → FORBIDDEN.
+   */
+  async listOrders(
+    user: { id: string; roles: string[] },
+    filters: { storeId?: string; status?: string } = {},
+  ) {
+    const scoped = await this.scopedStoreIds(user);
+    if (scoped.length === 0) {
+      throw new ForbiddenException({ code: "NOT_A_MERCHANT_USER", message: "Usuário sem lojas no escopo" });
+    }
+    let storeIds = scoped;
+    if (filters.storeId) {
+      if (!scoped.includes(filters.storeId)) {
+        throw new ForbiddenException({ code: "STORE_NOT_IN_SCOPE", message: "Loja fora do escopo do usuário" });
+      }
+      storeIds = [filters.storeId];
+    }
+
+    const groups = await this.prisma.orderGroup.findMany({
+      where: {
+        storeId: { in: storeIds },
+        ...(filters.status ? { status: filters.status as never } : {}),
+      },
+      orderBy: { order: { createdAt: "desc" } },
+      include: {
+        store: { select: { name: true } },
+        order: { select: { createdAt: true } },
+        _count: { select: { items: true } },
+      },
+    });
+
+    return groups.map((g) => ({
+      id: g.id,
+      orderId: g.orderId,
+      storeId: g.storeId,
+      storeName: g.store.name,
+      status: g.status,
+      fulfillment: g.fulfillment,
+      itemCount: g._count.items,
+      totalCents: g.subtotalCents + g.deliveryCents + g.prepCents + g.platformFeeCents,
+      pickupCode: g.pickupCode,
+      createdAt: g.order.createdAt.toISOString(),
+    }));
+  }
+
   // ── Ofertas ──
 
   async listOffers(userId: string, filters: OfferFilters) {

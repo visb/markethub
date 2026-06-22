@@ -8,6 +8,7 @@ import { shortCode } from "../common/codes";
 import { IntegrationService } from "../integration/integration.service";
 import { PushService } from "../notifications/push.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { OrderEvents } from "./order.events";
 import { OrderTrackingService } from "./order-tracking.service";
 import { PickingEvents } from "./picking.events";
 import { PICK_TASK_INCLUDE, toPickTaskDto } from "./picking.mapper";
@@ -20,11 +21,14 @@ export class HandoffService {
     private readonly tracking: OrderTrackingService,
     private readonly push: PushService,
     private readonly integration: IntegrationService,
+    private readonly orderEvents: OrderEvents,
   ) {}
 
   /**
-   * Emite webhook order.status_changed para o merchant do grupo (story 09).
-   * Best-effort: carrega merchantId/storeId/orderId do grupo e enfileira.
+   * Propaga uma transição de status do OrderGroup (story 09 + 12). Ponto único:
+   * (a) enfileira webhook order.status_changed p/ o merchant (story 09);
+   * (b) emite order.status_changed à store room via socket (story 12).
+   * Best-effort: carrega merchantId/storeId/orderId do grupo.
    */
   private async emitGroupStatus(orderGroupId: string, status: string) {
     const g = await this.prisma.orderGroup.findUnique({
@@ -33,6 +37,12 @@ export class HandoffService {
     });
     if (!g) return;
     void this.integration.emit(g.merchantId, "order.status_changed", {
+      orderId: g.orderId,
+      merchantId: g.merchantId,
+      storeId: g.storeId,
+      status,
+    });
+    this.orderEvents.statusChanged({
       orderId: g.orderId,
       merchantId: g.merchantId,
       storeId: g.storeId,

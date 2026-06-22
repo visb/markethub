@@ -3,6 +3,7 @@ import { GeocodingModule } from "../geocoding/geocoding.module";
 import { StorageModule } from "../storage/storage.module";
 import { UsersModule } from "../users/users.module";
 import { MerchantContextController } from "./merchant-context.controller";
+import { MerchantOrdersController } from "./merchant-orders.controller";
 import { MerchantProductService } from "./merchant-product.service";
 import { MerchantStaffController } from "./merchant-staff.controller";
 import { MerchantStaffService } from "./merchant-staff.service";
@@ -11,7 +12,12 @@ import { MerchantService } from "./merchant.service";
 
 @Module({
   imports: [StorageModule, GeocodingModule, UsersModule],
-  controllers: [MerchantContextController, MerchantStaffController, MerchantController],
+  controllers: [
+    MerchantContextController,
+    MerchantStaffController,
+    MerchantOrdersController,
+    MerchantController,
+  ],
   providers: [MerchantService, MerchantProductService, MerchantStaffService],
   exports: [MerchantService],
 })

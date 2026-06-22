@@ -25,4 +25,8 @@ export const queryKeys = {
     stocks: (storeId: string | undefined) => ["catalog", "stocks", storeId ?? "all"] as const,
     stocksAll: ["catalog", "stocks"] as const,
   },
+  orders: {
+    all: ["orders"] as const,
+    list: (filters: { storeId?: string; status?: string } = {}) => ["orders", "list", filters] as const,
+  },
 } as const;

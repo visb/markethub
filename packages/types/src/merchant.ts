@@ -171,3 +171,37 @@ export type UpdateMerchantStaffInput = Partial<{
   active: boolean;
   staffRole: StaffRoleName;
 }>;
+
+// ── Pedidos em tempo real (story 12) ──
+
+/** Status de cumprimento de um OrderGroup (mesmas etapas do OrderStatus). */
+export const orderGroupStatusSchema = z.enum([
+  "created",
+  "paid",
+  "preparing",
+  "picking",
+  "ready_for_pickup",
+  "on_the_way",
+  "delivered",
+  "canceled",
+]);
+export type OrderGroupStatus = z.infer<typeof orderGroupStatusSchema>;
+
+/**
+ * Sub-pedido (OrderGroup) visto pelo app merchant (story 12). Card resumido p/
+ * o board por status: nº/loja/itens/total/horário/status/pickupCode. Sem itens
+ * linha a linha (detalhe é story futura).
+ */
+export const merchantOrderSchema = z.object({
+  id: z.string(),
+  orderId: z.string(),
+  storeId: z.string(),
+  storeName: z.string(),
+  status: orderGroupStatusSchema,
+  fulfillment: z.enum(["delivery", "pickup"]),
+  itemCount: z.number(),
+  totalCents: z.number(),
+  pickupCode: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type MerchantOrderDTO = z.infer<typeof merchantOrderSchema>;
