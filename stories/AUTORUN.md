@@ -15,7 +15,7 @@ a cada intervalo, independente do limite de sessão — disparo que cair no limi
 próximo (após o reset) retoma. Colar (ajustar a faixa de stories e a ordem):
 
 ```
-/loop 30m Modo autônomo. Siga C:\code\markethub\final2\stories\AUTORUN.md à risca, sem me perguntar nada. A cada disparo deste loop, releia stories/PROGRESS.md + git log e continue da próxima story NÃO commitada na ordem 01 → 02. Se a sessão tiver batido o limite, não faça nada e aguarde o próximo disparo (após o reset) — não tente rearmar nada. Implemente tudo que for autonomamente possível; ao terminar cada story, rode os testes automatizados (unit + e2e) e, com a suíte tocada TODA verde, faça merge --no-ff na main e siga para a próxima. O que depender de credencial/serviço externo que você não tem: implemente atrás de interface com mocks nos testes, marque BLOQUEADO em PROGRESS.md com o motivo, e siga — não invente chaves, não chame API real, não dê push. Quando todas estiverem commitadas ou BLOQUEADAS, escreva o resumo final em PROGRESS.md e encerre o loop.
+/loop 30m Modo autônomo. Siga C:\code\markethub\final2\stories\AUTORUN.md à risca, sem me perguntar nada. A cada disparo deste loop, releia stories/PROGRESS.md + git log e continue da próxima story NÃO commitada na ordem 14 → 15 → 16 → 17 → 18. Se a sessão tiver batido o limite, não faça nada e aguarde o próximo disparo (após o reset) — não tente rearmar nada. Implemente tudo que for autonomamente possível; ao terminar cada story, rode os testes automatizados (unit + e2e) e, com a suíte tocada TODA verde, faça merge --no-ff na main e siga para a próxima. O que depender de credencial/serviço externo que você não tem: implemente atrás de interface com mocks nos testes, marque BLOQUEADO em PROGRESS.md com o motivo, e siga — não invente chaves, não chame API real, não dê push. Quando todas estiverem commitadas ou BLOQUEADAS, escreva o resumo final em PROGRESS.md e encerre o loop.
 ```
 
 ---
@@ -43,22 +43,30 @@ próximo (após o reset) retoma. Colar (ajustar a faixa de stories e a ordem):
 
 | #   | Tipo / o que é | Implementar? |
 | --- | --- | --- |
-| 01 | Separação dirige o status do pedido + emit realtime (backend `picking`) | SIM |
-| 02 | Tela `/track/:id` em tempo real via socket (api-client + app customer) | SIM (depende 01) |
+| 14 | App merchant: cadastro de veículos de entrega (model `Vehicle` por rede) | SIM |
+| 15 | App entregador: seleciona veículo no login + indicador na home (≤2 cliques) | SIM (dep 14) |
+| 16 | App merchant: novo `StaffRole admin` (acima de gerente) + resolução de nível | SIM |
+| 17 | App merchant: gerente restrito à loja atribuída + sem integração | SIM (dep 16) |
+| 18 | App merchant: gerente cria só nível inferior (picker, driver) | SIM (dep 16) |
 
 ## Ordem e dependências
 
 ```
-01 → 02
+14 → 15                 (veículos: backend/CRUD merchant → seleção no driver)
+16 → 17, 18             (RBAC: admin/nível primeiro; gerente-escopo e gerente-cria dependem dele)
 ```
 
-Cadeia rígida: **02 consome o contrato de eventos que a 01 dirige** (status "Comprando" +
-snapshot pelo canal `order:`). Implementar 01 antes da 02. Se a 01 bloquear, a 02 também fica
-bloqueada — registrar e **parar a fila**, não pular.
+Executar na **ordem numérica 14 → 18** (satisfaz todas as dependências, que são todas para trás).
+
+Cadeias rígidas (B consome contrato/fundação de A → se A bloquear, B também bloqueia; **não pular** B):
+- **15** depende da **14** (entidade `Vehicle` + contrato de veículos da rede). Se 14 bloquear, 15 também.
+- **17** e **18** dependem da **16** (`StaffRole admin` + resolução de nível owner/admin/manager). Se 16 bloquear, ambas bloqueiam.
+- As duas cadeias (veículos 14→15 / RBAC 16→17→18) são **independentes** entre si: se uma bloquear, seguir a outra.
 
 - Declarar dependências rígidas. Se houver (story B consome contrato de A), a fila é **sequencial**:
-  se A bloquear, B também fica bloqueada — registrar e **parar a fila**, não pular.
-- Sem dependência rígida, pode reordenar por conveniência (ex: do mais isolado ao mais acoplado).
+  se A bloquear, B também fica bloqueada — registrar e **parar a fila** dessa cadeia, não pular.
+- Sem dependência rígida (cadeias picker / explore / merchant são independentes entre si), pode
+  seguir a próxima cadeia se uma bloquear.
 
 ## Branches — uma por story, mergeada na main ao fechar
 
@@ -89,20 +97,33 @@ o código por falta de credencial.
 
 ## Cuidados específicos da rodada
 
-- **Sem migration nesta rodada.** A story 01 usa enums/colunas existentes (`OrderStatus`,
-  `OrderGroup.status`) — **sem mudança de schema**. Se algo exigir migration, criar **nova** (nunca
-  editar aplicada) e rodar `prisma:migrate` antes do e2e.
-- **Contratos compartilhados**: a 02 mexe em `packages/api-client` (socket real) e reusa nomes de
-  evento de `packages/types` (`picking-events`). Rodar `pnpm --filter @markethub/types build` +
-  `pnpm --filter @markethub/api-client build` **antes** de typecheck/test do app customer (sem o
-  `dist/` os consumidores quebram).
-- **Realtime**: a 01 emite `order.updated` no canal `order:<orderId>` (gateway `/picking`); a 02
-  consome esse snapshot. Não duplicar nomes de evento soltos — reusar os contratos de `types`.
-- **Sem credencial — MOCK, não bloquear** (regra geral acima): push real FCM/APNs segue stub;
-  socket testado com `socket.io-client` mockado (sem rede).
+- **Migrations (3 stories mexem em schema — criar nova migration, nunca editar aplicada; rodar
+  `prisma:generate` antes do typecheck e `prisma:migrate` antes do e2e):**
+  - **14**: novo model `Vehicle` (por rede / `merchantId`) + enum novo `VehicleType`
+    (`motorcycle | car | van`).
+  - **15**: vínculo do veículo ativo ao entregador (campo `activeVehicleId` / relação opcional
+    com `Vehicle`, ou tabela `DriverVehicle` se optar por histórico — ver a story).
+  - **16**: adicionar `admin` ao enum `StaffRole`. TS `strict` vai apontar os `switch`/checagens
+    exaustivos de `StaffRole` que faltarem tratar — corrigir todos.
+- **Contratos compartilhados**: stories que tocam `packages/types` / `packages/api-client`
+  (tipo `Vehicle` e veículos da rede na 14; veículo do entregador na 15; nível
+  owner/admin/manager do `merchant-context` na 16) → rodar
+  `pnpm --filter @markethub/types build && pnpm --filter @markethub/api-client build` **antes** de
+  typecheck/test dos apps consumidores (sem o `dist/` eles quebram). Rebuildar quando o contrato mudar.
+- **App entregador (`apps/driver`) ainda usa fetch legado** (`useState`/`useEffect`, sem
+  `queryKeys.ts` nem `src/api/`): a story **15** introduz a infra React Query (queryKeys, `src/api/`,
+  `QueryClientProvider` no `_layout.tsx`) **só** para a feature de veículo. Não migrar a lista de
+  entregas legada da home (fora de escopo) — só o que a feature toca segue o padrão obrigatório.
+- **RBAC é o coração de 16/17/18 — backend é a fonte da verdade**: escopo de loja e hierarquia de
+  papéis impostos no service (`merchant-staff.service`, `merchant-context`, services de
+  orders/catalog/reports), nunca confiando em `storeId`/`merchantId` vindos do cliente. A UI só
+  espelha (esconder nav/ações) por UX. Erros no shape `{ code, message }`
+  (`ROLE_ESCALATION_FORBIDDEN`, `STORE_OUT_OF_SCOPE`, etc.). Hierarquia final:
+  owner → tudo; admin → manager|picker|driver no escopo dele; manager → picker|driver só.
+  Integração: owner + admin acessam; manager bloqueado (já é owner-only — incluir admin).
 - **Padrões CLAUDE.md são gate**: telas não fazem fetch, React Query + query keys em
-  `queryKeys.ts`, controller fino / regra no service. Código legado migrado ao ser tocado
-  (a 02 troca o `setInterval`/`useState` por hook).
+  `queryKeys.ts`, controller fino / regra no service, RBAC (`@Roles`, `merchant`/`StaffRole`).
+  Código legado migrado ao ser tocado.
 
 ## Bootstrap de serviços (uma vez, no início, em background)
 
@@ -112,29 +133,29 @@ o código por falta de credencial.
    typecheck do backend.
 4. `pnpm --filter @markethub/types build && pnpm --filter @markethub/api-client build` —
    **obrigatório** antes de typecheck/test dos apps quando a story tocar `packages/types` ou
-   `packages/api-client` (story 02). Rebuildar sempre que o contrato mudar.
+   `packages/api-client` (stories 14, 15, 16). Rebuildar sempre que o contrato mudar.
 5. **API** (background, só se o e2e exigir): `pnpm dev:api` → http://localhost:3000. Esperar o
    healthcheck antes de testar. O e2e do backend (`test:e2e`, jest-e2e) usa o Postgres do `infra`.
-6. **App web** (background, só p/ e2e Playwright web): `pnpm dev:customer` (Expo web) /
-   `pnpm dev:admin` (Vite, porta 3001), conforme a story. Esperar responder.
+6. **App web** (background, só p/ e2e Playwright web, se a story exigir UI ao vivo): merchant
+   (Vite) / driver (Expo web), conforme a story. Esperar responder.
 
 ## Por cada story (dentro do sub-agente)
 
 a. Ler `stories/NN-*.md` **inteiro**. Implementar exatamente o descrito.
 b. Se tocou `packages/types` / `packages/api-client`, rodar os builds correspondentes (passo 4).
-c. Se criou migration, aplicá-la (`prisma:migrate`) antes do e2e. (Nesta rodada: nenhuma.)
+c. Se criou migration, aplicá-la (`prisma:migrate`) antes do e2e. (Nesta rodada: 14, 15 e 16
+   mexem em schema — ver "Cuidados específicos da rodada".)
 d. Se adicionou dependência npm, instalar com `pnpm --filter <workspace> add <pkg>` conferindo
-   compat (a 02 adiciona `socket.io-client` ao `@markethub/api-client`).
+   compat (ex: a 15 pode precisar de `@tanstack/react-query` no `apps/driver` se ainda não houver).
 e. Atualizar/adicionar os testes da seção **Validação** da story (sem `skip`/`only`/`xfail` sem
    justificativa no código — dependência externa SEM credencial é justificativa válida; mockar).
-f. Rodar os testes **automatizados** da story (serviços já no ar):
-   - Backend (story 01): `pnpm --filter @markethub/api test` **e**
-     `pnpm --filter @markethub/api test:e2e`. Gate de cobertura:
-     `pnpm --filter @markethub/api test:coverage`.
-   - api-client (story 02): `pnpm --filter @markethub/api-client test`.
-   - customer (story 02): `pnpm --filter @markethub/customer test` (gate:
-     `pnpm --filter @markethub/customer test:coverage`).
-   - admin (se tocado): `pnpm --filter @markethub/admin test` (gate: `test:coverage`).
+f. Rodar os testes **automatizados** da story (serviços já no ar) — só os workspaces tocados:
+   - Backend (14, 15, 16, 17, 18 — todas tocam `services/api`): `pnpm --filter @markethub/api test`
+     **e** `pnpm --filter @markethub/api test:e2e`. Gate: `pnpm --filter @markethub/api test:coverage`.
+   - api-client / types (14, 15, 16 — tocam contratos): `pnpm --filter @markethub/api-client test`
+     (após rebuildar types + api-client).
+   - merchant (14, 16, 17, 18): `pnpm --filter @markethub/merchant test` (gate: `test:coverage`).
+   - driver (15): `pnpm --filter @markethub/driver test` (gate: `test:coverage`).
    - e2e web (se a story exigir UI ao vivo): `pnpm test:e2e` (Playwright na raiz).
 g. Corrigir até a suíte tocada passar **inteira** (casos novos + sem regressão). Antes de
    "pronto": `pnpm typecheck` + `pnpm build` (CLAUDE.md). Suíte verde é pré-requisito do merge (DoD).
