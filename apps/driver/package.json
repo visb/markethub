@@ -28,6 +28,7 @@
     "@babel/runtime": "^7.26.0",
     "@markethub/api-client": "workspace:*",
     "@markethub/ui": "workspace:*",
+    "@tanstack/react-query": "^5.101.0",
     "expo": "~52.0.0",
     "expo-constants": "~17.0.0",
     "expo-linking": "~7.0.0",
