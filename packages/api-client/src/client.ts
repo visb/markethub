@@ -20,6 +20,11 @@ import type {
   CreateMerchantStaffInput,
   UpdateMerchantStaffInput,
   MerchantOrderDTO,
+  MerchantReportQuery,
+  SalesReportDTO,
+  OperationsReportDTO,
+  TopProductsReportDTO,
+  ReviewsReportDTO,
   PickTaskDTO,
   RefreshInput,
   RegisterInput,
@@ -341,6 +346,38 @@ export class ApiClient {
     if (params.status) q.set("status", params.status);
     const qs = q.toString();
     return this.request(`/merchant/orders${qs ? `?${qs}` : ""}`, { auth: true });
+  }
+
+  // ─── Merchant / relatórios (story 13) ───────────
+
+  private reportQuery(params: MerchantReportQuery & { limit?: number }): string {
+    const q = new URLSearchParams();
+    if (params.from) q.set("from", params.from);
+    if (params.to) q.set("to", params.to);
+    if (params.storeId) q.set("storeId", params.storeId);
+    if (params.limit !== undefined) q.set("limit", String(params.limit));
+    const qs = q.toString();
+    return qs ? `?${qs}` : "";
+  }
+
+  /** Vendas/faturamento do período, escopado às lojas do usuário. */
+  merchantSalesReport(params: MerchantReportQuery = {}): Promise<SalesReportDTO> {
+    return this.request(`/merchant/reports/sales${this.reportQuery(params)}`, { auth: true });
+  }
+
+  /** Operacional: pedidos/separação/entrega por status no período. */
+  merchantOperationsReport(params: MerchantReportQuery = {}): Promise<OperationsReportDTO> {
+    return this.request(`/merchant/reports/operations${this.reportQuery(params)}`, { auth: true });
+  }
+
+  /** Top produtos por quantidade/receita no período. */
+  merchantTopProductsReport(params: MerchantReportQuery & { limit?: number } = {}): Promise<TopProductsReportDTO> {
+    return this.request(`/merchant/reports/top-products${this.reportQuery(params)}`, { auth: true });
+  }
+
+  /** Avaliações agregadas por eixo no período. */
+  merchantReviewsReport(params: MerchantReportQuery = {}): Promise<ReviewsReportDTO> {
+    return this.request(`/merchant/reports/reviews${this.reportQuery(params)}`, { auth: true });
   }
 
   merchantUploadUrl(filename: string, contentType: string): Promise<PresignedUpload> {

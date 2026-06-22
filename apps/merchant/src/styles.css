@@ -333,3 +333,55 @@ body {
 .input-sm {
   width: 90px;
 }
+
+/* ── Relatórios (story 13) ── */
+.report-section {
+  margin-bottom: 28px;
+}
+.report-section h2 {
+  font-size: 16px;
+  margin: 0 0 12px;
+}
+.report-section h3 {
+  font-size: 13px;
+  color: #475569;
+  margin: 0 0 6px;
+}
+.cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 140px;
+  padding: 12px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+}
+.card-label {
+  font-size: 12px;
+  color: #64748b;
+}
+.card strong {
+  font-size: 18px;
+}
+.report-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: flex-start;
+}
+.table {
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.table th,
+.table td {
+  text-align: left;
+  padding: 4px 12px 4px 0;
+  border-bottom: 1px solid #f1f5f9;
+}

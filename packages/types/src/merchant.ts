@@ -205,3 +205,72 @@ export const merchantOrderSchema = z.object({
   createdAt: z.string(),
 });
 export type MerchantOrderDTO = z.infer<typeof merchantOrderSchema>;
+
+// ── Relatórios (story 13) ──
+
+/** Filtro comum dos relatórios: período (ISO) + loja (uma do escopo ou todas). */
+export interface MerchantReportQuery {
+  from?: string;
+  to?: string;
+  storeId?: string;
+}
+
+/** Janela efetiva aplicada pelo backend (devolvida p/ exibir no front). */
+export const reportPeriodSchema = z.object({
+  from: z.string(),
+  to: z.string(),
+});
+export type ReportPeriodDTO = z.infer<typeof reportPeriodSchema>;
+
+/**
+ * Vendas/faturamento do período, escopado às lojas do usuário. salesCents é a
+ * receita dos pedidos pagos; ticketCents = média por pedido pago; payout estimado
+ * = vendas − taxa plataforma − reembolsos.
+ */
+export const salesReportSchema = z.object({
+  period: reportPeriodSchema,
+  ordersPaid: z.number(),
+  salesCents: z.number(),
+  platformFeeCents: z.number(),
+  refundsCents: z.number(),
+  ticketCents: z.number(),
+  estimatedPayoutCents: z.number(),
+});
+export type SalesReportDTO = z.infer<typeof salesReportSchema>;
+
+/** Operacional: pedidos por status + separação/entrega por status (escopo). */
+export const operationsReportSchema = z.object({
+  period: reportPeriodSchema,
+  ordersByStatus: z.record(z.number()),
+  picking: z.record(z.number()),
+  deliveries: z.record(z.number()),
+  pendingPickups: z.number(),
+});
+export type OperationsReportDTO = z.infer<typeof operationsReportSchema>;
+
+/** Linha do ranking de produtos mais vendidos (quantidade + receita). */
+export const topProductSchema = z.object({
+  productId: z.string().nullable(),
+  name: z.string(),
+  quantity: z.number(),
+  revenueCents: z.number(),
+});
+export type TopProductDTO = z.infer<typeof topProductSchema>;
+
+export const topProductsReportSchema = z.object({
+  period: reportPeriodSchema,
+  items: z.array(topProductSchema),
+});
+export type TopProductsReportDTO = z.infer<typeof topProductsReportSchema>;
+
+/** Avaliações agregadas por eixo (platform/delivery/merchant) no período. */
+export const reviewsReportAxisSchema = z.object({
+  axis: z.enum(["platform", "delivery", "merchant"]),
+  average: z.number(),
+  count: z.number(),
+});
+export const reviewsReportSchema = z.object({
+  period: reportPeriodSchema,
+  axes: z.array(reviewsReportAxisSchema),
+});
+export type ReviewsReportDTO = z.infer<typeof reviewsReportSchema>;

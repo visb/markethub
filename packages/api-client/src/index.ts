@@ -40,4 +40,11 @@ export type {
   UpdateMerchantStaffInput,
   OrderGroupStatus,
   MerchantOrderDTO,
+  MerchantReportQuery,
+  ReportPeriodDTO,
+  SalesReportDTO,
+  OperationsReportDTO,
+  TopProductDTO,
+  TopProductsReportDTO,
+  ReviewsReportDTO,
 } from "@markethub/types";

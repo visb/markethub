@@ -29,4 +29,15 @@ export const queryKeys = {
     all: ["orders"] as const,
     list: (filters: { storeId?: string; status?: string } = {}) => ["orders", "list", filters] as const,
   },
+  reports: {
+    all: ["reports"] as const,
+    sales: (filters: { from?: string; to?: string; storeId?: string } = {}) =>
+      ["reports", "sales", filters] as const,
+    operations: (filters: { from?: string; to?: string; storeId?: string } = {}) =>
+      ["reports", "operations", filters] as const,
+    topProducts: (filters: { from?: string; to?: string; storeId?: string } = {}) =>
+      ["reports", "top-products", filters] as const,
+    reviews: (filters: { from?: string; to?: string; storeId?: string } = {}) =>
+      ["reports", "reviews", filters] as const,
+  },
 } as const;
