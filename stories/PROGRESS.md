@@ -1,3 +1,22 @@
+# PROGRESS — rodada AUTORUN (stories 14 → 18)
+
+Rodada: veículos (14–15) + RBAC merchant (16–18).
+Ordem numérica 14 → 18 (satisfaz todas as deps — ver AUTORUN.md "Ordem e dependências").
+Fonte de verdade p/ retomar: **git log + este arquivo**. Story com `feat(story-NN)` = feita; pular.
+
+| #  | Título | Dep | Status |
+|----|--------|-----|--------|
+| 14 | App merchant: cadastro de veículos de entrega (model `Vehicle` por rede) | — | OK |
+| 15 | App entregador: seleciona veículo no login + indicador na home | 14 | — |
+| 16 | App merchant: novo `StaffRole admin` + resolução de nível | — | — |
+| 17 | App merchant: gerente restrito à loja atribuída + sem integração | 16 | — |
+| 18 | App merchant: gerente cria só nível inferior (picker, driver) | 16 | — |
+
+## Log
+
+<!-- [OK|PARCIAL|BLOQUEADO] NN — testes: <resumo> — commit: <hash> — merge: <hash> — <data> — <bloqueio> -->
+[OK] 14 — testes: api unit 307/307 (+19: merchant-vehicles.service.spec resolve merchantId do contexto/escopo/placa inválida/ambígua, PATCH parcial/soft toggle, hard delete VEHICLE_IN_USE vs sem entregas, VEHICLE_NOT_FOUND; serviço 94% stmts) coverage gate exit=0; api e2e 85/85 (+7: cadastro placa normalizada/INVALID_PLATE/lista escopo da rede/PATCH+soft toggle/VEHICLE_IN_USE/hard delete/401); merchant 159/159 (+17: useVehicles hooks invalidam queryKeys.vehicles, VehicleForm rhf+zod placa/tipo, Vehicles lista/criar/editar/toggle/excluir) coverage gate verde; typecheck+build verdes — commit: 37e08b4 — merge: c6c0838 — 2026-06-22 — Vehicle pertence à rede (merchantId resolvido pelo backend, nunca do body); Delivery.vehicleId adicionado p/ histórico/guard VEHICLE_IN_USE (consumido pela story 15)
+
 # PROGRESS — rodada AUTORUN (stories 01 → 13)
 
 Rodada: picker (01–03) + explore mapa (04–06) + app merchant (07–13).
