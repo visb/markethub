@@ -42,7 +42,9 @@ function makeService(taskStatus: string) {
     },
     orderGroup: {
       update: groupUpdate,
-      findUnique: jest.fn().mockResolvedValue({ orderId: "o1", order: { userId: "owner1" } }),
+      findUnique: jest
+        .fn()
+        .mockResolvedValue({ orderId: "o1", merchantId: "m1", storeId: "s1", order: { userId: "owner1" } }),
     },
     delivery: { upsert: jest.fn() },
     $transaction,
@@ -52,8 +54,10 @@ function makeService(taskStatus: string) {
   const push = { sendToUser: jest.fn().mockResolvedValue(undefined) } as never;
   const emit = jest.fn().mockResolvedValue(undefined);
   const integration = { emit } as never;
-  const svc = new HandoffService(prisma, events, tracking, push, integration);
-  return { svc, $transaction, recomputeAndEmit, events, emit };
+  const statusChanged = jest.fn();
+  const orderEvents = { statusChanged, created: jest.fn() } as never;
+  const svc = new HandoffService(prisma, events, tracking, push, integration, orderEvents);
+  return { svc, $transaction, recomputeAndEmit, events, emit, statusChanged };
 }
 
 describe("HandoffService.markReady — regressão story 01", () => {
@@ -66,6 +70,18 @@ describe("HandoffService.markReady — regressão story 01", () => {
     expect(recomputeAndEmit).toHaveBeenCalledWith("g1");
     expect((events as { readyForPickup: jest.Mock }).readyForPickup).toHaveBeenCalled();
     expect(dto.status).toBe("ready_for_pickup");
+  });
+
+  // Story 12: a transição do OrderGroup emite order.status_changed à store room.
+  it("markReady emite order.status_changed (story 12) à store room do grupo", async () => {
+    const { svc, statusChanged } = makeService("packed");
+    await svc.markReady("u1", "t1");
+    expect(statusChanged).toHaveBeenCalledWith({
+      orderId: "o1",
+      merchantId: "m1",
+      storeId: "s1",
+      status: "ready_for_pickup",
+    });
   });
 
   it("idempotente: já ready_for_pickup não re-transiciona", async () => {

@@ -38,4 +38,6 @@ export type {
   MerchantStaffDTO,
   CreateMerchantStaffInput,
   UpdateMerchantStaffInput,
+  OrderGroupStatus,
+  MerchantOrderDTO,
 } from "@markethub/types";

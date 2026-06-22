@@ -434,3 +434,105 @@ describe("Merchant staff (e2e)", () => {
     await request(app.getHttpServer()).get(url("/merchant/staff")).expect(401);
   });
 });
+
+/**
+ * Story 12: GET /merchant/orders escopado às lojas do usuário. owner vê as lojas
+ * da rede; manager só os vínculos; loja fora do escopo / não autenticado negados.
+ */
+describe("Merchant orders (e2e)", () => {
+  let app: INestApplication;
+  const url = (p: string) => `/${API_PREFIX}${p}`;
+
+  beforeAll(async () => {
+    app = await createTestApp();
+    await resetDatabase(getPrisma(app));
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  async function seedGroup(storeId: string, merchantId: string, status: string) {
+    const prisma = getPrisma(app);
+    const customer = await prisma.user.create({
+      data: { name: "Cli", email: `cli-${Date.now()}-${Math.random()}@t.dev`, passwordHash: "x" },
+    });
+    const order = await prisma.order.create({ data: { userId: customer.id } });
+    return prisma.orderGroup.create({
+      data: {
+        orderId: order.id,
+        merchantId,
+        storeId,
+        status: status as never,
+        subtotalCents: 1000,
+        deliveryCents: 500,
+        items: { create: [{ nameSnapshot: "X", unitPriceCents: 1000, quantity: 1, lineTotalCents: 1000 }] },
+      },
+    });
+  }
+
+  async function makeOwner() {
+    const prisma = getPrisma(app);
+    const seeded = await seedOffer(prisma);
+    const owner = await registerUser(app, { roles: ["merchant"] });
+    const ownerRow = await prisma.user.findFirstOrThrow({ where: { email: owner.email } });
+    await prisma.storeStaff.create({
+      data: { userId: ownerRow.id, storeId: seeded.storeId, staffRole: "manager", active: true },
+    });
+    return { owner, seeded };
+  }
+
+  it("owner vê os sub-pedidos da loja da rede com totais/itens/horário", async () => {
+    const { owner, seeded } = await makeOwner();
+    await seedGroup(seeded.storeId, seeded.merchantId, "preparing");
+
+    const res = await request(app.getHttpServer())
+      .get(url("/merchant/orders"))
+      .set(authHeader(owner))
+      .expect(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    const card = res.body.find((o: { storeId: string }) => o.storeId === seeded.storeId);
+    expect(card).toMatchObject({
+      storeId: seeded.storeId,
+      status: "preparing",
+      itemCount: 1,
+      totalCents: 1500,
+    });
+    expect(card).toHaveProperty("createdAt");
+    expect(card).toHaveProperty("orderId");
+  });
+
+  it("filtra por status", async () => {
+    const { owner, seeded } = await makeOwner();
+    await seedGroup(seeded.storeId, seeded.merchantId, "preparing");
+    await seedGroup(seeded.storeId, seeded.merchantId, "delivered");
+
+    const res = await request(app.getHttpServer())
+      .get(url("/merchant/orders?status=delivered"))
+      .set(authHeader(owner))
+      .expect(200);
+    const scoped = res.body.filter((o: { storeId: string }) => o.storeId === seeded.storeId);
+    expect(scoped.length).toBeGreaterThan(0);
+    expect(scoped.every((o: { status: string }) => o.status === "delivered")).toBe(true);
+  });
+
+  it("manager: loja fora do escopo → 403 STORE_NOT_IN_SCOPE", async () => {
+    const prisma = getPrisma(app);
+    const own = await makeOwner();
+    const other = await seedOffer(prisma);
+    const manager = await registerUser(app);
+    const mgrRow = await prisma.user.findFirstOrThrow({ where: { email: manager.email } });
+    await prisma.storeStaff.create({
+      data: { userId: mgrRow.id, storeId: own.seeded.storeId, staffRole: "manager", active: true },
+    });
+    const res = await request(app.getHttpServer())
+      .get(url(`/merchant/orders?storeId=${other.storeId}`))
+      .set(authHeader(manager))
+      .expect(403);
+    expect(res.body.code).toBe("STORE_NOT_IN_SCOPE");
+  });
+
+  it("nega não autenticado (401)", async () => {
+    await request(app.getHttpServer()).get(url("/merchant/orders")).expect(401);
+  });
+});

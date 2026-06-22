@@ -4,7 +4,13 @@
  * Usado pelo rastreio de pedido em tempo real (S5.1 / story 02).
  */
 import { io, type Socket } from "socket.io-client";
-import { PICKING_NAMESPACE, ORDER_UPDATED_EVENT, PICK_TASK_UPDATED_EVENT } from "@markethub/types";
+import {
+  PICKING_NAMESPACE,
+  ORDER_UPDATED_EVENT,
+  PICK_TASK_UPDATED_EVENT,
+  ORDER_CREATED_EVENT,
+  ORDER_STATUS_CHANGED_EVENT,
+} from "@markethub/types";
 
 export interface RealtimeClient {
   connect(): void;
@@ -78,4 +84,9 @@ export function createRealtimeClient(opts: RealtimeOptions): RealtimeClient {
 }
 
 /** Reexporta os nomes de evento para os consumidores não duplicarem o literal. */
-export { ORDER_UPDATED_EVENT, PICK_TASK_UPDATED_EVENT };
+export {
+  ORDER_UPDATED_EVENT,
+  PICK_TASK_UPDATED_EVENT,
+  ORDER_CREATED_EVENT,
+  ORDER_STATUS_CHANGED_EVENT,
+};

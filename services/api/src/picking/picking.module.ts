@@ -3,6 +3,7 @@ import { JwtModule } from "@nestjs/jwt";
 import { IntegrationModule } from "../integration/integration.module";
 import { RefundModule } from "../payment/refund.module";
 import { HandoffService } from "./handoff.service";
+import { OrderEvents } from "./order.events";
 import { OrderTrackingService } from "./order-tracking.service";
 import { PickingController } from "./picking.controller";
 import { PickingEvents } from "./picking.events";
@@ -24,8 +25,9 @@ import { SubstitutionService } from "./substitution.service";
     HandoffService,
     PickingGateway,
     PickingEvents,
+    OrderEvents,
     OrderTrackingService,
   ],
-  exports: [PickingService, HandoffService, OrderTrackingService, PickingEvents],
+  exports: [PickingService, HandoffService, OrderTrackingService, PickingEvents, OrderEvents],
 })
 export class PickingModule {}

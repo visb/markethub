@@ -19,6 +19,7 @@ import type {
   MerchantStaffDTO,
   CreateMerchantStaffInput,
   UpdateMerchantStaffInput,
+  MerchantOrderDTO,
   PickTaskDTO,
   RefreshInput,
   RegisterInput,
@@ -329,6 +330,17 @@ export class ApiClient {
 
   merchantUnlockStock(id: string, field: string): Promise<unknown> {
     return this.request(`/merchant/stocks/${id}/locks/${field}`, { method: "DELETE", auth: true });
+  }
+
+  // ─── Merchant / pedidos em tempo real (story 12) ───────────
+
+  /** Snapshot dos sub-pedidos (OrderGroup) das lojas no escopo do usuário. */
+  merchantOrders(params: { storeId?: string; status?: string } = {}): Promise<MerchantOrderDTO[]> {
+    const q = new URLSearchParams();
+    if (params.storeId) q.set("storeId", params.storeId);
+    if (params.status) q.set("status", params.status);
+    const qs = q.toString();
+    return this.request(`/merchant/orders${qs ? `?${qs}` : ""}`, { auth: true });
   }
 
   merchantUploadUrl(filename: string, contentType: string): Promise<PresignedUpload> {

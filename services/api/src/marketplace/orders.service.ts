@@ -5,6 +5,7 @@ import { shortCode } from "../common/codes";
 import { ErpService } from "../erp/erp.service";
 import { IntegrationService } from "../integration/integration.service";
 import { RefundService } from "../payment/refund.service";
+import { OrderEvents } from "../picking/order.events";
 import { OrderTrackingService } from "../picking/order-tracking.service";
 import { PickingService } from "../picking/picking.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -33,6 +34,7 @@ export class OrdersService {
     private readonly scheduling: SchedulingService,
     private readonly refund: RefundService,
     private readonly integration: IntegrationService,
+    private readonly orderEvents: OrderEvents,
   ) {}
 
   /** Snapshot de rastreio do pedido por etapas (S5.1). Só o dono acessa. */
@@ -140,9 +142,16 @@ export class OrdersService {
 
     await this.cart.clear(userId);
 
-    // Webhook order.created por merchant da rede que recebeu grupo (story 09).
+    // Webhook order.created (story 09) + socket à store room (story 12), por
+    // merchant da rede que recebeu grupo.
     for (const g of view.groups) {
       void this.integration.emit(g.merchantId, "order.created", {
+        orderId: order.id,
+        merchantId: g.merchantId,
+        storeId: g.storeId,
+        status: "created",
+      });
+      this.orderEvents.created({
         orderId: order.id,
         merchantId: g.merchantId,
         storeId: g.storeId,
@@ -226,9 +235,15 @@ export class OrdersService {
     await this.picking.generateForOrder(orderId);
     // rastreio em tempo real (S5.1): pago → preparando
     await this.tracking.emit(orderId);
-    // webhook order.status_changed → preparing (story 09)
+    // webhook order.status_changed → preparing (story 09) + socket (story 12)
     for (const g of order.groups) {
       void this.integration.emit(g.merchantId, "order.status_changed", {
+        orderId,
+        merchantId: g.merchantId,
+        storeId: g.storeId,
+        status: "preparing",
+      });
+      this.orderEvents.statusChanged({
         orderId,
         merchantId: g.merchantId,
         storeId: g.storeId,
@@ -277,9 +292,15 @@ export class OrdersService {
     await this.refund.issueCancelRefund(id);
     // rastreio em tempo real
     await this.tracking.emit(id);
-    // webhook order.status_changed → canceled (story 09)
+    // webhook order.status_changed → canceled (story 09) + socket (story 12)
     for (const g of order.groups) {
       void this.integration.emit(g.merchantId, "order.status_changed", {
+        orderId: id,
+        merchantId: g.merchantId,
+        storeId: g.storeId,
+        status: "canceled",
+      });
+      this.orderEvents.statusChanged({
         orderId: id,
         merchantId: g.merchantId,
         storeId: g.storeId,
