@@ -7,6 +7,7 @@ import { Layout } from "@/components/Layout";
 import { Login } from "@/pages/Login";
 import { Stores } from "@/pages/Stores";
 import { Integration } from "@/pages/Integration";
+import { Staff } from "@/pages/Staff";
 import { Placeholder } from "@/pages/Placeholder";
 
 const queryClient = new QueryClient({
@@ -28,7 +29,7 @@ export function App() {
                   <Route path="integration" element={<Integration />} />
                 </Route>
                 <Route element={<RequireCapability capability="staff.manage" />}>
-                  <Route path="staff" element={<Placeholder title="Colaboradores" story="story 10" />} />
+                  <Route path="staff" element={<Staff />} />
                 </Route>
                 <Route element={<RequireCapability capability="catalog.manage" />}>
                   <Route path="catalog" element={<Placeholder title="Catálogo" story="story 11" />} />

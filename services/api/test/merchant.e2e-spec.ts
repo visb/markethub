@@ -180,3 +180,257 @@ describe("Merchant stores CRUD (e2e)", () => {
       .expect(401);
   });
 });
+
+/**
+ * Story 10: colaboradores (StoreStaff). owner gere qualquer papel em qualquer loja
+ * da rede; manager gere picker/driver só nas lojas dele e não cria manager. Remoção
+ * = desativa (owner pode deletar de fato).
+ */
+describe("Merchant staff (e2e)", () => {
+  let app: INestApplication;
+  const url = (p: string) => `/${API_PREFIX}${p}`;
+  let emailSeq = 0;
+  const uniqEmail = () => `staff-${Date.now()}-${emailSeq++}@test.dev`;
+
+  beforeAll(async () => {
+    app = await createTestApp();
+    await resetDatabase(getPrisma(app));
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  async function makeOwner() {
+    const prisma = getPrisma(app);
+    const seeded = await seedOffer(prisma);
+    const owner = await registerUser(app, { roles: ["merchant"] });
+    const ownerRow = await prisma.user.findFirstOrThrow({ where: { email: owner.email } });
+    await prisma.storeStaff.create({
+      data: { userId: ownerRow.id, storeId: seeded.storeId, staffRole: "manager", active: true },
+    });
+    return { owner, seeded };
+  }
+
+  async function makeManager(storeId: string) {
+    const prisma = getPrisma(app);
+    const manager = await registerUser(app); // customer + StoreStaff manager
+    const mgrRow = await prisma.user.findFirstOrThrow({ where: { email: manager.email } });
+    await prisma.storeStaff.create({
+      data: { userId: mgrRow.id, storeId, staffRole: "manager", active: true },
+    });
+    return manager;
+  }
+
+  it("owner cria picker e o vínculo + role ficam corretos", async () => {
+    const { owner, seeded } = await makeOwner();
+    const prisma = getPrisma(app);
+    const res = await request(app.getHttpServer())
+      .post(url("/merchant/staff"))
+      .set(authHeader(owner))
+      .send({
+        name: "Picker 1",
+        email: uniqEmail(),
+        password: "secret1",
+        staffRole: "picker",
+        storeId: seeded.storeId,
+      })
+      .expect(201);
+    const created = await prisma.user.findUniqueOrThrow({
+      where: { id: res.body.id },
+      include: { roles: { include: { role: true } }, staffOf: true },
+    });
+    expect(created.roles.map((r) => r.role.name)).toContain("picker");
+    expect(created.staffOf[0]).toMatchObject({ storeId: seeded.storeId, staffRole: "picker" });
+  });
+
+  it("owner cria manager", async () => {
+    const { owner, seeded } = await makeOwner();
+    await request(app.getHttpServer())
+      .post(url("/merchant/staff"))
+      .set(authHeader(owner))
+      .send({
+        name: "Gerente",
+        email: uniqEmail(),
+        password: "secret1",
+        staffRole: "manager",
+        storeId: seeded.storeId,
+      })
+      .expect(201);
+  });
+
+  it("manager cria picker na sua loja, mas criar manager → 403 CANNOT_MANAGE_MANAGER", async () => {
+    const { seeded } = await makeOwner();
+    const manager = await makeManager(seeded.storeId);
+
+    await request(app.getHttpServer())
+      .post(url("/merchant/staff"))
+      .set(authHeader(manager))
+      .send({
+        name: "Picker M",
+        email: uniqEmail(),
+        password: "secret1",
+        staffRole: "picker",
+        storeId: seeded.storeId,
+      })
+      .expect(201);
+
+    const res = await request(app.getHttpServer())
+      .post(url("/merchant/staff"))
+      .set(authHeader(manager))
+      .send({
+        name: "Outro gerente",
+        email: uniqEmail(),
+        password: "secret1",
+        staffRole: "manager",
+        storeId: seeded.storeId,
+      })
+      .expect(403);
+    expect(res.body.code).toBe("CANNOT_MANAGE_MANAGER");
+  });
+
+  it("manager criar em loja fora do escopo → 403 STORE_NOT_IN_SCOPE", async () => {
+    const prisma = getPrisma(app);
+    const own = await makeOwner();
+    const other = await seedOffer(prisma);
+    const manager = await makeManager(own.seeded.storeId);
+    const res = await request(app.getHttpServer())
+      .post(url("/merchant/staff"))
+      .set(authHeader(manager))
+      .send({
+        name: "X",
+        email: uniqEmail(),
+        password: "secret1",
+        staffRole: "picker",
+        storeId: other.storeId,
+      })
+      .expect(403);
+    expect(res.body.code).toBe("STORE_NOT_IN_SCOPE");
+  });
+
+  it("email duplicado → 409 EMAIL_TAKEN", async () => {
+    const { owner, seeded } = await makeOwner();
+    const email = uniqEmail();
+    const body = (e: string) => ({
+      name: "Dup",
+      email: e,
+      password: "secret1",
+      staffRole: "picker" as const,
+      storeId: seeded.storeId,
+    });
+    await request(app.getHttpServer())
+      .post(url("/merchant/staff"))
+      .set(authHeader(owner))
+      .send(body(email))
+      .expect(201);
+    const res = await request(app.getHttpServer())
+      .post(url("/merchant/staff"))
+      .set(authHeader(owner))
+      .send(body(email))
+      .expect(409);
+    expect(res.body.code).toBe("EMAIL_TAKEN");
+  });
+
+  it("lista respeita o escopo (manager não vê colaborador de loja alheia)", async () => {
+    const prisma = getPrisma(app);
+    const own = await makeOwner();
+    const other = await seedOffer(prisma);
+    const manager = await makeManager(own.seeded.storeId);
+
+    // picker na loja do manager
+    await request(app.getHttpServer())
+      .post(url("/merchant/staff"))
+      .set(authHeader(manager))
+      .send({
+        name: "Meu picker",
+        email: uniqEmail(),
+        password: "secret1",
+        staffRole: "picker",
+        storeId: own.seeded.storeId,
+      })
+      .expect(201);
+    // picker na loja alheia (criado pelo owner que não gere essa, mas seed direto)
+    const alienEmail = uniqEmail();
+    await prisma.user.create({
+      data: {
+        name: "Alheio",
+        email: alienEmail,
+        passwordHash: "x",
+        staffOf: { create: [{ storeId: other.storeId, staffRole: "picker" }] },
+      },
+    });
+
+    const res = await request(app.getHttpServer())
+      .get(url("/merchant/staff"))
+      .set(authHeader(manager))
+      .expect(200);
+    const emails = res.body.map((s: { user: { email: string } }) => s.user.email);
+    expect(emails).not.toContain(alienEmail);
+    expect(res.body.every((s: { store: { id: string } }) => s.store.id === own.seeded.storeId)).toBe(
+      true,
+    );
+  });
+
+  it("PATCH active=false mantém o User; owner DELETE remove o vínculo", async () => {
+    const prisma = getPrisma(app);
+    const { owner, seeded } = await makeOwner();
+    const created = await request(app.getHttpServer())
+      .post(url("/merchant/staff"))
+      .set(authHeader(owner))
+      .send({
+        name: "Toggle",
+        email: uniqEmail(),
+        password: "secret1",
+        staffRole: "driver",
+        storeId: seeded.storeId,
+      })
+      .expect(201);
+    const link = await prisma.storeStaff.findFirstOrThrow({ where: { userId: created.body.id } });
+
+    await request(app.getHttpServer())
+      .patch(url(`/merchant/staff/${link.id}`))
+      .set(authHeader(owner))
+      .send({ active: false })
+      .expect(200);
+    const after = await prisma.storeStaff.findUniqueOrThrow({ where: { id: link.id } });
+    expect(after.active).toBe(false);
+    const userStill = await prisma.user.findUnique({ where: { id: created.body.id } });
+    expect(userStill).not.toBeNull();
+
+    await request(app.getHttpServer())
+      .delete(url(`/merchant/staff/${link.id}?hard=true`))
+      .set(authHeader(owner))
+      .expect(200);
+    const gone = await prisma.storeStaff.findUnique({ where: { id: link.id } });
+    expect(gone).toBeNull();
+    // o User permanece (histórico)
+    expect(await prisma.user.findUnique({ where: { id: created.body.id } })).not.toBeNull();
+  });
+
+  it("manager pedindo hard delete → 403 DELETE_OWNER_ONLY", async () => {
+    const { seeded } = await makeOwner();
+    const manager = await makeManager(seeded.storeId);
+    const prisma = getPrisma(app);
+    const created = await request(app.getHttpServer())
+      .post(url("/merchant/staff"))
+      .set(authHeader(manager))
+      .send({
+        name: "Soft",
+        email: uniqEmail(),
+        password: "secret1",
+        staffRole: "picker",
+        storeId: seeded.storeId,
+      })
+      .expect(201);
+    const link = await prisma.storeStaff.findFirstOrThrow({ where: { userId: created.body.id } });
+    const res = await request(app.getHttpServer())
+      .delete(url(`/merchant/staff/${link.id}?hard=true`))
+      .set(authHeader(manager))
+      .expect(403);
+    expect(res.body.code).toBe("DELETE_OWNER_ONLY");
+  });
+
+  it("nega não autenticado (401)", async () => {
+    await request(app.getHttpServer()).get(url("/merchant/staff")).expect(401);
+  });
+});

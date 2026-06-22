@@ -34,4 +34,8 @@ export type {
   WebhookCreatedDTO,
   CreateWebhookInput,
   UpdateWebhookInput,
+  StaffRoleName,
+  MerchantStaffDTO,
+  CreateMerchantStaffInput,
+  UpdateMerchantStaffInput,
 } from "@markethub/types";
