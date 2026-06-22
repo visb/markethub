@@ -272,20 +272,25 @@ export class MerchantService {
   /**
    * Lojas no escopo do usuário (owner: todas as lojas das redes que possui;
    * manager: só as dos vínculos). Reusa `myStores` (posse = StoreStaff manager).
-   * Vazio quando o usuário não tem vínculo.
+   * Vazio quando o usuário não tem vínculo. Também devolve os merchantIds das
+   * redes do escopo (usado p/ agregar reviews, que têm alvo merchant — story 13).
    */
-  private async scopedStoreIds(user: { id: string; roles: string[] }): Promise<string[]> {
+  async scopedStores(user: { id: string; roles: string[] }): Promise<{ storeIds: string[]; merchantIds: string[] }> {
     const scoped = await this.myStores(user.id);
-    if (scoped.length === 0) return [];
+    if (scoped.length === 0) return { storeIds: [], merchantIds: [] };
+    const merchantIds = [...new Set(scoped.map((s) => s.merchantId))];
     if (user.roles.includes("merchant")) {
-      const merchantIds = [...new Set(scoped.map((s) => s.merchantId))];
       const stores = await this.prisma.store.findMany({
         where: { merchantId: { in: merchantIds } },
         select: { id: true },
       });
-      return stores.map((s) => s.id);
+      return { storeIds: stores.map((s) => s.id), merchantIds };
     }
-    return scoped.map((s) => s.id);
+    return { storeIds: scoped.map((s) => s.id), merchantIds };
+  }
+
+  private async scopedStoreIds(user: { id: string; roles: string[] }): Promise<string[]> {
+    return (await this.scopedStores(user)).storeIds;
   }
 
   /**

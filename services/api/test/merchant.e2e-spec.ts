@@ -536,3 +536,177 @@ describe("Merchant orders (e2e)", () => {
     await request(app.getHttpServer()).get(url("/merchant/orders")).expect(401);
   });
 });
+
+/**
+ * Story 13: relatórios escopados às lojas do usuário. owner vê a rede; manager só
+ * os vínculos. Vendas/operacional/top-products/avaliações respeitam escopo e
+ * período. Manager alcança a rota (sem @Roles de classe); loja fora → 403.
+ */
+describe("Merchant reports (e2e)", () => {
+  let app: INestApplication;
+  const url = (p: string) => `/${API_PREFIX}${p}`;
+
+  beforeAll(async () => {
+    app = await createTestApp();
+    await resetDatabase(getPrisma(app));
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  async function makeOwner() {
+    const prisma = getPrisma(app);
+    const seeded = await seedOffer(prisma);
+    const owner = await registerUser(app, { roles: ["merchant"] });
+    const ownerRow = await prisma.user.findFirstOrThrow({ where: { email: owner.email } });
+    await prisma.storeStaff.create({
+      data: { userId: ownerRow.id, storeId: seeded.storeId, staffRole: "manager", active: true },
+    });
+    return { owner, seeded };
+  }
+
+  /** Cria um pedido pago com 1 grupo na loja + 1 item, opcionalmente reembolsado. */
+  async function seedPaidOrder(
+    seeded: { storeId: string; merchantId: string; productId: string },
+    opts: { totalCents: number; platformFeeCents?: number; itemQty?: number; lineCents?: number } = { totalCents: 2000 },
+  ) {
+    const prisma = getPrisma(app);
+    const customer = await prisma.user.create({
+      data: { name: "Cli", email: `cli-${Date.now()}-${Math.random()}@t.dev`, passwordHash: "x" },
+    });
+    const order = await prisma.order.create({
+      data: {
+        userId: customer.id,
+        status: "delivered",
+        totalCents: opts.totalCents,
+        platformFeeCents: opts.platformFeeCents ?? 0,
+        payment: { create: { provider: "mock", amountCents: opts.totalCents, status: "paid", paidAt: new Date() } },
+        groups: {
+          create: [
+            {
+              merchantId: seeded.merchantId,
+              storeId: seeded.storeId,
+              status: "delivered",
+              subtotalCents: opts.totalCents,
+              items: {
+                create: [
+                  {
+                    productId: seeded.productId,
+                    nameSnapshot: "Arroz",
+                    unitPriceCents: opts.lineCents ?? opts.totalCents,
+                    quantity: opts.itemQty ?? 1,
+                    lineTotalCents: opts.lineCents ?? opts.totalCents,
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    });
+    return order;
+  }
+
+  it("owner: vendas agregam pedidos pagos no escopo (faturamento/ticket/payout)", async () => {
+    const { owner, seeded } = await makeOwner();
+    await seedPaidOrder(seeded, { totalCents: 2000, platformFeeCents: 200 });
+    await seedPaidOrder(seeded, { totalCents: 4000, platformFeeCents: 400 });
+
+    const res = await request(app.getHttpServer())
+      .get(url("/merchant/reports/sales"))
+      .set(authHeader(owner))
+      .expect(200);
+    expect(res.body.ordersPaid).toBe(2);
+    expect(res.body.salesCents).toBe(6000);
+    expect(res.body.platformFeeCents).toBe(600);
+    expect(res.body.ticketCents).toBe(3000);
+    expect(res.body.estimatedPayoutCents).toBe(5400);
+    expect(res.body.period).toHaveProperty("from");
+  });
+
+  it("período (from/to) filtra: pedido antigo fora da janela não conta", async () => {
+    const { owner, seeded } = await makeOwner();
+    await seedPaidOrder(seeded, { totalCents: 5000, platformFeeCents: 0 });
+    // janela no futuro → nenhum pedido pago dentro
+    const future = new Date(Date.now() + 86_400_000).toISOString();
+    const farther = new Date(Date.now() + 2 * 86_400_000).toISOString();
+    const res = await request(app.getHttpServer())
+      .get(url(`/merchant/reports/sales?from=${future}&to=${farther}`))
+      .set(authHeader(owner))
+      .expect(200);
+    expect(res.body.ordersPaid).toBe(0);
+    expect(res.body.salesCents).toBe(0);
+  });
+
+  it("operacional: pedidos por status + retiradas pendentes no escopo", async () => {
+    const { owner, seeded } = await makeOwner();
+    await seedPaidOrder(seeded, { totalCents: 1000 });
+    // janela ampla (passado→futuro) para não depender do relógio durante o seed
+    const from = new Date(Date.now() - 86_400_000).toISOString();
+    const to = new Date(Date.now() + 86_400_000).toISOString();
+    const res = await request(app.getHttpServer())
+      .get(url(`/merchant/reports/operations?from=${from}&to=${to}`))
+      .set(authHeader(owner))
+      .expect(200);
+    expect(res.body.ordersByStatus.delivered).toBeGreaterThanOrEqual(1);
+    expect(res.body).toHaveProperty("pendingPickups");
+  });
+
+  it("top-products: agrega quantidade/receita por produto ordenado desc", async () => {
+    const { owner, seeded } = await makeOwner();
+    await seedPaidOrder(seeded, { totalCents: 3000, itemQty: 3, lineCents: 3000 });
+    await seedPaidOrder(seeded, { totalCents: 1000, itemQty: 1, lineCents: 1000 });
+    const res = await request(app.getHttpServer())
+      .get(url("/merchant/reports/top-products"))
+      .set(authHeader(owner))
+      .expect(200);
+    const top = res.body.items.find((i: { productId: string }) => i.productId === seeded.productId);
+    expect(top.quantity).toBe(4);
+    expect(top.revenueCents).toBe(4000);
+  });
+
+  it("avaliações: média/contagem por eixo, merchant escopado à rede", async () => {
+    const prisma = getPrisma(app);
+    const { owner, seeded } = await makeOwner();
+    const order = await seedPaidOrder(seeded, { totalCents: 1000 });
+    await prisma.review.create({
+      data: { orderId: order.id, axis: "merchant", rating: 4, targetMerchantId: seeded.merchantId },
+    });
+    await prisma.review.create({
+      data: { orderId: order.id, axis: "platform", rating: 5 },
+    });
+    const res = await request(app.getHttpServer())
+      .get(url("/merchant/reports/reviews"))
+      .set(authHeader(owner))
+      .expect(200);
+    const merchantAxis = res.body.axes.find((a: { axis: string }) => a.axis === "merchant");
+    expect(merchantAxis).toMatchObject({ average: 4, count: 1 });
+  });
+
+  it("manager alcança a rota; loja fora do escopo → 403 STORE_NOT_IN_SCOPE", async () => {
+    const prisma = getPrisma(app);
+    const own = await makeOwner();
+    const other = await seedOffer(prisma);
+    const manager = await registerUser(app);
+    const mgrRow = await prisma.user.findFirstOrThrow({ where: { email: manager.email } });
+    await prisma.storeStaff.create({
+      data: { userId: mgrRow.id, storeId: own.seeded.storeId, staffRole: "manager", active: true },
+    });
+    // alcança a rota (não é 403 por papel)
+    await request(app.getHttpServer())
+      .get(url("/merchant/reports/sales"))
+      .set(authHeader(manager))
+      .expect(200);
+    // loja fora do escopo → 403
+    const res = await request(app.getHttpServer())
+      .get(url(`/merchant/reports/sales?storeId=${other.storeId}`))
+      .set(authHeader(manager))
+      .expect(403);
+    expect(res.body.code).toBe("STORE_NOT_IN_SCOPE");
+  });
+
+  it("nega não autenticado (401)", async () => {
+    await request(app.getHttpServer()).get(url("/merchant/reports/sales")).expect(401);
+  });
+});
