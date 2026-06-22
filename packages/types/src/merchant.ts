@@ -133,3 +133,41 @@ export type UpdateWebhookInput = Partial<{
   events: string[];
   active: boolean;
 }>;
+
+// ── Colaboradores (StoreStaff — story 10) ──
+
+/** Papel operacional do colaborador na loja. */
+export const staffRoleSchema = z.enum(["manager", "picker", "driver"]);
+export type StaffRoleName = z.infer<typeof staffRoleSchema>;
+
+/** Vínculo de um colaborador a uma loja (papel + status + loja + usuário). */
+export const merchantStaffSchema = z.object({
+  id: z.string(),
+  staffRole: staffRoleSchema,
+  active: z.boolean(),
+  createdAt: z.string(),
+  store: z.object({ id: z.string(), name: z.string() }),
+  user: z.object({
+    id: z.string(),
+    name: z.string(),
+    email: z.string(),
+    active: z.boolean(),
+  }),
+});
+export type MerchantStaffDTO = z.infer<typeof merchantStaffSchema>;
+
+/** Payload de criação de colaborador (cria User + role + vínculo). */
+export const createMerchantStaffInputSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().email(),
+  password: z.string().min(6),
+  staffRole: staffRoleSchema,
+  storeId: z.string().min(1),
+});
+export type CreateMerchantStaffInput = z.infer<typeof createMerchantStaffInputSchema>;
+
+/** Patch de colaborador: ativar/desativar e/ou trocar papel. */
+export type UpdateMerchantStaffInput = Partial<{
+  active: boolean;
+  staffRole: StaffRoleName;
+}>;

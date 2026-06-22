@@ -16,6 +16,9 @@ import type {
   WebhookCreatedDTO,
   CreateWebhookInput,
   UpdateWebhookInput,
+  MerchantStaffDTO,
+  CreateMerchantStaffInput,
+  UpdateMerchantStaffInput,
   PickTaskDTO,
   RefreshInput,
   RegisterInput,
@@ -269,6 +272,33 @@ export class ApiClient {
   /** Enfileira um ping assinado p/ o webhook (botão "testar"). */
   merchantTestWebhook(id: string): Promise<{ enqueued: boolean }> {
     return this.request(`/merchant/integration/webhooks/${id}/test`, { method: "POST", auth: true });
+  }
+
+  // ─── Merchant / colaboradores (StoreStaff — story 10) ───────────
+
+  /** Lista colaboradores das lojas no escopo (owner: todas; manager: as dele). */
+  merchantStaff(storeId?: string): Promise<MerchantStaffDTO[]> {
+    return this.request(`/merchant/staff${storeId ? `?storeId=${encodeURIComponent(storeId)}` : ""}`, {
+      auth: true,
+    });
+  }
+
+  /** Cria colaborador (User + role + vínculo). Gerente não cria manager (backend reforça). */
+  merchantCreateStaff(input: CreateMerchantStaffInput): Promise<{ id: string; email: string; name: string }> {
+    return this.request("/merchant/staff", { method: "POST", body: input, auth: true });
+  }
+
+  /** Ativa/desativa o vínculo ou troca o papel do colaborador. */
+  merchantUpdateStaff(id: string, patch: UpdateMerchantStaffInput): Promise<{ id: string; staffRole: string; active: boolean }> {
+    return this.request(`/merchant/staff/${id}`, { method: "PATCH", body: patch, auth: true });
+  }
+
+  /** Remove o colaborador. Padrão: desativa; `hard` (owner-only): deleta o vínculo. */
+  merchantRemoveStaff(id: string, hard = false): Promise<{ id: string; active?: boolean; removed?: boolean }> {
+    return this.request(`/merchant/staff/${id}${hard ? "?hard=true" : ""}`, {
+      method: "DELETE",
+      auth: true,
+    });
   }
 
   merchantOffers(params: { storeId?: string; search?: string; categoryId?: string; available?: boolean } = {}): Promise<MerchantOffer[]> {

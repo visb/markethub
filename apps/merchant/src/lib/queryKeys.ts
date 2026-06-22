@@ -14,4 +14,8 @@ export const queryKeys = {
     apiKeys: ["integration", "api-keys"] as const,
     webhooks: ["integration", "webhooks"] as const,
   },
+  staff: {
+    all: ["staff"] as const,
+    byStore: (storeId: string | undefined) => ["staff", storeId ?? "all"] as const,
+  },
 } as const;
