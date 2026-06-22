@@ -82,18 +82,21 @@ export class IntegrationService {
   // ── owner scope ──
 
   /**
-   * Resolve a rede (merchantId) do dono. Integração é owner-only: exige RoleName
-   * `merchant`. Sem rede única → erro (informa ambiguidade). Gerente → FORBIDDEN.
+   * Resolve a rede (merchantId) para a integração. Acesso = owner + admin da loja
+   * (story 16); gerente é bloqueado. Exige RoleName `merchant`. Sem rede única →
+   * erro (informa ambiguidade).
    */
   async resolveOwnerMerchantId(user: User): Promise<string> {
     if (!user.roles.includes("merchant")) {
       throw new ForbiddenException({
         code: "NOT_AN_OWNER",
-        message: "Apenas o dono da rede pode gerenciar a integração",
+        message: "Apenas o dono ou administrador pode gerenciar a integração",
       });
     }
+    // Posse da rede via vínculos owner-equivalentes (admin | manager). O bloqueio
+    // específico do gerente (sem RoleName merchant) virá na story 17.
     const staff = await this.prisma.storeStaff.findMany({
-      where: { userId: user.id, staffRole: "manager", active: true },
+      where: { userId: user.id, staffRole: { in: ["admin", "manager"] }, active: true },
       include: { store: { select: { merchantId: true } } },
     });
     const owned = new Set(staff.map((s) => s.store.merchantId));

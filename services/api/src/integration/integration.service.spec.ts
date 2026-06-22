@@ -88,6 +88,13 @@ describe("IntegrationService — owner scope (story 09)", () => {
     const { svc } = makeService({ staff: [] });
     await expect(svc.getErpConfig(owner)).rejects.toBeInstanceOf(BadRequestException);
   });
+
+  it("admin (story 16) acessa integração: resolve a rede via vínculo admin", async () => {
+    // admin tem RoleName merchant; o vínculo de loja (admin) resolve o merchantId.
+    const { svc } = makeService({ staff: [{ store: { merchantId: "m1" } }] });
+    const cfg = await svc.getErpConfig({ id: "a1", roles: ["merchant"] });
+    expect(cfg.connectorType).toBeNull();
+  });
 });
 
 describe("IntegrationService — ERP config", () => {

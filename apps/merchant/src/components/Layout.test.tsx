@@ -42,4 +42,14 @@ describe("Layout — nav gated por can() (story 07)", () => {
     }
     expect(screen.getByText(/Gerente/)).toBeInTheDocument();
   });
+
+  it("admin (story 16) VÊ Integração e é rotulado 'Administrador'", () => {
+    role = "admin";
+    renderLayout();
+    expect(screen.getByRole("link", { name: "Integração" })).toBeInTheDocument();
+    for (const label of ["Lojas", "Colaboradores", "Catálogo", "Pedidos", "Relatórios"]) {
+      expect(screen.getByRole("link", { name: label })).toBeInTheDocument();
+    }
+    expect(screen.getByText(/Administrador/)).toBeInTheDocument();
+  });
 });

@@ -64,6 +64,27 @@ describe("Merchant context (e2e)", () => {
     expect(res.body.stores.map((s: { id: string }) => s.id)).not.toContain(b.storeId);
   });
 
+  it("admin (story 16): RoleName merchant + StoreStaff admin → role admin, só a loja do vínculo", async () => {
+    const prisma = getPrisma(app);
+    const a = await seedOffer(prisma);
+    const b = await seedOffer(prisma); // loja fora do escopo do admin
+    const admin = await registerUser(app, { roles: ["merchant"] });
+    const row = await prisma.user.findFirstOrThrow({ where: { email: admin.email } });
+    await prisma.storeStaff.create({
+      data: { userId: row.id, storeId: a.storeId, staffRole: "admin", active: true },
+    });
+
+    const res = await request(app.getHttpServer())
+      .get(url("/merchant/context"))
+      .set(authHeader(admin))
+      .expect(200);
+
+    expect(res.body.role).toBe("admin");
+    expect(res.body.stores).toHaveLength(1);
+    expect(res.body.stores[0].id).toBe(a.storeId);
+    expect(res.body.stores.map((s: { id: string }) => s.id)).not.toContain(b.storeId);
+  });
+
   it("nega usuário sem RoleName merchant e sem vínculo manager (403 NOT_A_MERCHANT_USER)", async () => {
     const user = await registerUser(app); // customer, sem vínculo
     const res = await request(app.getHttpServer())
@@ -222,6 +243,17 @@ describe("Merchant staff (e2e)", () => {
     return manager;
   }
 
+  // admin de loja (story 16): RoleName merchant p/ guards + StoreStaff(admin) ativo.
+  async function makeAdmin(storeId: string) {
+    const prisma = getPrisma(app);
+    const admin = await registerUser(app, { roles: ["merchant"] });
+    const row = await prisma.user.findFirstOrThrow({ where: { email: admin.email } });
+    await prisma.storeStaff.create({
+      data: { userId: row.id, storeId, staffRole: "admin", active: true },
+    });
+    return admin;
+  }
+
   it("owner cria picker e o vínculo + role ficam corretos", async () => {
     const { owner, seeded } = await makeOwner();
     const prisma = getPrisma(app);
@@ -259,7 +291,7 @@ describe("Merchant staff (e2e)", () => {
       .expect(201);
   });
 
-  it("manager cria picker na sua loja, mas criar manager → 403 CANNOT_MANAGE_MANAGER", async () => {
+  it("manager cria picker na sua loja, mas criar manager → 403 ROLE_ESCALATION_FORBIDDEN", async () => {
     const { seeded } = await makeOwner();
     const manager = await makeManager(seeded.storeId);
 
@@ -286,7 +318,59 @@ describe("Merchant staff (e2e)", () => {
         storeId: seeded.storeId,
       })
       .expect(403);
-    expect(res.body.code).toBe("CANNOT_MANAGE_MANAGER");
+    expect(res.body.code).toBe("ROLE_ESCALATION_FORBIDDEN");
+  });
+
+  it("admin (story 16) cria manager na sua loja (escopo + hierarquia ok)", async () => {
+    const { seeded } = await makeOwner();
+    const admin = await makeAdmin(seeded.storeId);
+    await request(app.getHttpServer())
+      .post(url("/merchant/staff"))
+      .set(authHeader(admin))
+      .send({
+        name: "Gerente do admin",
+        email: uniqEmail(),
+        password: "secret1",
+        staffRole: "manager",
+        storeId: seeded.storeId,
+      })
+      .expect(201);
+  });
+
+  it("admin (story 16) NÃO cria outro admin → 403 ROLE_ESCALATION_FORBIDDEN", async () => {
+    const { seeded } = await makeOwner();
+    const admin = await makeAdmin(seeded.storeId);
+    const res = await request(app.getHttpServer())
+      .post(url("/merchant/staff"))
+      .set(authHeader(admin))
+      .send({
+        name: "Outro admin",
+        email: uniqEmail(),
+        password: "secret1",
+        staffRole: "admin",
+        storeId: seeded.storeId,
+      })
+      .expect(403);
+    expect(res.body.code).toBe("ROLE_ESCALATION_FORBIDDEN");
+  });
+
+  it("admin (story 16) NÃO escapa do escopo de loja → 403 STORE_NOT_IN_SCOPE", async () => {
+    const prisma = getPrisma(app);
+    const own = await makeOwner();
+    const other = await seedOffer(prisma); // loja fora do escopo do admin
+    const admin = await makeAdmin(own.seeded.storeId);
+    const res = await request(app.getHttpServer())
+      .post(url("/merchant/staff"))
+      .set(authHeader(admin))
+      .send({
+        name: "Picker alheio",
+        email: uniqEmail(),
+        password: "secret1",
+        staffRole: "picker",
+        storeId: other.storeId,
+      })
+      .expect(403);
+    expect(res.body.code).toBe("STORE_NOT_IN_SCOPE");
   });
 
   it("manager criar em loja fora do escopo → 403 STORE_NOT_IN_SCOPE", async () => {

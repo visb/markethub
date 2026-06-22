@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { ApiClientError } from "@markethub/api-client";
-import type { MerchantStaffDTO, MerchantStoreDTO } from "@markethub/api-client";
+import type {
+  MerchantRole,
+  MerchantStaffDTO,
+  MerchantStoreDTO,
+  StaffRoleName,
+} from "@markethub/api-client";
 import { useMerchantContext } from "@/api/hooks/useMerchantContext";
 import {
   useCreateStaff,
@@ -15,14 +20,27 @@ function errMessage(err: unknown, fallback: string): string {
 }
 
 /**
- * Tela de colaboradores (story 10). Dono e gerente gerenciam a equipe das lojas
- * no escopo (backend reforça). O gerente não cadastra/edita outro gerente — a UI
- * esconde o papel "Gerente" e as ações sobre gerentes; o backend é a fonte da
- * verdade. Orquestra hooks + componentes; sem fetch inline.
+ * Papéis que cada nível pode cadastrar/gerenciar (RBAC story 16). owner: tudo;
+ * admin: manager|picker|driver; manager: picker|driver. Backend é a fonte da
+ * verdade — isto é só UX.
+ */
+const ROLES_BY_LEVEL: Record<MerchantRole, StaffRoleName[]> = {
+  owner: ["admin", "manager", "picker", "driver"],
+  admin: ["manager", "picker", "driver"],
+  manager: ["picker", "driver"],
+};
+
+/**
+ * Tela de colaboradores (story 10 + RBAC story 16). Dono, admin e gerente
+ * gerenciam a equipe das lojas no escopo (backend reforça). Cada nível só cria/
+ * edita papéis abaixo do seu — a UI esconde papéis e ações fora do alcance; o
+ * backend é a fonte da verdade. Orquestra hooks + componentes; sem fetch inline.
  */
 export function Staff() {
   const { data: ctx } = useMerchantContext();
-  const isOwner = ctx?.role === "owner";
+  const level = ctx?.role ?? null;
+  const isOwner = level === "owner";
+  const manageableRoles = level ? ROLES_BY_LEVEL[level] : [];
   const stores = ctx?.stores ?? [];
 
   const [storeFilter, setStoreFilter] = useState<string>("");
@@ -33,7 +51,7 @@ export function Staff() {
     return (
       <CreateStaff
         stores={stores}
-        allowManager={isOwner}
+        allowedRoles={manageableRoles}
         onDone={() => setCreating(false)}
       />
     );
@@ -73,7 +91,12 @@ export function Staff() {
       {staff && staff.length > 0 && (
         <ul className="list">
           {staff.map((s) => (
-            <StaffRow key={s.id} staff={s} isOwner={isOwner} />
+            <StaffRow
+              key={s.id}
+              staff={s}
+              isOwner={isOwner}
+              manageableRoles={manageableRoles}
+            />
           ))}
         </ul>
       )}
@@ -83,11 +106,11 @@ export function Staff() {
 
 function CreateStaff({
   stores,
-  allowManager,
+  allowedRoles,
   onDone,
 }: {
   stores: MerchantStoreDTO[];
-  allowManager: boolean;
+  allowedRoles: StaffRoleName[];
   onDone: () => void;
 }) {
   const mutation = useCreateStaff();
@@ -104,7 +127,7 @@ function CreateStaff({
   return (
     <StaffForm
       stores={stores}
-      allowManager={allowManager}
+      allowedRoles={allowedRoles}
       onSubmit={onSubmit}
       onCancel={onDone}
       submitting={mutation.isPending}
@@ -113,13 +136,21 @@ function CreateStaff({
   );
 }
 
-function StaffRow({ staff, isOwner }: { staff: MerchantStaffDTO; isOwner: boolean }) {
+function StaffRow({
+  staff,
+  isOwner,
+  manageableRoles,
+}: {
+  staff: MerchantStaffDTO;
+  isOwner: boolean;
+  manageableRoles: StaffRoleName[];
+}) {
   const update = useUpdateStaff();
   const remove = useRemoveStaff();
   const [error, setError] = useState<string | null>(null);
 
-  // Gerente não pode gerenciar outro gerente (a UI esconde; o backend reforça).
-  const canManage = isOwner || staff.staffRole !== "manager";
+  // Só age sobre vínculos cujo papel o ator pode gerenciar (UI esconde; backend reforça).
+  const canManage = manageableRoles.includes(staff.staffRole);
 
   const toggleActive = () => {
     setError(null);

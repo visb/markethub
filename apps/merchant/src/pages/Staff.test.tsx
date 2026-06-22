@@ -93,6 +93,22 @@ describe("Staff (story 10)", () => {
     expect(screen.queryByRole("button", { name: "Remover" })).not.toBeInTheDocument();
   });
 
+  it("admin (story 16) gerencia gerente (vê ações na linha)", () => {
+    ctx = { data: { role: "admin", merchantId: "m1", stores: [stores[0]] } };
+    staffResult = { data: [row({ staffRole: "manager" })], isLoading: false };
+    render(<Staff />);
+    expect(screen.getByRole("button", { name: "Desativar" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remover" })).toBeInTheDocument();
+  });
+
+  it("admin (story 16) NÃO gerencia outro admin (sem ações na linha)", () => {
+    ctx = { data: { role: "admin", merchantId: "m1", stores: [stores[0]] } };
+    staffResult = { data: [row({ staffRole: "admin" })], isLoading: false };
+    render(<Staff />);
+    expect(screen.queryByRole("button", { name: "Desativar" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Remover" })).not.toBeInTheDocument();
+  });
+
   it("owner: remover chama removeStaff com hard=true", () => {
     render(<Staff />);
     fireEvent.click(screen.getByRole("button", { name: "Excluir" }));

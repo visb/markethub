@@ -12,6 +12,8 @@ function makeService(opts: {
   stores?: { id: string; name: string; merchantId: string }[];
   geocode?: jest.Mock;
   store?: Record<string, unknown> | null;
+  /** simula vínculo StoreStaff(admin) ativo p/ resolveLevel (story 16). */
+  hasAdminLink?: boolean;
 }) {
   const stores = opts.stores ?? [];
   const create = jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: "new", ...data }));
@@ -21,6 +23,7 @@ function makeService(opts: {
       findMany: jest
         .fn()
         .mockResolvedValue(stores.map((s) => ({ store: s }))),
+      findFirst: jest.fn().mockResolvedValue(opts.hasAdminLink ? { id: "lnk" } : null),
     },
     store: {
       findUnique: jest.fn().mockResolvedValue(opts.store ?? null),
@@ -61,6 +64,16 @@ describe("MerchantService — lojas (story 08)", () => {
       const { svc, create } = makeService({ stores: [{ ...ownerStore }] });
       await expect(svc.createStore(manager, { name: "X" })).rejects.toBeInstanceOf(ForbiddenException);
       await expect(svc.createStore(manager, { name: "X" })).rejects.toMatchObject({
+        response: expect.objectContaining({ code: "NOT_AN_OWNER" }),
+      });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("admin (story 16) recebe FORBIDDEN (NOT_AN_OWNER): criar loja é owner-only", async () => {
+      // admin tem RoleName merchant (guards) + vínculo admin → nível admin, não owner.
+      const adminUser = { id: "u3", roles: ["merchant"] };
+      const { svc, create } = makeService({ stores: [{ ...ownerStore }], hasAdminLink: true });
+      await expect(svc.createStore(adminUser, { name: "X" })).rejects.toMatchObject({
         response: expect.objectContaining({ code: "NOT_AN_OWNER" }),
       });
       expect(create).not.toHaveBeenCalled();

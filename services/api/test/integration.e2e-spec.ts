@@ -200,6 +200,26 @@ describe("Merchant integration (e2e)", () => {
       .expect(403);
   });
 
+  it("admin (story 16): acessa a integração (resolve a rede via vínculo admin)", async () => {
+    const prisma = getPrisma(app);
+    const seeded = await seedOffer(prisma);
+    const admin = await registerUser(app, { roles: ["merchant"] });
+    const row = await prisma.user.findFirstOrThrow({ where: { email: admin.email } });
+    await prisma.storeStaff.create({
+      data: { userId: row.id, storeId: seeded.storeId, staffRole: "admin", active: true },
+    });
+
+    await request(app.getHttpServer())
+      .put(url("/merchant/integration/erp"))
+      .set(authHeader(admin))
+      .send({ connectorType: "csv", connectorConfig: { dir: "/data", apiKey: "s" } })
+      .expect(200);
+    await request(app.getHttpServer())
+      .get(url("/merchant/integration/erp"))
+      .set(authHeader(admin))
+      .expect(200);
+  });
+
   it("não autenticado → 401", async () => {
     await request(app.getHttpServer()).get(url("/merchant/integration/erp")).expect(401);
   });

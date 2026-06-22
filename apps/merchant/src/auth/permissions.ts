@@ -5,8 +5,10 @@ import type { MerchantRole } from "@markethub/api-client";
  * itens de nav e ações por capacidade — a aplicação fina por tela é das stories
  * seguintes, e o backend SEMPRE reforça (RBAC no service).
  *
- * Matriz (refino da story):
- * - owner (dono da rede): tudo.
+ * Matriz (refino da story / RBAC story 16):
+ * - owner (dono da rede): tudo, incluindo criar/editar lojas.
+ * - admin (administrador da loja): acesso total à(s) loja(s) do escopo, INCLUI
+ *   integração e gestão de equipe; NÃO cria/edita lojas (nível de rede).
  * - manager (gerente da loja): colaboradores + catálogo da(s) sua(s) loja(s);
  *   SEM integração e SEM criar/editar lojas.
  */
@@ -31,6 +33,17 @@ const OWNER_CAPS: ReadonlySet<Capability> = new Set<Capability>([
   "reports.view",
 ]);
 
+// Admin da loja: tudo menos criar/editar lojas (nível de rede, owner-only).
+const ADMIN_CAPS: ReadonlySet<Capability> = new Set<Capability>([
+  "stores.view",
+  "integration.manage",
+  "staff.manage",
+  "vehicles.manage",
+  "catalog.manage",
+  "orders.view",
+  "reports.view",
+]);
+
 const MANAGER_CAPS: ReadonlySet<Capability> = new Set<Capability>([
   "stores.view",
   "staff.manage",
@@ -42,6 +55,7 @@ const MANAGER_CAPS: ReadonlySet<Capability> = new Set<Capability>([
 
 const CAPS_BY_ROLE: Record<MerchantRole, ReadonlySet<Capability>> = {
   owner: OWNER_CAPS,
+  admin: ADMIN_CAPS,
   manager: MANAGER_CAPS,
 };
 
