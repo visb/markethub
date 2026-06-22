@@ -2,14 +2,20 @@ import { ForbiddenException } from "@nestjs/common";
 import { MerchantService } from "./merchant.service";
 
 /**
- * Story 07: GET /merchant/context resolve o papel efetivo (owner vs manager) e
- * as lojas visíveis. owner = RoleName `merchant` (vê suas lojas); manager =
- * StoreStaff(manager) ativo (vê só as do vínculo); nega quem não é nenhum.
+ * Story 07 + RBAC story 16: GET /merchant/context resolve o nível efetivo na
+ * hierarquia owner > admin > manager e as lojas visíveis. owner = RoleName
+ * `merchant` sem vínculo admin; admin = StoreStaff(admin) ativo; manager =
+ * StoreStaff(manager) ativo; nega quem não é nenhum.
  */
-function makeService(staff: { store: { id: string; name: string; merchantId: string } }[]) {
+function makeService(
+  staff: { store: { id: string; name: string; merchantId: string } }[],
+  opts: { hasAdminLink?: boolean } = {},
+) {
   const prisma = {
     storeStaff: {
       findMany: jest.fn().mockResolvedValue(staff),
+      // resolveLevel: existe vínculo StoreStaff(admin) ativo?
+      findFirst: jest.fn().mockResolvedValue(opts.hasAdminLink ? { id: "lnk" } : null),
     },
   } as never;
   const geocoding = { geocode: jest.fn().mockResolvedValue(null) } as never;
@@ -43,6 +49,20 @@ describe("MerchantService.getContext", () => {
     expect(ctx.role).toBe("manager");
     expect(ctx.merchantId).toBe("m2");
     expect(ctx.stores.map((s) => s.id)).toEqual(["s9"]);
+  });
+
+  it("admin (StoreStaff admin ativo) → role admin com as lojas do vínculo (story 16)", async () => {
+    const svc = makeService([loja("s5", "m3")], { hasAdminLink: true });
+    const ctx = await svc.getContext({ id: "u5", roles: ["merchant"] });
+    expect(ctx.role).toBe("admin");
+    expect(ctx.merchantId).toBe("m3");
+    expect(ctx.stores.map((s) => s.id)).toEqual(["s5"]);
+  });
+
+  it("hierarquia owner > admin > manager: vínculo admin tem precedência sobre RoleName merchant", async () => {
+    const svc = makeService([loja("s5")], { hasAdminLink: true });
+    const ctx = await svc.getContext({ id: "u5", roles: ["merchant"] });
+    expect(ctx.role).toBe("admin"); // não "owner", apesar do RoleName merchant
   });
 
   it("nega usuário sem RoleName merchant e sem vínculo manager (FORBIDDEN)", async () => {

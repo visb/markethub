@@ -21,7 +21,7 @@ class CreateStaffDto {
   @MinLength(8)
   password!: string;
 
-  @IsIn(["manager", "picker", "driver"])
+  @IsIn(["admin", "manager", "picker", "driver"])
   staffRole!: StaffRole;
 
   @IsString()

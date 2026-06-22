@@ -13,7 +13,7 @@ import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import type { AuthUser } from "../auth/auth.types";
 import { MerchantStaffService } from "./merchant-staff.service";
 
-const STAFF_ROLES = ["manager", "picker", "driver"] as const;
+const STAFF_ROLES = ["admin", "manager", "picker", "driver"] as const;
 type StaffRoleDto = (typeof STAFF_ROLES)[number];
 
 class CreateStaffDto {

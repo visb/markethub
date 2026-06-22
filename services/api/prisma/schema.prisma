@@ -78,6 +78,7 @@ model Session {
 
 // Papel do funcionário dentro de uma loja.
 enum StaffRole {
+  admin // administrador da loja: acesso total à loja (inclui integração) e gere manager|picker|driver (story 16)
   manager // usuário do merchant que gerencia a loja
   picker // separador (faz o picking)
   driver // entregador da loja (entrega própria, SF-delivery)

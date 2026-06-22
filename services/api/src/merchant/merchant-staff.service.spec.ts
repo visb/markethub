@@ -14,8 +14,16 @@ function makeService(opts: {
   staffRow?: { id: string; staffRole: string; active: boolean; storeId: string } | null;
 }) {
   const myStores = opts.myStores ?? [];
+  // resolveLevel derivado dos roles do ator (owner via RoleName merchant; admin
+  // quando o teste pedir; senão manager) — espelha o MerchantService real.
+  const resolveLevel = jest.fn().mockImplementation((user: { roles: string[] }) => {
+    if (user.roles.includes("admin-staff")) return Promise.resolve("admin");
+    if (user.roles.includes("merchant")) return Promise.resolve("owner");
+    return Promise.resolve("manager");
+  });
   const merchant = {
     myStores: jest.fn().mockResolvedValue(myStores),
+    resolveLevel,
   } as never;
 
   const storeFindMany = jest.fn().mockResolvedValue(opts.storesInMerchant ?? []);
@@ -42,6 +50,8 @@ function makeService(opts: {
 
 const owner = { id: "o1", roles: ["merchant"] };
 const manager = { id: "m1", roles: ["customer"] };
+// admin-staff: tem RoleName merchant (p/ guards) + flag de teste p/ resolveLevel mock.
+const admin = { id: "a1", roles: ["merchant", "admin-staff"] };
 const storeA = { id: "sA", name: "Loja A", merchantId: "mer1" };
 const storeB = { id: "sB", name: "Loja B", merchantId: "mer1" };
 
@@ -79,7 +89,7 @@ describe("MerchantStaffService (story 10)", () => {
       expect(createStaff).toHaveBeenCalledTimes(1);
     });
 
-    it("gerente criar manager → FORBIDDEN (CANNOT_MANAGE_MANAGER)", async () => {
+    it("gerente criar manager → FORBIDDEN (ROLE_ESCALATION_FORBIDDEN)", async () => {
       const { svc, createStaff } = makeService({ myStores: [storeA] });
       await expect(
         svc.create(manager, {
@@ -89,7 +99,7 @@ describe("MerchantStaffService (story 10)", () => {
           staffRole: "manager",
           storeId: "sA",
         }),
-      ).rejects.toMatchObject({ response: expect.objectContaining({ code: "CANNOT_MANAGE_MANAGER" }) });
+      ).rejects.toMatchObject({ response: expect.objectContaining({ code: "ROLE_ESCALATION_FORBIDDEN" }) });
       expect(createStaff).not.toHaveBeenCalled();
     });
 
@@ -172,7 +182,7 @@ describe("MerchantStaffService (story 10)", () => {
         staffRow: { id: "st1", staffRole: "manager", active: true, storeId: "sA" },
       });
       await expect(svc.update(manager, "st1", { active: false })).rejects.toMatchObject({
-        response: expect.objectContaining({ code: "CANNOT_MANAGE_MANAGER" }),
+        response: expect.objectContaining({ code: "ROLE_ESCALATION_FORBIDDEN" }),
       });
     });
 
@@ -182,7 +192,7 @@ describe("MerchantStaffService (story 10)", () => {
         staffRow: { id: "st1", staffRole: "picker", active: true, storeId: "sA" },
       });
       await expect(svc.update(manager, "st1", { staffRole: "manager" })).rejects.toMatchObject({
-        response: expect.objectContaining({ code: "CANNOT_MANAGE_MANAGER" }),
+        response: expect.objectContaining({ code: "ROLE_ESCALATION_FORBIDDEN" }),
       });
     });
 
@@ -224,6 +234,90 @@ describe("MerchantStaffService (story 10)", () => {
         staffRow: { id: "st1", staffRole: "picker", active: true, storeId: "sA" },
       });
       await expect(svc.remove(manager, "st1", true)).rejects.toMatchObject({
+        response: expect.objectContaining({ code: "DELETE_OWNER_ONLY" }),
+      });
+      expect(staffDelete).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── RBAC story 16: admin (acima de manager, abaixo de owner) ──
+  describe("admin (story 16)", () => {
+    it("admin cria manager|picker|driver no escopo dele → delega createStaff", async () => {
+      const { svc, createStaff } = makeService({ myStores: [storeA] });
+      for (const role of ["manager", "picker", "driver"] as const) {
+        await svc.create(admin, {
+          name: "N",
+          email: `${role}@x.z`,
+          password: "secret1",
+          staffRole: role,
+          storeId: "sA",
+        });
+      }
+      expect(createStaff).toHaveBeenCalledTimes(3);
+      expect(createStaff).toHaveBeenCalledWith(
+        expect.objectContaining({ staffRole: "manager", storeId: "sA" }),
+      );
+    });
+
+    it("admin NÃO cria outro admin → ROLE_ESCALATION_FORBIDDEN", async () => {
+      const { svc, createStaff } = makeService({ myStores: [storeA] });
+      await expect(
+        svc.create(admin, {
+          name: "A",
+          email: "a@x.z",
+          password: "secret1",
+          staffRole: "admin",
+          storeId: "sA",
+        }),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: "ROLE_ESCALATION_FORBIDDEN" }),
+      });
+      expect(createStaff).not.toHaveBeenCalled();
+    });
+
+    it("admin NÃO escapa do escopo de loja → STORE_NOT_IN_SCOPE", async () => {
+      const { svc, createStaff } = makeService({ myStores: [storeA] });
+      await expect(
+        svc.create(admin, {
+          name: "P",
+          email: "p@x.z",
+          password: "secret1",
+          staffRole: "picker",
+          storeId: "fora",
+        }),
+      ).rejects.toMatchObject({
+        response: expect.objectContaining({ code: "STORE_NOT_IN_SCOPE" }),
+      });
+      expect(createStaff).not.toHaveBeenCalled();
+    });
+
+    it("admin gerencia vínculo de manager (update troca papel/ativa)", async () => {
+      const { svc, staffUpdate } = makeService({
+        myStores: [storeA],
+        staffRow: { id: "st1", staffRole: "manager", active: true, storeId: "sA" },
+      });
+      await svc.update(admin, "st1", { active: false });
+      expect(staffUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: "st1" }, data: { active: false } }),
+      );
+    });
+
+    it("admin NÃO mexe em vínculo de outro admin → ROLE_ESCALATION_FORBIDDEN", async () => {
+      const { svc } = makeService({
+        myStores: [storeA],
+        staffRow: { id: "st1", staffRole: "admin", active: true, storeId: "sA" },
+      });
+      await expect(svc.update(admin, "st1", { active: false })).rejects.toMatchObject({
+        response: expect.objectContaining({ code: "ROLE_ESCALATION_FORBIDDEN" }),
+      });
+    });
+
+    it("admin pedindo hard delete → DELETE_OWNER_ONLY (só owner deleta de fato)", async () => {
+      const { svc, staffDelete } = makeService({
+        myStores: [storeA],
+        staffRow: { id: "st1", staffRole: "picker", active: true, storeId: "sA" },
+      });
+      await expect(svc.remove(admin, "st1", true)).rejects.toMatchObject({
         response: expect.objectContaining({ code: "DELETE_OWNER_ONLY" }),
       });
       expect(staffDelete).not.toHaveBeenCalled();

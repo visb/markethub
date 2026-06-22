@@ -1,7 +1,11 @@
 import { z } from "zod";
 
-/** Papel efetivo do usuário dentro do app merchant. */
-export const merchantRoleSchema = z.enum(["owner", "manager"]);
+/**
+ * Nível efetivo do usuário dentro do app merchant, na hierarquia
+ * owner > admin > manager (story 16). owner = dono da rede; admin = administrador
+ * da loja (acesso total, inclui integração); manager = gerente da loja.
+ */
+export const merchantRoleSchema = z.enum(["owner", "admin", "manager"]);
 export type MerchantRole = z.infer<typeof merchantRoleSchema>;
 
 export const merchantStoreSchema = z.object({
@@ -136,8 +140,8 @@ export type UpdateWebhookInput = Partial<{
 
 // ── Colaboradores (StoreStaff — story 10) ──
 
-/** Papel operacional do colaborador na loja. */
-export const staffRoleSchema = z.enum(["manager", "picker", "driver"]);
+/** Papel operacional do colaborador na loja (admin acima de manager — story 16). */
+export const staffRoleSchema = z.enum(["admin", "manager", "picker", "driver"]);
 export type StaffRoleName = z.infer<typeof staffRoleSchema>;
 
 /** Vínculo de um colaborador a uma loja (papel + status + loja + usuário). */

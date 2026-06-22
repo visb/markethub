@@ -7,12 +7,15 @@ export interface CreateStaffInput {
   email: string;
   name: string;
   password: string;
-  staffRole: StaffRole; // manager | picker | driver
+  staffRole: StaffRole; // admin | manager | picker | driver
   storeId: string;
 }
 
-// Papel operacional na loja → papel de acesso (RoleName).
+// Papel operacional na loja → papel de acesso (RoleName). admin e manager recebem
+// `merchant` p/ passar nos guards do app merchant; o nível efetivo (owner/admin/
+// manager) é resolvido no MerchantService a partir do StoreStaff (story 16).
 const STAFF_TO_ROLE: Record<StaffRole, RoleName> = {
+  admin: "merchant",
   manager: "merchant",
   picker: "picker",
   driver: "driver",

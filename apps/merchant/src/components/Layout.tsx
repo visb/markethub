@@ -2,6 +2,14 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "@/auth/auth-context";
 import { useMerchantContext } from "@/api/hooks/useMerchantContext";
 import { can, type Capability } from "@/auth/permissions";
+import type { MerchantRole } from "@markethub/api-client";
+
+/** Rótulo do nível efetivo do usuário no topo do painel (story 16). */
+const ROLE_LABEL: Record<MerchantRole, string> = {
+  owner: "Dono",
+  admin: "Administrador",
+  manager: "Gerente",
+};
 
 interface NavItem {
   to: string;
@@ -46,7 +54,7 @@ export function Layout() {
       <div className="main">
         <header className="topbar">
           <span className="topbar-title">
-            Painel do mercado{role ? ` · ${role === "owner" ? "Dono" : "Gerente"}` : ""}
+            Painel do mercado{role ? ` · ${ROLE_LABEL[role]}` : ""}
           </span>
           <div className="topbar-user">
             <span>{user?.name}</span>
