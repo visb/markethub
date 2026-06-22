@@ -7,7 +7,7 @@ Fonte de verdade p/ retomar: **git log + este arquivo**. Story com `feat(story-N
 | #  | Título | Dep | Status |
 |----|--------|-----|--------|
 | 14 | App merchant: cadastro de veículos de entrega (model `Vehicle` por rede) | — | OK |
-| 15 | App entregador: seleciona veículo no login + indicador na home | 14 | — |
+| 15 | App entregador: seleciona veículo no login + indicador na home | 14 | OK |
 | 16 | App merchant: novo `StaffRole admin` + resolução de nível | — | — |
 | 17 | App merchant: gerente restrito à loja atribuída + sem integração | 16 | — |
 | 18 | App merchant: gerente cria só nível inferior (picker, driver) | 16 | — |
@@ -15,6 +15,7 @@ Fonte de verdade p/ retomar: **git log + este arquivo**. Story com `feat(story-N
 ## Log
 
 <!-- [OK|PARCIAL|BLOQUEADO] NN — testes: <resumo> — commit: <hash> — merge: <hash> — <data> — <bloqueio> -->
+[OK] 15 — testes: api unit 317/317 (+10: driver-vehicle.service.spec listAvailable só active da rede/[] sem vínculo, current null/reflete/desativado/fora de escopo, select persiste+VEHICLE_NOT_FOUND/NOT_AVAILABLE outra rede/inativo) coverage gate exit=0; api e2e 93/93 (+8: GET vehicles só active da rede/current null antes/PUT seleciona+persiste+troca/outra rede 403/inativo 403/inexistente 404/401); driver 18/18 (+6: useDriverVehicle hooks chamada certa+enabled=false+invalida queryKeys.vehicles.current, select-vehicle renderiza lista/seleciona dispara mutation+navega, gate pós-login sem sessão→/login, sem veículo→/select-vehicle, com veículo→/home) coverage gate exit=0; api-client 18/18; typecheck 12/12 + build 9/9 verdes — commit: 4a40d0b — merge: ccf67fd — 2026-06-22 — escopo (rede) sempre resolvido pelo vínculo de staff no backend, nunca por id do cliente; activeVehicleId via FK onDelete:SetNull; corrigido WIP do agente anterior: jest.mock factory referenciava vars sem prefixo mock (canGoBack/vehiclesData/...) e mock de Redirect quebrava o assert de href (children split) — sem dep externa
 [OK] 14 — testes: api unit 307/307 (+19: merchant-vehicles.service.spec resolve merchantId do contexto/escopo/placa inválida/ambígua, PATCH parcial/soft toggle, hard delete VEHICLE_IN_USE vs sem entregas, VEHICLE_NOT_FOUND; serviço 94% stmts) coverage gate exit=0; api e2e 85/85 (+7: cadastro placa normalizada/INVALID_PLATE/lista escopo da rede/PATCH+soft toggle/VEHICLE_IN_USE/hard delete/401); merchant 159/159 (+17: useVehicles hooks invalidam queryKeys.vehicles, VehicleForm rhf+zod placa/tipo, Vehicles lista/criar/editar/toggle/excluir) coverage gate verde; typecheck+build verdes — commit: 37e08b4 — merge: c6c0838 — 2026-06-22 — Vehicle pertence à rede (merchantId resolvido pelo backend, nunca do body); Delivery.vehicleId adicionado p/ histórico/guard VEHICLE_IN_USE (consumido pela story 15)
 
 # PROGRESS — rodada AUTORUN (stories 01 → 13)
