@@ -321,6 +321,57 @@ describe("Merchant staff (e2e)", () => {
     expect(res.body.code).toBe("ROLE_ESCALATION_FORBIDDEN");
   });
 
+  it("manager criar admin → 403 ROLE_ESCALATION_FORBIDDEN (story 18)", async () => {
+    const { seeded } = await makeOwner();
+    const manager = await makeManager(seeded.storeId);
+    const res = await request(app.getHttpServer())
+      .post(url("/merchant/staff"))
+      .set(authHeader(manager))
+      .send({
+        name: "Admin proibido",
+        email: uniqEmail(),
+        password: "secret1",
+        staffRole: "admin",
+        storeId: seeded.storeId,
+      })
+      .expect(403);
+    expect(res.body.code).toBe("ROLE_ESCALATION_FORBIDDEN");
+  });
+
+  it("manager cria driver na sua loja (nível inferior, story 18)", async () => {
+    const { seeded } = await makeOwner();
+    const manager = await makeManager(seeded.storeId);
+    await request(app.getHttpServer())
+      .post(url("/merchant/staff"))
+      .set(authHeader(manager))
+      .send({
+        name: "Entregador M",
+        email: uniqEmail(),
+        password: "secret1",
+        staffRole: "driver",
+        storeId: seeded.storeId,
+      })
+      .expect(201);
+  });
+
+  it("manager NÃO edita vínculo de admin → 403 ROLE_ESCALATION_FORBIDDEN (story 18)", async () => {
+    const prisma = getPrisma(app);
+    const { seeded } = await makeOwner();
+    const manager = await makeManager(seeded.storeId);
+    // admin vinculado à MESMA loja do manager (escopo ok; bloqueio é por papel)
+    const adminUser = await registerUser(app, { roles: ["merchant"] });
+    const adminRow = await prisma.user.findFirstOrThrow({ where: { email: adminUser.email } });
+    const adminLink = await prisma.storeStaff.create({
+      data: { userId: adminRow.id, storeId: seeded.storeId, staffRole: "admin", active: true },
+    });
+    const res = await request(app.getHttpServer())
+      .patch(url(`/merchant/staff/${adminLink.id}`))
+      .set(authHeader(manager))
+      .send({ active: false })
+      .expect(403);
+    expect(res.body.code).toBe("ROLE_ESCALATION_FORBIDDEN");
+  });
+
   it("admin (story 16) cria manager na sua loja (escopo + hierarquia ok)", async () => {
     const { seeded } = await makeOwner();
     const admin = await makeAdmin(seeded.storeId);
