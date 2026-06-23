@@ -82,19 +82,29 @@ export class IntegrationService {
   // ── owner scope ──
 
   /**
-   * Resolve a rede (merchantId) para a integração. Acesso = owner + admin da loja
-   * (story 16); gerente é bloqueado. Exige RoleName `merchant`. Sem rede única →
-   * erro (informa ambiguidade).
+   * Resolve a rede (merchantId) para a integração. Acesso = **owner + admin** da
+   * loja; o **gerente é bloqueado** (story 17). Reusa a resolução de nível da
+   * story 16: owner = RoleName `merchant`; admin = vínculo StoreStaff(admin) ativo;
+   * manager = nem um nem outro → FORBIDDEN. Sem rede única → erro (ambiguidade).
+   *
+   * O backend é a fonte da verdade (CLAUDE.md): mesmo que um gerente receba o
+   * RoleName `merchant` por algum caminho de provisionamento, sem o vínculo
+   * `admin` ativo (e sem ser owner) ele não passa daqui.
    */
   async resolveOwnerMerchantId(user: User): Promise<string> {
-    if (!user.roles.includes("merchant")) {
+    const adminLink = await this.prisma.storeStaff.findFirst({
+      where: { userId: user.id, staffRole: "admin", active: true },
+      select: { id: true },
+    });
+    const isOwner = user.roles.includes("merchant");
+    // Gerente (sem vínculo admin e sem RoleName merchant) é bloqueado da integração.
+    if (!adminLink && !isOwner) {
       throw new ForbiddenException({
-        code: "NOT_AN_OWNER",
+        code: "INTEGRATION_FORBIDDEN",
         message: "Apenas o dono ou administrador pode gerenciar a integração",
       });
     }
-    // Posse da rede via vínculos owner-equivalentes (admin | manager). O bloqueio
-    // específico do gerente (sem RoleName merchant) virá na story 17.
+    // Posse da rede via vínculos de nível de loja (admin | manager). Vazio → erro.
     const staff = await this.prisma.storeStaff.findMany({
       where: { userId: user.id, staffRole: { in: ["admin", "manager"] }, active: true },
       include: { store: { select: { merchantId: true } } },
