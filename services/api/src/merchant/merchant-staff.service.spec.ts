@@ -323,4 +323,116 @@ describe("MerchantStaffService (story 10)", () => {
       expect(staffDelete).not.toHaveBeenCalled();
     });
   });
+
+  // ── Story 18: gerente cria/edita SÓ nível inferior (picker | driver). ──
+  // Matriz explícita da hierarquia: manager nunca escala para manager nem para o
+  // novo papel admin (story 16), em create, update (promoção/edição) e remove.
+  describe("hierarquia de papel — gerente cria só nível inferior (story 18)", () => {
+    describe("create", () => {
+      it("gerente cria picker E driver nas suas lojas → delega createStaff", async () => {
+        const { svc, createStaff } = makeService({ myStores: [storeA] });
+        for (const role of ["picker", "driver"] as const) {
+          await svc.create(manager, {
+            name: "N",
+            email: `${role}@x.z`,
+            password: "secret1",
+            staffRole: role,
+            storeId: "sA",
+          });
+        }
+        expect(createStaff).toHaveBeenCalledTimes(2);
+        expect(createStaff).toHaveBeenCalledWith(
+          expect.objectContaining({ staffRole: "driver", storeId: "sA" }),
+        );
+      });
+
+      it("gerente NÃO cria manager nem admin → ROLE_ESCALATION_FORBIDDEN", async () => {
+        for (const role of ["manager", "admin"] as const) {
+          const { svc, createStaff } = makeService({ myStores: [storeA] });
+          await expect(
+            svc.create(manager, {
+              name: "X",
+              email: `${role}@x.z`,
+              password: "secret1",
+              staffRole: role,
+              storeId: "sA",
+            }),
+          ).rejects.toMatchObject({
+            response: expect.objectContaining({ code: "ROLE_ESCALATION_FORBIDDEN" }),
+          });
+          expect(createStaff).not.toHaveBeenCalled();
+        }
+      });
+    });
+
+    describe("update / promoção", () => {
+      it("gerente NÃO promove picker a manager nem a admin → ROLE_ESCALATION_FORBIDDEN", async () => {
+        for (const role of ["manager", "admin"] as const) {
+          const { svc, staffUpdate } = makeService({
+            myStores: [storeA],
+            staffRow: { id: "st1", staffRole: "picker", active: true, storeId: "sA" },
+          });
+          await expect(svc.update(manager, "st1", { staffRole: role })).rejects.toMatchObject({
+            response: expect.objectContaining({ code: "ROLE_ESCALATION_FORBIDDEN" }),
+          });
+          expect(staffUpdate).not.toHaveBeenCalled();
+        }
+      });
+
+      it("gerente NÃO edita vínculo de manager nem de admin → ROLE_ESCALATION_FORBIDDEN", async () => {
+        for (const role of ["manager", "admin"] as const) {
+          const { svc, staffUpdate } = makeService({
+            myStores: [storeA],
+            staffRow: { id: "st1", staffRole: role, active: true, storeId: "sA" },
+          });
+          await expect(svc.update(manager, "st1", { active: false })).rejects.toMatchObject({
+            response: expect.objectContaining({ code: "ROLE_ESCALATION_FORBIDDEN" }),
+          });
+          expect(staffUpdate).not.toHaveBeenCalled();
+        }
+      });
+
+      it("gerente edita/ativa vínculo de picker e driver (nível inferior)", async () => {
+        for (const role of ["picker", "driver"] as const) {
+          const { svc, staffUpdate } = makeService({
+            myStores: [storeA],
+            staffRow: { id: "st1", staffRole: role, active: true, storeId: "sA" },
+          });
+          await svc.update(manager, "st1", { active: false });
+          expect(staffUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({ where: { id: "st1" }, data: { active: false } }),
+          );
+        }
+      });
+    });
+
+    describe("remove / desativar", () => {
+      it("gerente NÃO desativa vínculo de manager nem de admin → ROLE_ESCALATION_FORBIDDEN", async () => {
+        for (const role of ["manager", "admin"] as const) {
+          const { svc, staffUpdate, staffDelete } = makeService({
+            myStores: [storeA],
+            staffRow: { id: "st1", staffRole: role, active: true, storeId: "sA" },
+          });
+          await expect(svc.remove(manager, "st1", false)).rejects.toMatchObject({
+            response: expect.objectContaining({ code: "ROLE_ESCALATION_FORBIDDEN" }),
+          });
+          expect(staffUpdate).not.toHaveBeenCalled();
+          expect(staffDelete).not.toHaveBeenCalled();
+        }
+      });
+
+      it("gerente desativa picker/driver (nível inferior) → soft delete", async () => {
+        for (const role of ["picker", "driver"] as const) {
+          const { svc, staffUpdate } = makeService({
+            myStores: [storeA],
+            staffRow: { id: "st1", staffRole: role, active: true, storeId: "sA" },
+          });
+          await svc.remove(manager, "st1", false);
+          expect(staffUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({ data: { active: false } }),
+          );
+        }
+      });
+    });
+  });
 });
