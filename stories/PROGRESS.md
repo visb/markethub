@@ -64,6 +64,9 @@ Commits/merges da rodada: 14 (feat `37e08b4` / merge `c6c0838`), 15 (`4a40d0b` /
 `ccf67fd`), 16 (`9c4ee85` / `7727982`), 17 (`1ce7bf0` / `dbb8d83`), 18 (`15bfba6` /
 `3c9862b`). Serviços deixados de pé.
 
+**Rodada 14 → 18 ENCERRADA** — 5/5 stories OK e mergeadas na `main`. Loop AUTORUN
+pode encerrar (nada reagendar).
+
 # PROGRESS — rodada AUTORUN (stories 01 → 13)
 
 Rodada: picker (01–03) + explore mapa (04–06) + app merchant (07–13).
