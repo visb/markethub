@@ -12,7 +12,7 @@ Cuidados da rodada: stories 29/34 mudam **schema** (Store.phone/allowsPickup + S
 | 20 | Cobertura — payment (reembolso + providers) | 19 | OK |
 | 21 | Cobertura — marketplace (cart.service + orders.service) | 19 | OK |
 | 22 | Cobertura — substituição (picking) + gorjeta (driver) | 19 | OK |
-| 23 | Cobertura — auth.service (login/refresh/hash) | 19 | todo |
+| 23 | Cobertura — auth.service (login/refresh/hash) | 19 | OK |
 | 24 | Cobertura — admin-users.service + addresses.service | 19 | todo |
 | 25 | Cobertura — catálogo (service, quality, categoria marketplace) | 19 | todo |
 | 26 | Cobertura — conectores ERP + providers de enrichment | 19 | todo |
@@ -35,6 +35,8 @@ Cuidados da rodada: stories 29/34 mudam **schema** (Store.phone/allowsPickup + S
 [OK] 21 — testes: api 433/433 (+53: cart.service.spec 31 + orders.service.spec 17 + orders.controller.spec 5); cobertura cart.service.ts 8.5%→100% lin/93% br, orders.service.ts 12.9%→100% lin/93% br, orders.controller.ts 0%→100%; casos unit vs weight(gramas)/qtd/remoção/recálculo total/indisponível; criação pedido/markPaid idempotente created→preparing/cancelamento conforme BUSINESS_RULES (status∈{created,paid,preparing} e PickTask só queued/assigned); prisma fake + $transaction mockado, sem DB; test:coverage exit 0 (api lines 44% > piso 35%) — typecheck 12/12 + build 9/9 verdes — commit: d4c870f — merge: 02d929a — 2026-06-28 — só testes, lógica intacta, nenhum bug
 
 [OK] 22 — testes: api 472/472 (+39 em 3 suítes: substitution.service.spec + substitution.scheduler.spec + reviews/tips.service.spec); cobertura substitution.service 0%→100% lin/branch, reviews/tips.service 0%→100% lin/92.6% branch; substitution.scheduler excluído do coverage por config da story 19 (!**/*.scheduler.ts) mas coberto por spec do disparo (delega resolveExpired + log); mock Prisma padrão picking/handoff, sem DB; test:coverage exit 0 ratchet OK — typecheck 12/12 + build 9/9 verdes — commit: 02bf36c — merge: 7102eea — 2026-06-28 — só testes, nenhum bug; nota: plano citava driver/tips.service.ts mas arquivo real é services/api/src/reviews/tips.service.ts (módulo reviews) — cobri o correto
+
+[OK] 23 — testes: api 491/491 (+19: auth.service.spec); cobertura auth.service.ts 0%→100% lin/90.5% branch; PrismaService mockado + TokenService real (argon2 hash/verify + JWT refresh de verdade, mesmos segredos de teste do token.service.spec, sem segredo logado/inventado); casos register(EMAIL_TAKEN/role padrão/dedupe), login(válido/INVALID_CREDENTIALS/inexistente/ACCOUNT_DISABLED), refresh(malformado/sessão ausente/dono divergente/reuse revogada→revoga cadeia/expirada/hash divergente/desativado/rotação replacedBySessionId), logout idempotente, me(ok/INVALID_TOKEN); test:coverage exit 0 (global 48.38%) — typecheck 12/12 + build 9/9 verdes — commit: 70404f7 — merge: 16e04a6 — 2026-06-28 — só testes, nenhum bug
 
 ---
 
