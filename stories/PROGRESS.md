@@ -19,7 +19,7 @@ Cuidados da rodada: stories 29/34 mudam **schema** (Store.phone/allowsPickup + S
 | 27 | Cobertura — notifications + storage | 19 | OK |
 | 28 | Cobertura — dashboard admin + agregado reviews + geocoding | 19 | OK |
 | 29 | Explore — modal do mercado ao tocar o marker (+ schema StoreHours/phone/pickup) | — | OK |
-| 30 | Explore — barra de endereço + marker da localização do usuário | 29 | todo |
+| 30 | Explore — barra de endereço + marker da localização do usuário | 29 | OK |
 | 31 | Modal de produto — add fecha (sem redirect) + animações slide | — | todo |
 | 32 | Página do mercado — remover nome duplicado (AppTitle vazio) | — | todo |
 | 33 | Página do mercado — botão "Seguir" no AppBar (no lugar do "?") | — | todo |
@@ -49,6 +49,8 @@ Cuidados da rodada: stories 29/34 mudam **schema** (Store.phone/allowsPickup + S
 [OK] 28 — testes: api 718/718 (+42 em 5 suítes novas); cobertura admin-dashboard.service 0%→100%, reviews-aggregate.service 0%→100%, nominatim.geocoding-provider 0%→100%, mock.geocoding-provider 0%→100%, admin-dashboard.controller + reviews.controller 100%; Nominatim mockado via global.fetch (hit/lista vazia/não-ok/exceção), Prisma mockado, sem DB/rede; global api lines 65.21% (piso 35) — typecheck 12/12 + build 9/9 verdes — commit: 19dffa8 — merge: 1087720 — 2026-06-28 — só testes, nenhum bug; FIM da cadeia de backfill 20-28 (api 35.5%→65.2% linhas)
 
 [OK] 29 — testes: api unit 740/740 (65.8% lin) + e2e catalog 17/17 + customer 79/79 (34.7% lin); migration nova 20260628194342_store_summary_phone_pickup_hours (Store.phone/allowsPickup + model StoreHours minutos-desde-meia-noite); GET /stores/:id/summary (openNow server-side America/Sao_Paulo abertura inclusiva/fechamento exclusivo, rating via review.aggregate axis=merchant, 404 STORE_NOT_FOUND); admin StoreDetail edita phone/allowsPickup/horário; StoreSummaryDTO em packages/types espelhado nos dois lados; explore.tsx selectedStoreId+StoreSummarySheet (não navega), useStoreSummary hook React Query, queryKeys.explore.storeSummary; seed popula horário padrão; coverage api+customer exit 0 — typecheck 12/12 + build 9/9 verdes — commit: 0d195a1 — merge: 10b6b2d — 2026-06-28 — doorFeeCents reusa CartService.DOOR_SURCHARGE_CENTS (ref estática); janelas cruzando meia-noite fora de escopo; admin StoreDetail seguiu padrão legado useState/useEffect do arquivo (migração total a RQ fora de escopo, coverage admin não gated)
+
+[OK] 30 — testes: customer 92/92 (16 suítes, +3 novas: addressBar, explore.screen.render, mapView.web + ajuste do título do marker no exploreMap.screen); frontend-only; AddressBar pill (com endereço→"Minha localização atual"+street/number+lápis; sem→CTA "Definir endereço") sobre o mapa, onPress→/delivery; useExploreMap expõe activeAddress (sem novo hook); marker "você está aqui" dot azul #2563EB+halo nas 2 engines (StoreMapProps inalterado); coverage exit 0 (lines 37.8% > piso 30) — typecheck 12/12 + build 9/9 verdes — commit: da837df — merge: b494085 — 2026-06-28 — sem backend/schema; retry após implementer anterior bater limite de sessão sem commitar
 
 ---
 
