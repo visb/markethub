@@ -1,11 +1,17 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Button, Text, colors, radius, spacing } from "@markethub/ui";
-import { useAuth } from "@/auth-context";
-import { brl, marketplace, type ProductDetail } from "@/api/marketplace";
+import { brl } from "@/api/marketplace";
+import {
+  useAddCartItem,
+  useFavorites,
+  useProductDetail,
+  useToggleFavorite,
+} from "@/api/hooks/useProductDetail";
+import { useToast } from "@/components/Toast";
 import { Header } from "@/components/Header";
 import { MerchantLogo } from "@/components/MerchantLogo";
 import { QtyStepper } from "@/components/QtyStepper";
@@ -13,43 +19,27 @@ import { Select } from "@/components/Select";
 
 const OUT_OF_STOCK_OPTIONS = ["Prefiro o reembolso", "Trocar por similar", "Cancelar a compra"];
 
-/** Detalhe do produto (modal full screen): imagem, preço, opções, info, preço em outros mercados. */
+/** Detalhe do produto (modal slide baixo→cima): imagem, preço, opções, info, preço em outros mercados. */
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { api } = useAuth();
-  const mkt = marketplace(api);
   const router = useRouter();
-  const [product, setProduct] = useState<ProductDetail | null>(null);
+  const toast = useToast();
+  const { product } = useProductDetail(id);
+  const { favorites } = useFavorites();
+  const toggleFavorite = useToggleFavorite();
+  const addCartItem = useAddCartItem();
+
   const [note, setNote] = useState("");
   // opção de preparo do departamento (S6.6): rótulo/opções vêm da API
   const [prep, setPrep] = useState<string | null>(null);
   const [outOfStock, setOutOfStock] = useState(OUT_OF_STOCK_OPTIONS[0]);
   const [qty, setQty] = useState(1);
   const [grams, setGrams] = useState(300);
-  // favorito da oferta principal (S6.5)
-  const [favorite, setFavorite] = useState(false);
-  const [favBusy, setFavBusy] = useState(false);
 
-  const load = useCallback(async () => {
-    if (!id) return;
-    const p = await mkt.productDetail(id);
-    setProduct(p);
-    setPrep(p.prepOptions?.options[0] ?? null);
-    const mainOfferId = p.offers[0]?.id;
-    if (mainOfferId) {
-      try {
-        const favs = await mkt.favorites();
-        setFavorite(favs.some((f) => f.offerId === mainOfferId));
-      } catch {
-        /* sem favoritos */
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
-
+  // default de preparo derivado do dado do hook (server-state → React Query).
   useEffect(() => {
-    void load();
-  }, [load]);
+    setPrep(product?.prepOptions?.options[0] ?? null);
+  }, [product?.id, product?.prepOptions]);
 
   if (!product) {
     return (
@@ -63,8 +53,9 @@ export default function ProductDetailScreen() {
   const main = product.offers[0];
   const others = product.offers.slice(1);
   const isWeight = product.saleType === "weight";
+  const favorite = !!main && favorites.some((f) => f.offerId === main.id);
 
-  async function addFromOffer(offerId: string) {
+  async function addFromOffer(offerId: string, opts?: { closeAfter?: boolean }) {
     const meta = [
       product?.prepOptions && prep ? `${product.prepOptions.label}: ${prep}` : null,
       `Fora de estoque: ${outOfStock}`,
@@ -72,25 +63,23 @@ export default function ProductDetailScreen() {
     ]
       .filter(Boolean)
       .join(" · ");
-    if (isWeight) await mkt.addItem({ offerId, weightGrams: grams, note: meta });
-    else await mkt.addItem({ offerId, quantity: qty, note: meta });
-    router.push("/cart");
+    const body = isWeight
+      ? { offerId, weightGrams: grams, note: meta }
+      : { offerId, quantity: qty, note: meta };
+    await addCartItem.mutateAsync(body);
+    // oferta principal: adiciona + toast + fecha o modal (story 31).
+    if (opts?.closeAfter) {
+      toast.show("Adicionado ✓");
+      router.back();
+    } else {
+      // outras ofertas: comportamento atual (vai pro carrinho).
+      router.push("/cart");
+    }
   }
 
-  async function toggleFavorite() {
-    if (!main || favBusy) return;
-    setFavBusy(true);
-    try {
-      if (favorite) {
-        await mkt.removeFavorite(main.id);
-        setFavorite(false);
-      } else {
-        await mkt.addFavorite(main.id);
-        setFavorite(true);
-      }
-    } finally {
-      setFavBusy(false);
-    }
+  function onToggleFavorite() {
+    if (!main || toggleFavorite.isPending) return;
+    toggleFavorite.mutate({ offerId: main.id, favorite });
   }
 
   return (
@@ -112,7 +101,7 @@ export default function ProductDetailScreen() {
           </View>
         ) : null}
 
-        <Pressable style={styles.fav} onPress={toggleFavorite} disabled={favBusy}>
+        <Pressable style={styles.fav} onPress={onToggleFavorite} disabled={toggleFavorite.isPending}>
           <Ionicons
             name={favorite ? "heart" : "heart-outline"}
             size={18}
@@ -205,7 +194,7 @@ export default function ProductDetailScreen() {
             onInc={() => (isWeight ? setGrams((g) => g + 100) : setQty((q) => q + 1))}
           />
           <View style={{ flex: 1 }}>
-            <Button title="Adicionar" onPress={() => addFromOffer(main.id)} />
+            <Button title="Adicionar" onPress={() => addFromOffer(main.id, { closeAfter: true })} />
           </View>
         </View>
       ) : null}
