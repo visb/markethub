@@ -80,3 +80,329 @@ describe("CatalogService.listStoresInBounds", () => {
     expect(result.map((s) => s.id)).toEqual(["perto", "longe"]);
   });
 });
+
+// ─── Mock flexível do Prisma p/ os demais métodos do service ───
+type AnyFn = jest.Mock;
+interface CatalogMocks {
+  merchant: { findMany: AnyFn; findUnique: AnyFn };
+  store: { findMany: AnyFn; findUnique: AnyFn };
+  offer: { findMany: AnyFn; count: AnyFn };
+  product: { findUnique: AnyFn };
+  marketplaceCategory: { findMany: AnyFn; findUnique: AnyFn };
+}
+
+function makeCatalog() {
+  const m: CatalogMocks = {
+    merchant: { findMany: jest.fn(), findUnique: jest.fn() },
+    store: { findMany: jest.fn(), findUnique: jest.fn() },
+    offer: { findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) },
+    product: { findUnique: jest.fn() },
+    marketplaceCategory: { findMany: jest.fn(), findUnique: jest.fn() },
+  };
+  const prisma = {
+    ...m,
+    // array de promises → Promise.all (mesma semântica do Prisma p/ transação por lote)
+    $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
+  } as never;
+  return { prisma, m };
+}
+
+const activeStore = { id: "s1", active: true, latitude: 0, longitude: 0 };
+
+function offerRow(id: string, over: Partial<Record<string, unknown>> = {}) {
+  return {
+    id,
+    priceCents: 100,
+    promoPriceCents: null,
+    product: {
+      id: `p-${id}`,
+      name: `Produto ${id}`,
+      brand: "Marca",
+      packageSize: "1kg",
+      saleType: "unit",
+      imageUrl: null,
+      gtin: "789",
+      category: { id: "c1", name: "Cat", slug: "cat" },
+    },
+    ...over,
+  };
+}
+
+describe("CatalogService.listMerchants", () => {
+  it("lista mercados ativos ordenados por nome", async () => {
+    const { prisma, m } = makeCatalog();
+    m.merchant.findMany.mockResolvedValue([{ id: "x" }]);
+    const res = await new CatalogService(prisma).listMerchants();
+    expect(m.merchant.findMany.mock.calls[0][0]).toMatchObject({
+      where: { active: true },
+      orderBy: { name: "asc" },
+    });
+    expect(res).toEqual([{ id: "x" }]);
+  });
+});
+
+describe("CatalogService.listStores", () => {
+  it("lança MERCHANT_NOT_FOUND quando o mercado não existe", async () => {
+    const { prisma, m } = makeCatalog();
+    m.merchant.findUnique.mockResolvedValue(null);
+    await expect(new CatalogService(prisma).listStores("m1")).rejects.toMatchObject({
+      response: { code: "MERCHANT_NOT_FOUND" },
+    });
+  });
+
+  it("lista lojas ativas do mercado", async () => {
+    const { prisma, m } = makeCatalog();
+    m.merchant.findUnique.mockResolvedValue({ id: "m1" });
+    m.store.findMany.mockResolvedValue([{ id: "s1" }]);
+    const res = await new CatalogService(prisma).listStores("m1");
+    expect(m.store.findMany.mock.calls[0][0].where).toEqual({ merchantId: "m1", active: true });
+    expect(res).toEqual([{ id: "s1" }]);
+  });
+});
+
+describe("CatalogService.listStoreCategories", () => {
+  it("deduplica categorias com produto disponível e ordena por nome", async () => {
+    const { prisma, m } = makeCatalog();
+    m.store.findUnique.mockResolvedValue(activeStore);
+    m.offer.findMany.mockResolvedValue([
+      { product: { category: { id: "c2", name: "Bebidas", slug: "bebidas" } } },
+      { product: { category: { id: "c1", name: "Açougue", slug: "acougue" } } },
+      { product: { category: { id: "c2", name: "Bebidas", slug: "bebidas" } } }, // dup
+      { product: { category: null } }, // ignorada
+    ]);
+    const res = await new CatalogService(prisma).listStoreCategories("s1");
+    expect(res.map((c) => c.id)).toEqual(["c1", "c2"]);
+  });
+
+  it("propaga STORE_NOT_FOUND quando a loja não existe/inativa", async () => {
+    const { prisma, m } = makeCatalog();
+    m.store.findUnique.mockResolvedValue(null);
+    await expect(new CatalogService(prisma).listStoreCategories("s1")).rejects.toMatchObject({
+      response: { code: "STORE_NOT_FOUND" },
+    });
+  });
+});
+
+describe("CatalogService.listStoreProducts", () => {
+  it("achata oferta+produto e pagina (clamp do pageSize)", async () => {
+    const { prisma, m } = makeCatalog();
+    m.store.findUnique.mockResolvedValue(activeStore);
+    m.offer.findMany.mockResolvedValue([offerRow("o1")]);
+    m.offer.count.mockResolvedValue(1);
+    const res = await new CatalogService(prisma).listStoreProducts("s1", { pageSize: 999 });
+    expect(res.pageSize).toBe(100); // MAX_PAGE_SIZE
+    expect(res.total).toBe(1);
+    expect(res.items[0]).toMatchObject({ offerId: "o1", priceCents: 100, id: "p-o1" });
+  });
+
+  it("aplica filtro de categoria crua e de categoria de marketplace", async () => {
+    const { prisma, m } = makeCatalog();
+    m.store.findUnique.mockResolvedValue(activeStore);
+    await new CatalogService(prisma).listStoreProducts("s1", {
+      categoryId: "c1",
+      marketplaceCategoryId: "mc1",
+    });
+    const where = m.offer.findMany.mock.calls[0][0].where;
+    expect(where).toMatchObject({
+      storeId: "s1",
+      available: true,
+      product: { categoryId: "c1", category: { marketplaceCategoryId: "mc1" } },
+    });
+  });
+
+  it("sem filtros não inclui cláusula de produto", async () => {
+    const { prisma, m } = makeCatalog();
+    m.store.findUnique.mockResolvedValue(activeStore);
+    await new CatalogService(prisma).listStoreProducts("s1", {});
+    expect(m.offer.findMany.mock.calls[0][0].where).not.toHaveProperty("product");
+  });
+});
+
+describe("CatalogService.search", () => {
+  it("termo vazio → resultado vazio sem tocar o banco", async () => {
+    const { prisma, m } = makeCatalog();
+    const res = await new CatalogService(prisma).search("   ", {});
+    expect(res).toEqual({ items: [], page: 1, pageSize: 20, total: 0 });
+    expect(m.offer.findMany).not.toHaveBeenCalled();
+  });
+
+  it("busca por nome/marca/categoria, restrita à loja quando informada", async () => {
+    const { prisma, m } = makeCatalog();
+    m.offer.findMany.mockResolvedValue([offerRow("o1")]);
+    m.offer.count.mockResolvedValue(1);
+    const res = await new CatalogService(prisma).search("arroz", { storeId: "s1" });
+    const where = m.offer.findMany.mock.calls[0][0].where;
+    expect(where.storeId).toBe("s1");
+    expect(where.product.OR).toHaveLength(3);
+    expect(res.items[0]).toMatchObject({ offerId: "o1" });
+  });
+});
+
+describe("CatalogService.productDetail", () => {
+  it("lança PRODUCT_NOT_FOUND quando ausente", async () => {
+    const { prisma, m } = makeCatalog();
+    m.product.findUnique.mockResolvedValue(null);
+    await expect(new CatalogService(prisma).productDetail("p1")).rejects.toMatchObject({
+      response: { code: "PRODUCT_NOT_FOUND" },
+    });
+  });
+
+  it("achata categoria e extrai prepOptions válidos", async () => {
+    const { prisma, m } = makeCatalog();
+    m.product.findUnique.mockResolvedValue({
+      id: "p1",
+      name: "Arroz",
+      category: {
+        id: "c1",
+        name: "Mercearia",
+        slug: "mercearia",
+        marketplaceCategory: { prepOptions: { label: "Como preparar?", options: ["a", "b"] } },
+      },
+      offers: [],
+    });
+    const res = await new CatalogService(prisma).productDetail("p1");
+    expect(res.category).toEqual({ id: "c1", name: "Mercearia", slug: "mercearia" });
+    expect(res.prepOptions).toEqual({ label: "Como preparar?", options: ["a", "b"] });
+  });
+
+  it("prepOptions inválido/ausente vira null e categoria nula é tolerada", async () => {
+    const { prisma, m } = makeCatalog();
+    m.product.findUnique.mockResolvedValue({
+      id: "p1",
+      name: "Arroz",
+      category: { id: "c1", name: "X", slug: "x", marketplaceCategory: { prepOptions: { options: [] } } },
+      offers: [],
+    });
+    const withInvalid = await new CatalogService(prisma).productDetail("p1");
+    expect(withInvalid.prepOptions).toBeNull();
+
+    m.product.findUnique.mockResolvedValue({ id: "p2", name: "Y", category: null, offers: [] });
+    const noCat = await new CatalogService(prisma).productDetail("p2");
+    expect(noCat.category).toBeNull();
+    expect(noCat.prepOptions).toBeNull();
+  });
+});
+
+describe("CatalogService.storeSections", () => {
+  function sectionStore(over: Partial<Record<string, unknown>> = {}) {
+    return {
+      id: "s1",
+      name: "Loja",
+      active: true,
+      latitude: 0,
+      longitude: 0,
+      avgPrepMinutes: 15,
+      merchant: { name: "Mercado", logoUrl: null, deliveryFeeCents: 500 },
+      ...over,
+    };
+  }
+
+  it("lança STORE_NOT_FOUND quando inativa", async () => {
+    const { prisma, m } = makeCatalog();
+    m.store.findUnique.mockResolvedValue(sectionStore({ active: false }));
+    await expect(new CatalogService(prisma).storeSections("s1")).rejects.toMatchObject({
+      response: { code: "STORE_NOT_FOUND" },
+    });
+  });
+
+  it("monta seções e calcula distância/ETA com geo", async () => {
+    const { prisma, m } = makeCatalog();
+    m.store.findUnique.mockResolvedValue(sectionStore({ latitude: -23.5, longitude: -46.6 }));
+    m.offer.findMany.mockResolvedValue([offerRow("o1")]);
+    const res = await new CatalogService(prisma).storeSections("s1", {
+      lat: -23.6,
+      lng: -46.6,
+    });
+    expect(res.store.deliveryFeeCents).toBe(500);
+    expect(res.store.distanceKm).toBeGreaterThan(0);
+    expect(res.featured).toHaveLength(1);
+    expect(res.mostBought).toHaveLength(1);
+    expect(res.recommended).toHaveLength(1);
+  });
+
+  it("sem geo a distância é nula", async () => {
+    const { prisma, m } = makeCatalog();
+    m.store.findUnique.mockResolvedValue(sectionStore());
+    const res = await new CatalogService(prisma).storeSections("s1");
+    expect(res.store.distanceKm).toBeNull();
+  });
+});
+
+describe("CatalogService.feed", () => {
+  function feedOffer(storeId: string, lat: number | null, lng: number | null) {
+    return {
+      id: `o-${storeId}`,
+      priceCents: 200,
+      promoPriceCents: null,
+      store: {
+        id: storeId,
+        name: `Loja ${storeId}`,
+        latitude: lat,
+        longitude: lng,
+        avgPrepMinutes: 10,
+        merchant: { name: "Mercado", logoUrl: null, deliveryFeeCents: 0 },
+      },
+      product: {
+        id: `p-${storeId}`,
+        name: "Item",
+        brand: null,
+        packageSize: null,
+        saleType: "unit",
+        imageUrl: null,
+      },
+    };
+  }
+
+  it("descarta categorias sem itens e mantém as com produtos", async () => {
+    const { prisma, m } = makeCatalog();
+    m.marketplaceCategory.findMany.mockResolvedValue([
+      { id: "cat-cheia", name: "Bebidas", slug: "bebidas" },
+      { id: "cat-vazia", name: "Vazia", slug: "vazia" },
+    ]);
+    m.offer.findMany
+      .mockResolvedValueOnce([feedOffer("s1", null, null)])
+      .mockResolvedValueOnce([]);
+    const res = await new CatalogService(prisma).feed();
+    expect(res).toHaveLength(1);
+    expect(res[0].category.id).toBe("cat-cheia");
+    expect(res[0].items[0]).toMatchObject({ storeId: "s1", deliveryEta: expect.any(String) });
+  });
+
+  it("com raio busca excedente (take*3) e filtra por distância", async () => {
+    const { prisma, m } = makeCatalog();
+    m.marketplaceCategory.findMany.mockResolvedValue([{ id: "cat", name: "C", slug: "c" }]);
+    // perto (dentro do raio) e longe (fora)
+    m.offer.findMany.mockResolvedValue([
+      feedOffer("perto", -23.5, -46.6),
+      feedOffer("longe", -3.1, -60.0),
+    ]);
+    const res = await new CatalogService(prisma).feed({
+      geo: { lat: -23.5, lng: -46.6, radiusKm: 5 },
+    });
+    // take default 10 → com raio busca 30
+    expect(m.offer.findMany.mock.calls[0][0].take).toBe(30);
+    expect(res[0].items.map((i) => i.storeId)).toEqual(["perto"]);
+  });
+});
+
+describe("CatalogService.categoryFeed", () => {
+  it("lança CATEGORY_NOT_FOUND quando a categoria curada não existe", async () => {
+    const { prisma, m } = makeCatalog();
+    m.marketplaceCategory.findUnique.mockResolvedValue(null);
+    await expect(new CatalogService(prisma).categoryFeed("mc1")).rejects.toMatchObject({
+      response: { code: "CATEGORY_NOT_FOUND" },
+    });
+  });
+
+  it("retorna categoria + itens paginados, com busca opcional restrita", async () => {
+    const { prisma, m } = makeCatalog();
+    m.marketplaceCategory.findUnique.mockResolvedValue({ id: "mc1", name: "Bebidas", slug: "bebidas" });
+    m.offer.findMany.mockResolvedValue([]);
+    const res = await new CatalogService(prisma).categoryFeed("mc1", { q: "coca", storeId: "s1" });
+    expect(res.category).toEqual({ id: "mc1", name: "Bebidas", slug: "bebidas" });
+    const where = m.offer.findMany.mock.calls[0][0].where;
+    expect(where.storeId).toBe("s1");
+    expect(where.product.OR).toHaveLength(2);
+    expect(where.product.category).toEqual({ marketplaceCategoryId: "mc1" });
+  });
+});
