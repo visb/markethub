@@ -14,7 +14,7 @@ Cuidados da rodada: stories 29/34 mudam **schema** (Store.phone/allowsPickup + S
 | 22 | Cobertura — substituição (picking) + gorjeta (driver) | 19 | OK |
 | 23 | Cobertura — auth.service (login/refresh/hash) | 19 | OK |
 | 24 | Cobertura — admin-users.service + addresses.service | 19 | OK |
-| 25 | Cobertura — catálogo (service, quality, categoria marketplace) | 19 | todo |
+| 25 | Cobertura — catálogo (service, quality, categoria marketplace) | 19 | OK |
 | 26 | Cobertura — conectores ERP + providers de enrichment | 19 | todo |
 | 27 | Cobertura — notifications + storage | 19 | todo |
 | 28 | Cobertura — dashboard admin + agregado reviews + geocoding | 19 | todo |
@@ -39,6 +39,8 @@ Cuidados da rodada: stories 29/34 mudam **schema** (Store.phone/allowsPickup + S
 [OK] 23 — testes: api 491/491 (+19: auth.service.spec); cobertura auth.service.ts 0%→100% lin/90.5% branch; PrismaService mockado + TokenService real (argon2 hash/verify + JWT refresh de verdade, mesmos segredos de teste do token.service.spec, sem segredo logado/inventado); casos register(EMAIL_TAKEN/role padrão/dedupe), login(válido/INVALID_CREDENTIALS/inexistente/ACCOUNT_DISABLED), refresh(malformado/sessão ausente/dono divergente/reuse revogada→revoga cadeia/expirada/hash divergente/desativado/rotação replacedBySessionId), logout idempotente, me(ok/INVALID_TOKEN); test:coverage exit 0 (global 48.38%) — typecheck 12/12 + build 9/9 verdes — commit: 70404f7 — merge: 16e04a6 — 2026-06-28 — só testes, nenhum bug
 
 [OK] 24 — testes: api 530/530 (+39 em 3 suítes: admin-users.service +14, admin-users.controller +7, addresses.service +18); cobertura admin-users.service 17%→100%, admin-users.controller 0%→100%, addresses.service 0%→100%; RBAC reaproveitado de merchant-staff.service.spec (mapeamento StaffRole→RoleName admin/manager→merchant, picker→picker, driver→driver; STORE_NOT_FOUND/EMAIL_TAKEN; hash argon2 senha nunca texto puro); GeocodingProvider mockado atrás de GEOCODING_PROVIDER, sem DB/rede; test:coverage exit 0 (global 50.8%) — typecheck 12/12 + build 9/9 verdes — commit: dbc1f25 — merge: b04508d — 2026-06-28 — só testes, nenhum bug
+
+[OK] 25 — testes: api 599/599 (catálogo 9 suítes/109 testes, 5 novas + 3 ampliadas); cobertura catalog.service 17.7%→100% lin/95% br, catalog-quality.service 0%→100%, marketplace-category.service 0%→100%, admin-catalog.service 65%→86%, controllers (catalog/admin-catalog/marketplace-category/catalog-quality) 100%; global api 36.3%→56.5% (gate 19 exit 0); Prisma/BullMQ mockados, sem DB/rede — typecheck 12/12 + build 9/9 verdes — commit: 12a863a — merge: a0f598d — 2026-06-28 — só testes, nenhum bug; nota: caminhos físicos divergem do plano — catalog-quality.service em src/enrichment/, marketplace-category.service em src/catalog/ (cobri os reais)
 
 ---
 
