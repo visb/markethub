@@ -102,7 +102,8 @@ export default function StoreHome() {
 
   return (
     <SafeAreaView style={styles.flex} edges={["top"]}>
-      <Header title={name ?? "Loja"} />
+      {/* Story 32: título do AppBar vazio — o nome do mercado fica só no storeHead, ao lado da logo. */}
+      <Header title="" />
 
       <View style={styles.storeHead}>
         <MerchantLogo name={store?.merchantName ?? name ?? "Loja"} logoUrl={store?.merchantLogoUrl} size={48} />
