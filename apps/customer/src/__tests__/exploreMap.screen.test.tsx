@@ -47,7 +47,7 @@ describe("StoreMap (nativo)", () => {
     expect(storeMarker?.coordinate).toEqual({ latitude: -25.6, longitude: -49.4 });
   });
 
-  it("renderiza o pin de destino quando há endereço ativo", () => {
+  it("renderiza o marker 'você está aqui' quando há endereço ativo (story 30)", () => {
     act(() => {
       renderer.create(
         <StoreMap
@@ -57,11 +57,11 @@ describe("StoreMap (nativo)", () => {
         />,
       );
     });
-    const dest = markerProps.find((m) => m.title === "Endereço de entrega");
+    const dest = markerProps.find((m) => m.title === "Você está aqui");
     expect(dest?.coordinate).toEqual({ latitude: -25.5, longitude: -49.3 });
   });
 
-  it("sem destino → nenhum pin de endereço", () => {
+  it("sem destino → nenhum marker do usuário", () => {
     act(() => {
       renderer.create(
         <StoreMap
@@ -71,7 +71,7 @@ describe("StoreMap (nativo)", () => {
         />,
       );
     });
-    expect(markerProps.find((m) => m.title === "Endereço de entrega")).toBeUndefined();
+    expect(markerProps.find((m) => m.title === "Você está aqui")).toBeUndefined();
   });
 });
 
@@ -93,6 +93,12 @@ describe("tela explore — orquestra o hook (não faz fetch inline)", () => {
   it("consome o ViewModel useExploreMap e o StoreMap", () => {
     expect(screen).toMatch(/useExploreMap/);
     expect(screen).toMatch(/StoreMap/);
+  });
+
+  it("renderiza a AddressBar com o endereço ativo e navega para /delivery (story 30)", () => {
+    expect(screen).toMatch(/AddressBar/);
+    expect(screen).toMatch(/activeAddress/);
+    expect(screen).toMatch(/router\.push\("\/delivery"\)/);
   });
 
   it("encaminha onViewportChange ao mapa e renderiza o overlay de loading (story 06)", () => {
