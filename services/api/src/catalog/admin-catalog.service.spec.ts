@@ -18,6 +18,53 @@ function makePrisma(existing: Record<string, unknown> | null) {
   };
 }
 
+describe("AdminCatalogService.listProducts", () => {
+  function makeListPrisma() {
+    const findMany = jest.fn().mockResolvedValue([{ id: "p1" }]);
+    const count = jest.fn().mockResolvedValue(1);
+    const prisma = {
+      product: { findMany, count },
+      $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
+    } as never;
+    return { prisma, findMany, count };
+  }
+
+  it("clampa paginação e ordena por completude e nome", async () => {
+    const { prisma, findMany } = makeListPrisma();
+    const res = await new AdminCatalogService(prisma).listProducts({ pageSize: 999 });
+    expect(res.pageSize).toBe(100);
+    expect(res.total).toBe(1);
+    expect(findMany.mock.calls[0][0].orderBy).toEqual([
+      { completenessScore: "asc" },
+      { name: "asc" },
+    ]);
+    expect(findMany.mock.calls[0][0].where).toEqual({});
+  });
+
+  it("monta where de busca (nome/marca/gtin) e status", async () => {
+    const { prisma, findMany } = makeListPrisma();
+    await new AdminCatalogService(prisma).listProducts({ search: "arroz", status: "pending" });
+    const where = findMany.mock.calls[0][0].where;
+    expect(where.enrichmentStatus).toBe("pending");
+    expect(where.OR).toHaveLength(3);
+  });
+});
+
+describe("AdminCatalogService.productDetail", () => {
+  it("lança PRODUCT_NOT_FOUND quando ausente", async () => {
+    const { prisma } = makePrisma(null);
+    await expect(new AdminCatalogService(prisma).productDetail("p1")).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it("retorna o produto com ofertas/enrichment quando existe", async () => {
+    const { prisma } = makePrisma({ id: "p1", offers: [] });
+    const res = await new AdminCatalogService(prisma).productDetail("p1");
+    expect(res).toMatchObject({ id: "p1" });
+  });
+});
+
 describe("AdminCatalogService.updateProduct", () => {
   it("lança PRODUCT_NOT_FOUND quando o produto não existe", async () => {
     const { prisma } = makePrisma(null);
