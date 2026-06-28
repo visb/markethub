@@ -194,6 +194,17 @@ Sem segredos no código. Tudo via env — ver `.env.example`. Nunca commitar `.e
 
 ---
 
+## Delegação (subagentes)
+
+Preferir delegar a fazer inline — mantém o contexto principal limpo:
+
+- **Localizar código** ("onde está X", "o que chama Y", mapear pasta) → agent `cavecrew-investigator` (output comprimido), não varredura inline.
+- **Revisar diff/branch** → agent `cavecrew-reviewer`.
+- **Implementar uma story/unidade fechada** → agent `markethub-implementer` (codifica + gates + commit na branch).
+- **Rodar os gates** (typecheck/build/test do escopo) → agent `markethub-validator` (devolve PASS/FAIL).
+
+---
+
 ## O que NÃO fazer
 
 - Não pôr backend em `apps/` (só frontend) nem lógica de negócio em controller.

@@ -7,10 +7,8 @@ description: Padrões dos frontends MarketHub — apps mobile customer/picker/dr
 
 ## Apps
 
-- `apps/customer` — Expo Router / React Native — app do cliente (catálogo, carrinho, checkout, tracking).
-- `apps/picker` — Expo Router / React Native — separador (picking).
-- `apps/driver` — Expo Router / React Native — entregador (entrega própria da loja).
-- `apps/admin` — React + Vite (react-router-dom) — painel administrativo e curadoria de catálogo.
+`apps/{customer,picker,driver}` (Expo Router / React Native) + `apps/admin` (React + Vite /
+react-router-dom). Quem é cada um e onde mora cada feature: skill `markethub-project-map`.
 
 Todos consomem `@markethub/types` (contratos), `@markethub/api-client` (HTTP + socket + token-store) e, no mobile, `@markethub/ui` (componentes RN compartilhados — source, Metro transpila).
 
@@ -138,8 +136,8 @@ Ao tocar o primeiro fluxo de um app ainda não migrado:
 
 ---
 
-## Validação recomendada
+## Validação
 
-- Admin: `pnpm --filter @markethub/admin build` (tsc + vite).
-- Mobile: sem build de produção no fluxo dev — validar tipos com `pnpm --filter @markethub/customer exec tsc --noEmit` (idem picker/driver) ou subir `pnpm dev:customer`.
-- Tipos/cliente compartilhado: `pnpm typecheck` na raiz cobre os workspaces.
+Gates (admin: `pnpm --filter @markethub/admin build`; mobile: typecheck via `pnpm typecheck` na raiz
+ou `tsc --noEmit` por app; testes do app tocado): delegar ao agent `markethub-validator` ou ver a
+skill `markethub-workflow`.
