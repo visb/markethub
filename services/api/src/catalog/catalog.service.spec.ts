@@ -406,3 +406,134 @@ describe("CatalogService.categoryFeed", () => {
     expect(where.product.category).toEqual({ marketplaceCategoryId: "mc1" });
   });
 });
+
+// ─── Story 29: resumo da loja (modal explore) ───
+import { CatalogService as CS, isOpenAt, saoPauloDayAndMinute } from "./catalog.service";
+
+describe("isOpenAt (story 29)", () => {
+  const hours = [
+    { dayOfWeek: 1, opensAt: 480, closesAt: 1320 }, // seg 8h–22h
+    { dayOfWeek: 0, opensAt: 480, closesAt: 1200 }, // dom 8h–20h
+  ];
+
+  it("dentro da janela → aberto", () => {
+    expect(isOpenAt(hours, 1, 600)).toBe(true);
+  });
+  it("abertura é inclusiva (opensAt) → aberto", () => {
+    expect(isOpenAt(hours, 1, 480)).toBe(true);
+  });
+  it("fechamento é exclusivo (closesAt) → fechado", () => {
+    expect(isOpenAt(hours, 1, 1320)).toBe(false);
+  });
+  it("antes da abertura → fechado", () => {
+    expect(isOpenAt(hours, 1, 479)).toBe(false);
+  });
+  it("depois do fechamento → fechado", () => {
+    expect(isOpenAt(hours, 1, 1321)).toBe(false);
+  });
+  it("dia sem linha → fechado", () => {
+    expect(isOpenAt(hours, 3, 600)).toBe(false);
+  });
+});
+
+describe("saoPauloDayAndMinute (story 29)", () => {
+  it("converte UTC para America/Sao_Paulo (-03:00)", () => {
+    // 2026-06-28 é um domingo; 12:00Z → 09:00 em São Paulo.
+    const { dayOfWeek, minuteOfDay } = saoPauloDayAndMinute(new Date("2026-06-28T12:00:00Z"));
+    expect(dayOfWeek).toBe(0);
+    expect(minuteOfDay).toBe(9 * 60);
+  });
+});
+
+describe("CatalogService.storeSummary (story 29)", () => {
+  function makeSummaryPrisma(store: unknown, agg: unknown) {
+    return {
+      store: { findUnique: jest.fn().mockResolvedValue(store) },
+      review: { aggregate: jest.fn().mockResolvedValue(agg) },
+    } as never;
+  }
+  const baseStore = {
+    id: "s1",
+    name: "Europa - Centro",
+    active: true,
+    street: "Rua X",
+    number: "100",
+    district: "Centro",
+    city: "Curitiba",
+    state: "PR",
+    phone: "(41) 3000-1001",
+    allowsPickup: true,
+    avgPrepMinutes: 30,
+    merchantId: "m1",
+    merchant: { name: "Supermercado Europa", logoUrl: null, deliveryFeeCents: 700 },
+    hours: [{ dayOfWeek: 0, opensAt: 480, closesAt: 1200 }],
+  };
+  // domingo 09:00 São Paulo → dentro de 8h–20h
+  const sundayMorning = new Date("2026-06-28T12:00:00Z");
+
+  it("monta o DTO com endereço, ETA, faixa de frete (piso/teto) e logo/merchant", async () => {
+    const prisma = makeSummaryPrisma(baseStore, { _avg: { rating: null }, _count: { _all: 0 } });
+    const out = await new CS(prisma).storeSummary("s1", sundayMorning);
+    expect(out).toMatchObject({
+      id: "s1",
+      name: "Europa - Centro",
+      merchantName: "Supermercado Europa",
+      merchantLogoUrl: null,
+      address: { street: "Rua X", number: "100", district: "Centro", city: "Curitiba", state: "PR" },
+      phone: "(41) 3000-1001",
+      etaMinutes: 30,
+      deliveryFeeCents: 700,
+      doorFeeCents: 700 + 400, // + door surcharge
+      allowsPickup: true,
+      openNow: true,
+    });
+  });
+
+  it("rating null quando não há reviews", async () => {
+    const prisma = makeSummaryPrisma(baseStore, { _avg: { rating: null }, _count: { _all: 0 } });
+    const out = await new CS(prisma).storeSummary("s1", sundayMorning);
+    expect(out.rating).toBeNull();
+  });
+
+  it("rating agrega média + contagem das reviews axis=merchant", async () => {
+    const prisma = makeSummaryPrisma(baseStore, { _avg: { rating: 4.25 }, _count: { _all: 8 } });
+    const out = await new CS(prisma).storeSummary("s1", sundayMorning);
+    expect(out.rating).toEqual({ average: 4.3, count: 8 });
+    const where = (prisma as never as { review: { aggregate: jest.Mock } }).review.aggregate.mock
+      .calls[0][0].where;
+    expect(where).toEqual({ axis: "merchant", targetMerchantId: "m1" });
+  });
+
+  it("openNow false fora da janela do dia", async () => {
+    const prisma = makeSummaryPrisma(baseStore, { _avg: { rating: null }, _count: { _all: 0 } });
+    // 2026-06-28 23:00Z → 20:00 São Paulo (== closesAt 1200, exclusivo) → fechado
+    const out = await new CS(prisma).storeSummary("s1", new Date("2026-06-28T23:00:00Z"));
+    expect(out.openNow).toBe(false);
+  });
+
+  it("allowsPickup reflete a coluna", async () => {
+    const prisma = makeSummaryPrisma(
+      { ...baseStore, allowsPickup: false },
+      { _avg: { rating: null }, _count: { _all: 0 } },
+    );
+    const out = await new CS(prisma).storeSummary("s1", sundayMorning);
+    expect(out.allowsPickup).toBe(false);
+  });
+
+  it("loja inexistente → 404 STORE_NOT_FOUND", async () => {
+    const prisma = makeSummaryPrisma(null, { _avg: { rating: null }, _count: { _all: 0 } });
+    await expect(new CS(prisma).storeSummary("x")).rejects.toMatchObject({
+      response: { code: "STORE_NOT_FOUND" },
+    });
+  });
+
+  it("loja inativa → 404 STORE_NOT_FOUND", async () => {
+    const prisma = makeSummaryPrisma(
+      { ...baseStore, active: false },
+      { _avg: { rating: null }, _count: { _all: 0 } },
+    );
+    await expect(new CS(prisma).storeSummary("s1")).rejects.toMatchObject({
+      response: { code: "STORE_NOT_FOUND" },
+    });
+  });
+});

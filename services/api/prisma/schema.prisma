@@ -230,6 +230,10 @@ model Store {
   zipCode       String?
   latitude      Float?
   longitude     Float?
+  // contato exibido no resumo da loja (modal explore — story 29)
+  phone         String?
+  // permite retirada de pedidos na loja (badge "Retirar na loja" — story 29)
+  allowsPickup  Boolean        @default(true)
   // tempo médio de preparo do pedido (min) — compõe o ETA real (S6.7)
   avgPrepMinutes Int           @default(15)
   active        Boolean        @default(true)
@@ -240,10 +244,28 @@ model Store {
   staff         StoreStaff[]
   orderGroups   OrderGroup[]
   deliverySlots DeliverySlot[]
+  hours         StoreHours[]
 
   @@unique([merchantId, externalId])
   @@index([merchantId])
   @@map("stores")
+}
+
+// Horário de funcionamento da loja por dia da semana (story 29). Uma faixa
+// abre–fecha por dia (`dayOfWeek` 0=domingo..6=sábado); `opensAt`/`closesAt` em
+// minutos desde a meia-noite (ex.: 8h = 480) p/ comparação livre de timezone.
+// Dia sem linha = fechado nesse dia. Janelas que cruzam a meia-noite ficam fora
+// de escopo (assume `closesAt > opensAt`).
+model StoreHours {
+  id        String   @id @default(cuid())
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  storeId   String
+  dayOfWeek Int // 0=domingo .. 6=sábado
+  opensAt   Int // minutos desde a meia-noite
+  closesAt  Int // minutos desde a meia-noite
+
+  @@index([storeId])
+  @@map("store_hours")
 }
 
 // Categoria CRUA (origem ERP/Cosmos, criada automaticamente). Mapeia para uma categoria

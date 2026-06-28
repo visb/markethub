@@ -1,8 +1,8 @@
 import type { ApiClient } from "@markethub/api-client";
-import type { NearbyStoreDTO, ViewportBoundsDTO } from "@markethub/types";
+import type { NearbyStoreDTO, StoreSummaryDTO, ViewportBoundsDTO } from "@markethub/types";
 
-// Re-export dos contratos compartilhados do mapa (stories 04/05/06) — fonte única em packages/types.
-export type { NearbyStoreDTO, ViewportBoundsDTO } from "@markethub/types";
+// Re-export dos contratos compartilhados do mapa (stories 04/05/06/29) — fonte única em packages/types.
+export type { NearbyStoreDTO, StoreSummaryDTO, ViewportBoundsDTO } from "@markethub/types";
 
 export type SaleType = "unit" | "weight";
 
@@ -301,6 +301,8 @@ export function marketplace(api: ApiClient) {
       api.request<NearbyStoreDTO[]>(
         `/stores/nearby?north=${bounds.north}&south=${bounds.south}&east=${bounds.east}&west=${bounds.west}`,
       ),
+    /** Resumo da loja para o modal do explore (story 29), buscado ao tocar o marker. */
+    storeSummary: (id: string) => api.request<StoreSummaryDTO>(`/stores/${id}/summary`),
     products: (storeId: string, page = 1) =>
       api.request<Paginated<ProductView>>(`/stores/${storeId}/products?page=${page}&pageSize=30`),
     search: (storeId: string, q: string) =>

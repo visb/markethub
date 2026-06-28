@@ -23,3 +23,37 @@ export interface NearbyStoreDTO {
   merchantName: string;
   merchantLogoUrl: string | null;
 }
+
+/** Endereço da loja exibido no resumo (modal explore — story 29). */
+export interface StoreSummaryAddressDTO {
+  street: string | null;
+  number: string | null;
+  district: string | null;
+  city: string | null;
+  state: string | null;
+}
+
+/**
+ * Resumo da loja para o modal do explore (`GET /stores/:id/summary` — story 29),
+ * buscado ao tocar o marker. `openNow` é computado no servidor (timezone
+ * America/Sao_Paulo); `rating` é `null` quando a loja não tem avaliações.
+ * Faixa de frete = [`deliveryFeeCents` (piso), `doorFeeCents` (teto)].
+ */
+export interface StoreSummaryDTO {
+  id: string;
+  name: string;
+  merchantName: string;
+  merchantLogoUrl: string | null;
+  address: StoreSummaryAddressDTO;
+  phone: string | null;
+  /** null = loja sem avaliações ainda. */
+  rating: { average: number; count: number } | null;
+  /** ETA em minutos (avgPrepMinutes). */
+  etaMinutes: number;
+  /** piso da faixa de frete. */
+  deliveryFeeCents: number;
+  /** teto da faixa de frete (deliveryFee + door surcharge). */
+  doorFeeCents: number;
+  allowsPickup: boolean;
+  openNow: boolean;
+}

@@ -86,7 +86,8 @@ describe("tela explore — orquestra o hook (não faz fetch inline)", () => {
   it("não importa React Query nem faz fetch inline", () => {
     expect(screen).not.toMatch(/@tanstack\/react-query/);
     expect(screen).not.toMatch(/useQuery|useMutation/);
-    expect(screen).not.toMatch(/useState|useEffect/);
+    // useEffect (fetch inline) segue proibido; useState p/ seleção de marker é UI local (story 29).
+    expect(screen).not.toMatch(/useEffect/);
   });
 
   it("consome o ViewModel useExploreMap e o StoreMap", () => {
@@ -98,5 +99,14 @@ describe("tela explore — orquestra o hook (não faz fetch inline)", () => {
     expect(screen).toMatch(/onViewportChange/);
     expect(screen).toMatch(/MapLoadingBadge/);
     expect(screen).toMatch(/fetching/);
+  });
+
+  it("tocar no marker abre o modal (não navega direto para /store) — story 29", () => {
+    // onStorePress agora guarda a seleção (abre o sheet) em vez de router.push para a loja.
+    expect(screen).toMatch(/onStorePress=\{\(s\) => setSelectedStoreId\(s\.id\)\}/);
+    expect(screen).toMatch(/StoreSummarySheet/);
+    expect(screen).toMatch(/selectedStoreId/);
+    // a navegação direta para /store/ não acontece mais no callback do marker
+    expect(screen).not.toMatch(/onStorePress=\{\(s\) => router\.push/);
   });
 });
