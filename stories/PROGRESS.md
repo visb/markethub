@@ -21,7 +21,7 @@ Cuidados da rodada: stories 29/34 mudam **schema** (Store.phone/allowsPickup + S
 | 29 | Explore — modal do mercado ao tocar o marker (+ schema StoreHours/phone/pickup) | — | OK |
 | 30 | Explore — barra de endereço + marker da localização do usuário | 29 | OK |
 | 31 | Modal de produto — add fecha (sem redirect) + animações slide | — | OK |
-| 32 | Página do mercado — remover nome duplicado (AppTitle vazio) | — | todo |
+| 32 | Página do mercado — remover nome duplicado (AppTitle vazio) | — | OK |
 | 33 | Página do mercado — botão "Seguir" no AppBar (no lugar do "?") | — | todo |
 | 34 | Seguir loja — backend (StoreFollow) + wiring do botão | 33 | todo |
 
@@ -53,6 +53,8 @@ Cuidados da rodada: stories 29/34 mudam **schema** (Store.phone/allowsPickup + S
 [OK] 30 — testes: customer 92/92 (16 suítes, +3 novas: addressBar, explore.screen.render, mapView.web + ajuste do título do marker no exploreMap.screen); frontend-only; AddressBar pill (com endereço→"Minha localização atual"+street/number+lápis; sem→CTA "Definir endereço") sobre o mapa, onPress→/delivery; useExploreMap expõe activeAddress (sem novo hook); marker "você está aqui" dot azul #2563EB+halo nas 2 engines (StoreMapProps inalterado); coverage exit 0 (lines 37.8% > piso 30) — typecheck 12/12 + build 9/9 verdes — commit: da837df — merge: b494085 — 2026-06-28 — sem backend/schema; retry após implementer anterior bater limite de sessão sem commitar
 
 [OK] 31 — testes: customer 105/105 (19 suítes, +13: useProductDetail + toast + productDetail.screen); frontend-only; Stack.Screen product/[id] presentation:modal+slide_from_bottom no _layout, ToastProvider/useToast (auto-dismiss 2s timer-driven p/ teste determinístico); addFromOffer(id,{closeAfter}) — principal=addItem+toast+router.back(), outras ofertas mantêm router.push("/cart"); migração RQ: useProductDetail/useFavorites/useToggleFavorite/useAddCartItem (queryKeys.products.detail/favorites.all), tela só orquestra; coverage exit 0 (lines 44.77% > piso 30) — typecheck 12/12 + build 9/9 verdes — commit: bb4bbd5 — merge: 5efa9de — 2026-06-28 — use-cart.ts não usa RQ então useAddCartItem só chama mkt.addItem (sem key de carrinho p/ invalidar); slide up/down é verificação manual Expo fora do ambiente
+
+[OK] 32 — testes: customer 107/107 (+2: storeScreen.title source-level); cosmético — Header title="" em store/[id] (showBack+ícone ajuda preservados, param name mantido como fallback do storeName ao lado da logo); teste lê o arquivo via fs.readFileSync + regex title="" (espelho do bloco explore); sem migração RQ (dívida registrada, fora de escopo); coverage exit 0 — typecheck 12/12 + build 9/9 verdes — commit: fc32701 — merge: 8317e04 — 2026-06-28 — "?"→"Seguir" é a story 33
 
 ---
 
