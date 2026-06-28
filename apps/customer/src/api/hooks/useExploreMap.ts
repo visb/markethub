@@ -65,6 +65,9 @@ export function useExploreMap() {
     initialRegion,
     stores,
     destination,
+    // Endereço de entrega ativo (default → primeiro) p/ a barra de endereço da
+    // tela montar — sem novo hook, já vem do `useAddresses` acima. Story 30.
+    activeAddress,
     onViewportChange,
     // Overlay de loading da story 06: enquanto a query do viewport busca.
     fetching: ready && fetching,

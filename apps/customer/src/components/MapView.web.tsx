@@ -43,7 +43,21 @@ const pinIcon = (color: string) =>
   });
 
 const STORE_PIN = pinIcon("#E11D2A");
-const DEST_PIN = pinIcon("#00A859");
+
+/**
+ * Marcador "você está aqui": dot azul (#2563EB) com halo translúcido + borda
+ * branca — visual distinto dos pinos de loja (vermelhos). Story 30.
+ */
+const USER_HERE_ICON = L.divIcon({
+  className: "mh-map-user",
+  html:
+    '<div style="position:relative;width:28px;height:28px">' +
+    '<div style="position:absolute;inset:0;border-radius:50%;background:rgba(37,99,235,0.2)"></div>' +
+    '<div style="position:absolute;left:7px;top:7px;width:14px;height:14px;border-radius:50%;background:#2563EB;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.4)"></div>' +
+    "</div>",
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
+});
 
 export function StoreMap({
   initialRegion,
@@ -88,8 +102,11 @@ export function StoreMap({
         </Marker>
       ))}
       {destination && (
-        <Marker position={[destination.latitude, destination.longitude]} icon={DEST_PIN}>
-          <Popup>Endereço de entrega</Popup>
+        <Marker
+          position={[destination.latitude, destination.longitude]}
+          icon={USER_HERE_ICON}
+        >
+          <Popup>Você está aqui</Popup>
         </Marker>
       )}
     </MapContainer>
