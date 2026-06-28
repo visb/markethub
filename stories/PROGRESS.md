@@ -16,7 +16,7 @@ Cuidados da rodada: stories 29/34 mudam **schema** (Store.phone/allowsPickup + S
 | 24 | Cobertura — admin-users.service + addresses.service | 19 | OK |
 | 25 | Cobertura — catálogo (service, quality, categoria marketplace) | 19 | OK |
 | 26 | Cobertura — conectores ERP + providers de enrichment | 19 | OK |
-| 27 | Cobertura — notifications + storage | 19 | todo |
+| 27 | Cobertura — notifications + storage | 19 | OK |
 | 28 | Cobertura — dashboard admin + agregado reviews + geocoding | 19 | todo |
 | 29 | Explore — modal do mercado ao tocar o marker (+ schema StoreHours/phone/pickup) | — | todo |
 | 30 | Explore — barra de endereço + marker da localização do usuário | 29 | todo |
@@ -43,6 +43,8 @@ Cuidados da rodada: stories 29/34 mudam **schema** (Store.phone/allowsPickup + S
 [OK] 25 — testes: api 599/599 (catálogo 9 suítes/109 testes, 5 novas + 3 ampliadas); cobertura catalog.service 17.7%→100% lin/95% br, catalog-quality.service 0%→100%, marketplace-category.service 0%→100%, admin-catalog.service 65%→86%, controllers (catalog/admin-catalog/marketplace-category/catalog-quality) 100%; global api 36.3%→56.5% (gate 19 exit 0); Prisma/BullMQ mockados, sem DB/rede — typecheck 12/12 + build 9/9 verdes — commit: 12a863a — merge: a0f598d — 2026-06-28 — só testes, nenhum bug; nota: caminhos físicos divergem do plano — catalog-quality.service em src/enrichment/, marketplace-category.service em src/catalog/ (cobri os reais)
 
 [OK] 26 — testes: api 647/647 (+48 em 7 suítes novas spec-only); cobertura csv.connector 0%→100%, csv.util 0%→100%/96% br, cosmos.provider 0%→100% (fetch mockado, sem rede), mock.provider 0%→100%; erp.scheduler/erp.processor/enrichment.processor seguem excluídos do coverage pela config 19 (!**/*.{processor,scheduler}.ts) mas o disparo coberto por spec (on/off env + fan-out price/stock + roteamento de jobs); global api lines 59.25% (piso 35); fixtures CSV existentes — typecheck 12/12 + build 9/9 verdes — commit: 9c3bcba — merge: dd66c84 — 2026-06-28 — só testes, nenhum bug
+
+[OK] 27 — testes: api 676/676 (+29 em 4 suítes novas); cobertura push.service 27%→100%, fcm.push-provider 0%→100%, storage.service 10.5%→100% lin/98% stmt (+bônus mock.push-provider 100%); FCM client e SDK storage mockados, sem rede; global api lines 61.84% (piso 35); best-effort no push, batching 1000 no FCM, SigV4 path-style no storage travados — typecheck 12/12 + build 9/9 verdes — commit: 5da7b66 — merge: b3c127e — 2026-06-28 — só testes, nenhum bug; GAP reportado: storage.service não valida content-type nem tamanho (presignUpload/uploadBuffer aceitam qualquer coisa) — sem código a cobrir; se validação for desejada vira fix à parte (DTO no controller de upload), não feito aqui (story é só-testes)
 
 ---
 
