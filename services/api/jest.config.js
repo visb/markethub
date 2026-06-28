@@ -9,4 +9,26 @@ module.exports = {
   transform: {
     "^.+\\.ts$": ["ts-jest", { tsconfig: "<rootDir>/../tsconfig.json" }],
   },
+  // Gate de cobertura (story 19) — all-files cravado no config, não em flag CLI.
+  // Glob relativo ao rootDir ("src"). Exclui specs, wiring de framework e código
+  // sem lógica testável (modules, DTOs, bootstrap, processors, schedulers).
+  collectCoverageFrom: [
+    "**/*.ts",
+    "!**/*.spec.ts",
+    "!**/*.module.ts",
+    "!**/*.dto.ts",
+    "!main.ts",
+    "!**/*.processor.ts",
+    "!**/*.scheduler.ts",
+  ],
+  coverageReporters: ["text-summary", "lcov", "json-summary"],
+  // Piso do ratchet — só sobe. Baseline medido em 28/06/2026 (linhas 36.3%).
+  coverageThreshold: {
+    global: {
+      statements: 35,
+      branches: 30,
+      functions: 29,
+      lines: 35,
+    },
+  },
 };

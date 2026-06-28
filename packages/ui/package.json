@@ -8,7 +8,8 @@
     "build": "echo \"@markethub/ui: source package (Metro transpiles), no build step\"",
     "typecheck": "echo \"@markethub/ui: typechecked by consuming apps\"",
     "lint": "echo \"skip\"",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "peerDependencies": {
     "react": "*",
@@ -17,6 +18,7 @@
   },
   "devDependencies": {
     "@types/react": "~18.3.12",
+    "@vitest/coverage-v8": "^4.1.8",
     "react": "18.3.1",
     "react-native": "0.76.5",
     "react-native-safe-area-context": "4.12.0",
