@@ -9,7 +9,7 @@ Cuidados da rodada: stories 29/34 mudam **schema** (Store.phone/allowsPickup + S
 | #  | Título | Dep | Status |
 |----|--------|-----|--------|
 | 19 | Gate de cobertura rígido no CI (ratchet, perFile, diff≥90%) | — | OK |
-| 20 | Cobertura — payment (reembolso + providers) | 19 | todo |
+| 20 | Cobertura — payment (reembolso + providers) | 19 | OK |
 | 21 | Cobertura — marketplace (cart.service + orders.service) | 19 | todo |
 | 22 | Cobertura — substituição (picking) + gorjeta (driver) | 19 | todo |
 | 23 | Cobertura — auth.service (login/refresh/hash) | 19 | todo |
@@ -29,6 +29,8 @@ Cuidados da rodada: stories 29/34 mudam **schema** (Store.phone/allowsPickup + S
 
 <!-- [OK|PARCIAL|BLOQUEADO] NN — testes: <resumo> — commit: <hash> — merge: <hash> — <data> — <bloqueio> -->
 [OK] 19 — testes: gate cravado em config nos 9 workspaces (jest collectCoverageFrom + coverageThreshold; vitest coverage.include all-files + thresholds — vitest@4 removeu coverage.all, include já é o all-files), reporters lcov/text-summary/json-summary; baseline verde exit 0 (api 336/336 36.28%, merchant 164/164 92.51%, admin 10/10, customer 67/67, picker 34/34, driver 18/18, api-client 18/18, types 8/8, ui 3/3); CI job `coverage` (test:coverage → scripts/diff-coverage.mjs ≥90% em PR → artifact lcov); validado o próprio gate: (a) baseline passa (b) subir threshold reprova (c) arquivo novo sem teste reprova via diff-coverage — typecheck 12/12 + build 9/9 + lint 12/12 verdes — commit: 7e8f0d3 — merge: b373445 — 2026-06-28 — PENDENTE-MANUAL: marcar job `coverage` como required check na branch protection da main (precisa admin do repo no GitHub). perFile NÃO ligado em workspaces de baixa cobertura (barrels/bootstrap em 0% deixariam main vermelha permanente — contra "rígido sem travar"); rigor por arquivo p/ código NOVO garantido pelo diff≥90%; admin/types/ui recalibrados ao baseline real all-files (6%/15%/28%, não os 48/100/100 de escopo falso do plano)
+
+[OK] 20 — testes: api 372/372 (suite payment 53/53, +30 casos: refund.service.spec 23 + payment-providers.spec 7); cobertura refund.service.ts 10.6%→100% lin/96% branch, pagarme.payment-provider 0%→100%, mock.payment-provider 0%→100%; casos estorno integral/consolidado faltas/idempotência(unique orderId)/cap no pago/corrida unique/falha provedor→failed/PIX criado-confirmado-expirado-falho via parseWebhook/erros HTTP Pagar.me com fetch mockado (sem rede); test:coverage exit 0 (api lines 38.8% > piso 35%) — typecheck 12/12 + build 9/9 verdes — commit: c63acfa — merge: f255a8c — 2026-06-28 — só testes, lógica intacta, nenhum bug; nota: code REFUND_ALREADY_DONE citado no plano não existe literal — idempotência é early-return no unique(orderId), comportamento intencional
 
 ---
 
