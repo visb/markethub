@@ -5,6 +5,14 @@
 import type { ViewportBoundsDTO } from "@markethub/types";
 
 export const queryKeys = {
+  products: {
+    /** Detalhe de um produto (modal de produto, story 31). */
+    detail: (id: string) => ["products", "detail", id] as const,
+  },
+  favorites: {
+    /** Favoritos de oferta do usuário autenticado (story 31). */
+    all: ["favorites"] as const,
+  },
   tracking: {
     /** Snapshot de rastreio (OrderTracking) de um pedido. */
     order: (orderId: string) => ["tracking", "order", orderId] as const,
