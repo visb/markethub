@@ -13,7 +13,7 @@ Cuidados da rodada: stories 29/34 mudam **schema** (Store.phone/allowsPickup + S
 | 21 | Cobertura — marketplace (cart.service + orders.service) | 19 | OK |
 | 22 | Cobertura — substituição (picking) + gorjeta (driver) | 19 | OK |
 | 23 | Cobertura — auth.service (login/refresh/hash) | 19 | OK |
-| 24 | Cobertura — admin-users.service + addresses.service | 19 | todo |
+| 24 | Cobertura — admin-users.service + addresses.service | 19 | OK |
 | 25 | Cobertura — catálogo (service, quality, categoria marketplace) | 19 | todo |
 | 26 | Cobertura — conectores ERP + providers de enrichment | 19 | todo |
 | 27 | Cobertura — notifications + storage | 19 | todo |
@@ -37,6 +37,8 @@ Cuidados da rodada: stories 29/34 mudam **schema** (Store.phone/allowsPickup + S
 [OK] 22 — testes: api 472/472 (+39 em 3 suítes: substitution.service.spec + substitution.scheduler.spec + reviews/tips.service.spec); cobertura substitution.service 0%→100% lin/branch, reviews/tips.service 0%→100% lin/92.6% branch; substitution.scheduler excluído do coverage por config da story 19 (!**/*.scheduler.ts) mas coberto por spec do disparo (delega resolveExpired + log); mock Prisma padrão picking/handoff, sem DB; test:coverage exit 0 ratchet OK — typecheck 12/12 + build 9/9 verdes — commit: 02bf36c — merge: 7102eea — 2026-06-28 — só testes, nenhum bug; nota: plano citava driver/tips.service.ts mas arquivo real é services/api/src/reviews/tips.service.ts (módulo reviews) — cobri o correto
 
 [OK] 23 — testes: api 491/491 (+19: auth.service.spec); cobertura auth.service.ts 0%→100% lin/90.5% branch; PrismaService mockado + TokenService real (argon2 hash/verify + JWT refresh de verdade, mesmos segredos de teste do token.service.spec, sem segredo logado/inventado); casos register(EMAIL_TAKEN/role padrão/dedupe), login(válido/INVALID_CREDENTIALS/inexistente/ACCOUNT_DISABLED), refresh(malformado/sessão ausente/dono divergente/reuse revogada→revoga cadeia/expirada/hash divergente/desativado/rotação replacedBySessionId), logout idempotente, me(ok/INVALID_TOKEN); test:coverage exit 0 (global 48.38%) — typecheck 12/12 + build 9/9 verdes — commit: 70404f7 — merge: 16e04a6 — 2026-06-28 — só testes, nenhum bug
+
+[OK] 24 — testes: api 530/530 (+39 em 3 suítes: admin-users.service +14, admin-users.controller +7, addresses.service +18); cobertura admin-users.service 17%→100%, admin-users.controller 0%→100%, addresses.service 0%→100%; RBAC reaproveitado de merchant-staff.service.spec (mapeamento StaffRole→RoleName admin/manager→merchant, picker→picker, driver→driver; STORE_NOT_FOUND/EMAIL_TAKEN; hash argon2 senha nunca texto puro); GeocodingProvider mockado atrás de GEOCODING_PROVIDER, sem DB/rede; test:coverage exit 0 (global 50.8%) — typecheck 12/12 + build 9/9 verdes — commit: dbc1f25 — merge: b04508d — 2026-06-28 — só testes, nenhum bug
 
 ---
 
