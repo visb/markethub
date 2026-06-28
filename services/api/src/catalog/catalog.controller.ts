@@ -73,6 +73,16 @@ export class CatalogController {
     return this.catalog.listStoresInBounds(q);
   }
 
+  /**
+   * Resumo da loja para o modal do explore (story 29). Rota estática `summary`
+   * (dois segmentos) não colide com `stores/nearby` (um segmento), casada após ela.
+   * Loja inexistente/inativa → 404 STORE_NOT_FOUND.
+   */
+  @Get("stores/:id/summary")
+  storeSummary(@Param("id") id: string) {
+    return this.catalog.storeSummary(id);
+  }
+
   @Get("stores/:id/categories")
   categories(@Param("id") id: string) {
     return this.catalog.listStoreCategories(id);

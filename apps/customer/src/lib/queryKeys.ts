@@ -17,6 +17,8 @@ export const queryKeys = {
       ["explore", "nearby", bounds.north, bounds.south, bounds.east, bounds.west] as const,
     /** Posição atual do dispositivo (GPS) — centro inicial do mapa. */
     deviceLocation: ["explore", "device-location"] as const,
+    /** Resumo da loja exibido no modal ao tocar o marker (story 29). */
+    storeSummary: (id: string) => ["explore", "store-summary", id] as const,
   },
   addresses: {
     /** Endereços do usuário autenticado. */

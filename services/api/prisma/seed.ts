@@ -111,8 +111,8 @@ async function seedCatalog(): Promise<void> {
 
   // Merchants + 1 loja cada (coordenadas em Curitiba p/ raio e ETA em dev, S6.4/S6.7).
   const merchants = [
-    { name: "Supermercado Europa", city: "Curitiba", state: "PR", latitude: -25.4284, longitude: -49.2733 },
-    { name: "Supermercado Condor", city: "Curitiba", state: "PR", latitude: -25.4521, longitude: -49.2918 },
+    { name: "Supermercado Europa", city: "Curitiba", state: "PR", latitude: -25.4284, longitude: -49.2733, phone: "(41) 3000-1001" },
+    { name: "Supermercado Condor", city: "Curitiba", state: "PR", latitude: -25.4521, longitude: -49.2918, phone: "(41) 3000-2002" },
   ];
 
   for (const m of merchants) {
@@ -123,9 +123,14 @@ async function seedCatalog(): Promise<void> {
       update: { connectorType: "csv", connectorConfig },
       create: { name: m.name, slug, connectorType: "csv", connectorConfig },
     });
-    await prisma.store.upsert({
+    const store = await prisma.store.upsert({
       where: { merchantId_externalId: { merchantId: merchant.id, externalId: "loja-1" } },
-      update: { latitude: m.latitude, longitude: m.longitude },
+      update: {
+        latitude: m.latitude,
+        longitude: m.longitude,
+        phone: m.phone,
+        allowsPickup: true,
+      },
       create: {
         merchantId: merchant.id,
         name: `${m.name} - Centro`,
@@ -134,7 +139,20 @@ async function seedCatalog(): Promise<void> {
         state: m.state,
         latitude: m.latitude,
         longitude: m.longitude,
+        phone: m.phone,
+        allowsPickup: true,
       },
+    });
+
+    // Horário padrão (story 29): seg–sáb 8h–22h, dom 8h–20h (minutos desde meia-noite).
+    await prisma.storeHours.deleteMany({ where: { storeId: store.id } });
+    await prisma.storeHours.createMany({
+      data: [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
+        storeId: store.id,
+        dayOfWeek,
+        opensAt: 8 * 60,
+        closesAt: dayOfWeek === 0 ? 20 * 60 : 22 * 60,
+      })),
     });
   }
 

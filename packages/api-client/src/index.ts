@@ -54,4 +54,8 @@ export type {
   TopProductDTO,
   TopProductsReportDTO,
   ReviewsReportDTO,
+  NearbyStoreDTO,
+  ViewportBoundsDTO,
+  StoreSummaryDTO,
+  StoreSummaryAddressDTO,
 } from "@markethub/types";

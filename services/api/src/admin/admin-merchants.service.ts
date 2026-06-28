@@ -52,7 +52,18 @@ export interface CreateStoreInput {
 export type UpdateStoreInput = Partial<Omit<CreateStoreInput, "merchantId">> & {
   /** Tempo médio de preparo (min) — compõe o ETA real (S6.7). */
   avgPrepMinutes?: number;
+  /** Contato exibido no resumo da loja (modal explore — story 29). */
+  phone?: string;
+  /** Permite retirada de pedidos na loja (badge "Retirar na loja" — story 29). */
+  allowsPickup?: boolean;
 };
+
+/** Faixa abre–fecha de um dia da semana (story 29); minutos desde meia-noite. */
+export interface StoreHoursEntry {
+  dayOfWeek: number;
+  opensAt: number;
+  closesAt: number;
+}
 
 const OFFER_LOCKABLE = ["priceCents", "promoPriceCents", "available"] as const;
 const STOCK_LOCKABLE = ["quantity", "available"] as const;
@@ -223,9 +234,15 @@ export class AdminMerchantsService {
         zipCode: true,
         latitude: true,
         longitude: true,
+        phone: true,
+        allowsPickup: true,
         avgPrepMinutes: true,
         active: true,
         merchant: { select: { id: true, name: true } },
+        hours: {
+          orderBy: { dayOfWeek: "asc" },
+          select: { id: true, dayOfWeek: true, opensAt: true, closesAt: true },
+        },
         _count: { select: { offers: true, staff: true, deliverySlots: true } },
       },
     });
@@ -302,12 +319,67 @@ export class AdminMerchantsService {
     if (patch.zipCode !== undefined) data.zipCode = patch.zipCode || null;
     if (patch.latitude !== undefined) data.latitude = patch.latitude;
     if (patch.longitude !== undefined) data.longitude = patch.longitude;
+    if (patch.phone !== undefined) data.phone = patch.phone || null;
+    if (patch.allowsPickup !== undefined) data.allowsPickup = patch.allowsPickup;
     if (patch.avgPrepMinutes !== undefined) data.avgPrepMinutes = patch.avgPrepMinutes;
     if (patch.active !== undefined) data.active = patch.active;
     if (Object.keys(data).length === 0) {
       throw new BadRequestException({ code: "NO_FIELDS", message: "Nenhum campo para atualizar" });
     }
     return this.prisma.store.update({ where: { id }, data });
+  }
+
+  // ── Horário de funcionamento (story 29) ──
+
+  /** Horário semanal da loja (uma faixa por dia), ordenado por dia da semana. */
+  async storeHours(storeId: string) {
+    await this.assertStoreExists(storeId);
+    return this.prisma.storeHours.findMany({
+      where: { storeId },
+      orderBy: { dayOfWeek: "asc" },
+      select: { id: true, dayOfWeek: true, opensAt: true, closesAt: true },
+    });
+  }
+
+  /**
+   * Substitui o horário semanal inteiro (replace-all): valida cada faixa
+   * (`closesAt > opensAt`, sem dia duplicado) e troca todas as linhas numa
+   * transação. Janelas que cruzam a meia-noite ficam fora de escopo.
+   */
+  async setStoreHours(storeId: string, entries: StoreHoursEntry[]) {
+    await this.assertStoreExists(storeId);
+    const seen = new Set<number>();
+    for (const e of entries) {
+      if (e.closesAt <= e.opensAt) {
+        throw new BadRequestException({
+          code: "INVALID_HOURS",
+          message: "Horário inválido: fechamento deve ser após a abertura",
+        });
+      }
+      if (seen.has(e.dayOfWeek)) {
+        throw new BadRequestException({
+          code: "DUPLICATE_DAY",
+          message: `Dia da semana repetido: ${e.dayOfWeek}`,
+        });
+      }
+      seen.add(e.dayOfWeek);
+    }
+    await this.prisma.$transaction([
+      this.prisma.storeHours.deleteMany({ where: { storeId } }),
+      ...(entries.length > 0
+        ? [
+            this.prisma.storeHours.createMany({
+              data: entries.map((e) => ({
+                storeId,
+                dayOfWeek: e.dayOfWeek,
+                opensAt: e.opensAt,
+                closesAt: e.closesAt,
+              })),
+            }),
+          ]
+        : []),
+    ]);
+    return this.storeHours(storeId);
   }
 
   // ── Ofertas + estoque da loja ──

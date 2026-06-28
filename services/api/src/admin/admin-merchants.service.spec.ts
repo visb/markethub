@@ -23,8 +23,9 @@ function makePrisma(over: Record<string, unknown> = {}) {
     },
     stock: { findUnique: jest.fn(), findMany: jest.fn(), update: jest.fn() },
     storeStaff: { findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn(), delete: jest.fn() },
+    storeHours: { findMany: jest.fn(), deleteMany: jest.fn(), createMany: jest.fn() },
     order: { groupBy: jest.fn() },
-    $transaction: jest.fn(),
+    $transaction: jest.fn().mockResolvedValue([]),
     ...over,
   } as never;
 }
@@ -134,6 +135,94 @@ describe("AdminMerchantsService.updateOffer", () => {
     await expect(svc.updateOffer("x", { available: true }, "a")).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+});
+
+describe("AdminMerchantsService.updateStore (phone/allowsPickup — story 29)", () => {
+  it("grava só os campos enviados (phone/allowsPickup); ausentes não viram update", async () => {
+    const update = jest.fn().mockResolvedValue({ id: "st1" });
+    const prisma = makePrisma({
+      store: { findUnique: jest.fn().mockResolvedValue({ id: "st1" }), update },
+    });
+    const svc = new AdminMerchantsService(prisma);
+    await svc.updateStore("st1", { phone: "(41) 99999-0000", allowsPickup: false });
+    const data = update.mock.calls[0][0].data;
+    expect(data).toEqual({ phone: "(41) 99999-0000", allowsPickup: false });
+  });
+
+  it("phone vazio vira null (limpa o contato)", async () => {
+    const update = jest.fn().mockResolvedValue({ id: "st1" });
+    const prisma = makePrisma({
+      store: { findUnique: jest.fn().mockResolvedValue({ id: "st1" }), update },
+    });
+    const svc = new AdminMerchantsService(prisma);
+    await svc.updateStore("st1", { phone: "" });
+    expect(update.mock.calls[0][0].data).toEqual({ phone: null });
+  });
+
+  it("nenhum campo → NO_FIELDS", async () => {
+    const prisma = makePrisma({
+      store: { findUnique: jest.fn().mockResolvedValue({ id: "st1" }), update: jest.fn() },
+    });
+    const svc = new AdminMerchantsService(prisma);
+    await expect(svc.updateStore("st1", {})).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+describe("AdminMerchantsService.setStoreHours (story 29)", () => {
+  function prismaWithStore(hoursAfter: unknown[] = []) {
+    const deleteMany = jest.fn();
+    const createMany = jest.fn();
+    const findMany = jest.fn().mockResolvedValue(hoursAfter);
+    const $transaction = jest.fn().mockResolvedValue([]);
+    const prisma = makePrisma({
+      store: { findUnique: jest.fn().mockResolvedValue({ id: "st1" }) },
+      storeHours: { deleteMany, createMany, findMany },
+      $transaction,
+    });
+    return { prisma, deleteMany, createMany, findMany, $transaction };
+  }
+
+  it("substitui o horário (delete + createMany) e devolve as linhas", async () => {
+    const rows = [{ id: "h1", dayOfWeek: 1, opensAt: 480, closesAt: 1320 }];
+    const { prisma, findMany } = prismaWithStore(rows);
+    const svc = new AdminMerchantsService(prisma);
+    const out = await svc.setStoreHours("st1", [{ dayOfWeek: 1, opensAt: 480, closesAt: 1320 }]);
+    expect(out).toEqual(rows);
+    expect(findMany).toHaveBeenCalled();
+  });
+
+  it("lista vazia limpa o horário sem createMany", async () => {
+    const { prisma, createMany } = prismaWithStore([]);
+    const svc = new AdminMerchantsService(prisma);
+    await svc.setStoreHours("st1", []);
+    // createMany não é incluído na transação quando não há faixas
+    expect(createMany).not.toHaveBeenCalled();
+  });
+
+  it("recusa closesAt ≤ opensAt → INVALID_HOURS", async () => {
+    const { prisma } = prismaWithStore();
+    const svc = new AdminMerchantsService(prisma);
+    await expect(
+      svc.setStoreHours("st1", [{ dayOfWeek: 1, opensAt: 600, closesAt: 600 }]),
+    ).rejects.toMatchObject({ response: { code: "INVALID_HOURS" } });
+  });
+
+  it("recusa dia da semana repetido → DUPLICATE_DAY", async () => {
+    const { prisma } = prismaWithStore();
+    const svc = new AdminMerchantsService(prisma);
+    await expect(
+      svc.setStoreHours("st1", [
+        { dayOfWeek: 2, opensAt: 480, closesAt: 720 },
+        { dayOfWeek: 2, opensAt: 800, closesAt: 1000 },
+      ]),
+    ).rejects.toMatchObject({ response: { code: "DUPLICATE_DAY" } });
+  });
+
+  it("404 se a loja não existe", async () => {
+    const prisma = makePrisma({ store: { findUnique: jest.fn().mockResolvedValue(null) } });
+    const svc = new AdminMerchantsService(prisma);
+    await expect(svc.setStoreHours("x", [])).rejects.toBeInstanceOf(NotFoundException);
   });
 });
 
