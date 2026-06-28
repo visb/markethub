@@ -18,7 +18,7 @@ Cuidados da rodada: stories 29/34 mudam **schema** (Store.phone/allowsPickup + S
 | 26 | Cobertura — conectores ERP + providers de enrichment | 19 | OK |
 | 27 | Cobertura — notifications + storage | 19 | OK |
 | 28 | Cobertura — dashboard admin + agregado reviews + geocoding | 19 | OK |
-| 29 | Explore — modal do mercado ao tocar o marker (+ schema StoreHours/phone/pickup) | — | todo |
+| 29 | Explore — modal do mercado ao tocar o marker (+ schema StoreHours/phone/pickup) | — | OK |
 | 30 | Explore — barra de endereço + marker da localização do usuário | 29 | todo |
 | 31 | Modal de produto — add fecha (sem redirect) + animações slide | — | todo |
 | 32 | Página do mercado — remover nome duplicado (AppTitle vazio) | — | todo |
@@ -47,6 +47,8 @@ Cuidados da rodada: stories 29/34 mudam **schema** (Store.phone/allowsPickup + S
 [OK] 27 — testes: api 676/676 (+29 em 4 suítes novas); cobertura push.service 27%→100%, fcm.push-provider 0%→100%, storage.service 10.5%→100% lin/98% stmt (+bônus mock.push-provider 100%); FCM client e SDK storage mockados, sem rede; global api lines 61.84% (piso 35); best-effort no push, batching 1000 no FCM, SigV4 path-style no storage travados — typecheck 12/12 + build 9/9 verdes — commit: 5da7b66 — merge: b3c127e — 2026-06-28 — só testes, nenhum bug; GAP reportado: storage.service não valida content-type nem tamanho (presignUpload/uploadBuffer aceitam qualquer coisa) — sem código a cobrir; se validação for desejada vira fix à parte (DTO no controller de upload), não feito aqui (story é só-testes)
 
 [OK] 28 — testes: api 718/718 (+42 em 5 suítes novas); cobertura admin-dashboard.service 0%→100%, reviews-aggregate.service 0%→100%, nominatim.geocoding-provider 0%→100%, mock.geocoding-provider 0%→100%, admin-dashboard.controller + reviews.controller 100%; Nominatim mockado via global.fetch (hit/lista vazia/não-ok/exceção), Prisma mockado, sem DB/rede; global api lines 65.21% (piso 35) — typecheck 12/12 + build 9/9 verdes — commit: 19dffa8 — merge: 1087720 — 2026-06-28 — só testes, nenhum bug; FIM da cadeia de backfill 20-28 (api 35.5%→65.2% linhas)
+
+[OK] 29 — testes: api unit 740/740 (65.8% lin) + e2e catalog 17/17 + customer 79/79 (34.7% lin); migration nova 20260628194342_store_summary_phone_pickup_hours (Store.phone/allowsPickup + model StoreHours minutos-desde-meia-noite); GET /stores/:id/summary (openNow server-side America/Sao_Paulo abertura inclusiva/fechamento exclusivo, rating via review.aggregate axis=merchant, 404 STORE_NOT_FOUND); admin StoreDetail edita phone/allowsPickup/horário; StoreSummaryDTO em packages/types espelhado nos dois lados; explore.tsx selectedStoreId+StoreSummarySheet (não navega), useStoreSummary hook React Query, queryKeys.explore.storeSummary; seed popula horário padrão; coverage api+customer exit 0 — typecheck 12/12 + build 9/9 verdes — commit: 0d195a1 — merge: 10b6b2d — 2026-06-28 — doorFeeCents reusa CartService.DOOR_SURCHARGE_CENTS (ref estática); janelas cruzando meia-noite fora de escopo; admin StoreDetail seguiu padrão legado useState/useEffect do arquivo (migração total a RQ fora de escopo, coverage admin não gated)
 
 ---
 
