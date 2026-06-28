@@ -1,3 +1,36 @@
+# PROGRESS — rodada AUTORUN (stories 19 → 34)
+
+Rodada: gate de cobertura (19) + backfill de cobertura backend por risco (20–28) + refino app customer / explore + seguir loja (29–34).
+Ordem: 19 → 20 → 21 → 22 → 23 → 24 → 25 → 26 → 27 → 28 → 29 → 30 → 31 → 32 → 33 → 34.
+Branch base: main | Merge na main por unidade: sim (--no-ff) | sem push, sem PR.
+Deps rígidas: 19 → {20..28} (gate de cobertura; se 19 bloquear, todo o backfill bloqueia — não pular). 33 → 34 (backend de seguir wira o botão da 33). 29 → 30 (compartilham a tela `explore`, dep fraca).
+Cuidados da rodada: stories 29/34 mudam **schema** (Store.phone/allowsPickup + StoreHours; StoreFollow) → migration nova + `prisma generate` antes do typecheck; espelhar contrato em packages/types E no app (backend não importa types). 19 mexe em config de teste de TODOS os workspaces + ci.yml (ratchet de piso só sobe, perFile, diff≥90%) — required check no GitHub é PENDENTE-MANUAL (não dá pra ativar branch protection sem acesso ao repo). 31–33 são refino só-frontend do app customer (modal/AppBar). Sem credencial externa nova (Cosmos/Pagar.me/Maps já atrás de mock).
+
+| #  | Título | Dep | Status |
+|----|--------|-----|--------|
+| 19 | Gate de cobertura rígido no CI (ratchet, perFile, diff≥90%) | — | todo |
+| 20 | Cobertura — payment (reembolso + providers) | 19 | todo |
+| 21 | Cobertura — marketplace (cart.service + orders.service) | 19 | todo |
+| 22 | Cobertura — substituição (picking) + gorjeta (driver) | 19 | todo |
+| 23 | Cobertura — auth.service (login/refresh/hash) | 19 | todo |
+| 24 | Cobertura — admin-users.service + addresses.service | 19 | todo |
+| 25 | Cobertura — catálogo (service, quality, categoria marketplace) | 19 | todo |
+| 26 | Cobertura — conectores ERP + providers de enrichment | 19 | todo |
+| 27 | Cobertura — notifications + storage | 19 | todo |
+| 28 | Cobertura — dashboard admin + agregado reviews + geocoding | 19 | todo |
+| 29 | Explore — modal do mercado ao tocar o marker (+ schema StoreHours/phone/pickup) | — | todo |
+| 30 | Explore — barra de endereço + marker da localização do usuário | 29 | todo |
+| 31 | Modal de produto — add fecha (sem redirect) + animações slide | — | todo |
+| 32 | Página do mercado — remover nome duplicado (AppTitle vazio) | — | todo |
+| 33 | Página do mercado — botão "Seguir" no AppBar (no lugar do "?") | — | todo |
+| 34 | Seguir loja — backend (StoreFollow) + wiring do botão | 33 | todo |
+
+## Log
+
+<!-- [OK|PARCIAL|BLOQUEADO] NN — testes: <resumo> — commit: <hash> — merge: <hash> — <data> — <bloqueio> -->
+
+---
+
 # PROGRESS — rodada AUTORUN (stories 14 → 18)
 
 Rodada: veículos (14–15) + RBAC merchant (16–18).
