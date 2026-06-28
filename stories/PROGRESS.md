@@ -11,7 +11,7 @@ Cuidados da rodada: stories 29/34 mudam **schema** (Store.phone/allowsPickup + S
 | 19 | Gate de cobertura rígido no CI (ratchet, perFile, diff≥90%) | — | OK |
 | 20 | Cobertura — payment (reembolso + providers) | 19 | OK |
 | 21 | Cobertura — marketplace (cart.service + orders.service) | 19 | OK |
-| 22 | Cobertura — substituição (picking) + gorjeta (driver) | 19 | todo |
+| 22 | Cobertura — substituição (picking) + gorjeta (driver) | 19 | OK |
 | 23 | Cobertura — auth.service (login/refresh/hash) | 19 | todo |
 | 24 | Cobertura — admin-users.service + addresses.service | 19 | todo |
 | 25 | Cobertura — catálogo (service, quality, categoria marketplace) | 19 | todo |
@@ -33,6 +33,8 @@ Cuidados da rodada: stories 29/34 mudam **schema** (Store.phone/allowsPickup + S
 [OK] 20 — testes: api 372/372 (suite payment 53/53, +30 casos: refund.service.spec 23 + payment-providers.spec 7); cobertura refund.service.ts 10.6%→100% lin/96% branch, pagarme.payment-provider 0%→100%, mock.payment-provider 0%→100%; casos estorno integral/consolidado faltas/idempotência(unique orderId)/cap no pago/corrida unique/falha provedor→failed/PIX criado-confirmado-expirado-falho via parseWebhook/erros HTTP Pagar.me com fetch mockado (sem rede); test:coverage exit 0 (api lines 38.8% > piso 35%) — typecheck 12/12 + build 9/9 verdes — commit: c63acfa — merge: f255a8c — 2026-06-28 — só testes, lógica intacta, nenhum bug; nota: code REFUND_ALREADY_DONE citado no plano não existe literal — idempotência é early-return no unique(orderId), comportamento intencional
 
 [OK] 21 — testes: api 433/433 (+53: cart.service.spec 31 + orders.service.spec 17 + orders.controller.spec 5); cobertura cart.service.ts 8.5%→100% lin/93% br, orders.service.ts 12.9%→100% lin/93% br, orders.controller.ts 0%→100%; casos unit vs weight(gramas)/qtd/remoção/recálculo total/indisponível; criação pedido/markPaid idempotente created→preparing/cancelamento conforme BUSINESS_RULES (status∈{created,paid,preparing} e PickTask só queued/assigned); prisma fake + $transaction mockado, sem DB; test:coverage exit 0 (api lines 44% > piso 35%) — typecheck 12/12 + build 9/9 verdes — commit: d4c870f — merge: 02d929a — 2026-06-28 — só testes, lógica intacta, nenhum bug
+
+[OK] 22 — testes: api 472/472 (+39 em 3 suítes: substitution.service.spec + substitution.scheduler.spec + reviews/tips.service.spec); cobertura substitution.service 0%→100% lin/branch, reviews/tips.service 0%→100% lin/92.6% branch; substitution.scheduler excluído do coverage por config da story 19 (!**/*.scheduler.ts) mas coberto por spec do disparo (delega resolveExpired + log); mock Prisma padrão picking/handoff, sem DB; test:coverage exit 0 ratchet OK — typecheck 12/12 + build 9/9 verdes — commit: 02bf36c — merge: 7102eea — 2026-06-28 — só testes, nenhum bug; nota: plano citava driver/tips.service.ts mas arquivo real é services/api/src/reviews/tips.service.ts (módulo reviews) — cobri o correto
 
 ---
 
