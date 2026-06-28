@@ -22,7 +22,26 @@
     "transformIgnorePatterns": [
       "node_modules/(?!(?:\\.pnpm/[^/]+/node_modules/)?((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|@markethub/.*))",
       "node_modules/(?:\\.pnpm/[^/]+/node_modules/)?react-native-reanimated/plugin/"
-    ]
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.{ts,tsx}",
+      "!src/**/*.test.{ts,tsx}",
+      "!src/**/__tests__/**",
+      "!src/**/*.d.ts"
+    ],
+    "coverageReporters": [
+      "text-summary",
+      "lcov",
+      "json-summary"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "statements": 45,
+        "branches": 40,
+        "functions": 60,
+        "lines": 46
+      }
+    }
   },
   "dependencies": {
     "@babel/runtime": "^7.26.0",

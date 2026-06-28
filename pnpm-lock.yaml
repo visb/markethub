@@ -422,6 +422,9 @@ importers:
         specifier: ^4.8.3
         version: 4.8.3
     devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^4.1.8
+        version: 4.1.8(vitest@4.1.8)
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
@@ -435,6 +438,9 @@ importers:
         specifier: ^3.24.1
         version: 3.25.76
     devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^4.1.8
+        version: 4.1.8(vitest@4.1.8)
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
@@ -447,6 +453,9 @@ importers:
       '@types/react':
         specifier: ~18.3.12
         version: 18.3.29
+      '@vitest/coverage-v8':
+        specifier: ^4.1.8
+        version: 4.1.8(vitest@4.1.8)
       react:
         specifier: 18.3.1
         version: 18.3.1
