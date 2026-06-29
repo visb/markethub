@@ -23,7 +23,7 @@ Cuidados da rodada: stories 29/34 mudam **schema** (Store.phone/allowsPickup + S
 | 31 | Modal de produto — add fecha (sem redirect) + animações slide | — | OK |
 | 32 | Página do mercado — remover nome duplicado (AppTitle vazio) | — | OK |
 | 33 | Página do mercado — botão "Seguir" no AppBar (no lugar do "?") | — | OK |
-| 34 | Seguir loja — backend (StoreFollow) + wiring do botão | 33 | todo |
+| 34 | Seguir loja — backend (StoreFollow) + wiring do botão | 33 | OK |
 
 ## Log
 
@@ -57,6 +57,49 @@ Cuidados da rodada: stories 29/34 mudam **schema** (Store.phone/allowsPickup + S
 [OK] 32 — testes: customer 107/107 (+2: storeScreen.title source-level); cosmético — Header title="" em store/[id] (showBack+ícone ajuda preservados, param name mantido como fallback do storeName ao lado da logo); teste lê o arquivo via fs.readFileSync + regex title="" (espelho do bloco explore); sem migração RQ (dívida registrada, fora de escopo); coverage exit 0 — typecheck 12/12 + build 9/9 verdes — commit: fc32701 — merge: 8317e04 — 2026-06-28 — "?"→"Seguir" é a story 33
 
 [OK] 33 — testes: customer 115/115 (23 suítes, +3 novas: header.rightAction + followButton + storeScreen.follow + ajuste do source-test da story 32); só UI; Header ganha prop rightAction (default mantém "?", telas existentes intactas); FollowButton (src/components/, pílula vermelha colors.primary + Ionicons heart); store/[id] usa rightAction e remove o Button "♡ Seguir" inline duplicado; onPress placeholder no-op (TODO→story 34); coverage exit 0 (lines 45.08% > piso 30) — typecheck 12/12 + build 9/9 verdes — commit: 536f81c — merge: c51b76b — 2026-06-28 — sem migração RQ (dívida); ajustei regex do storeScreen.title.test.tsx (Header virou multi-linha) preservando a intenção
+
+[OK] 34 — testes: api 754/754 (73 suítes) + customer 124/124 (25 suítes); migration nova 20260629000905_story34_store_follows (model StoreFollow espelha Favorite, @@unique[userId,storeId], relações inversas User.storeFollows/Store.followers); módulo store-follows (service follow upsert/STORE_NOT_FOUND/unfollow idempotente/list desc/isFollowing, controller @Roles customer GET/POST/DELETE); StoreMeta.following via isFollowing no sections; novo OptionalJwtAuthGuard (auth opcional, guest sem 401) na rota @Public /stores/:id/sections, app envia auth:true; frontend useStoreFollow optimista + FollowButton wirado (coração preenchido/contorno); coverage api 66.2% + customer 46.9% exit 0 — typecheck 12/12 + build 9/9 verdes — commit: 161ca64 — merge: f1629a4 — 2026-06-28 — StoreMeta é local de apps/customer (não packages/types), espelhado nos 2 lados sem rebuild; CatalogService passou a depender de StoreFollowsService (spec existente atualizado p/ novo construtor); e2e não rodado (fora da Validação do plano)
+
+## Resumo final da rodada 19 → 34
+
+**16/16 unidades OK**, todas mergeadas na `main` local (--no-ff, sem push, branches preservadas).
+Nenhuma BLOQUEADA. Loop AUTORUN encerrado (CronDelete do job da rodada).
+
+Por bloco:
+- **Gate de cobertura (19):** cobertura virou gate rígido do CI — thresholds cravados em config
+  (jest `coverageThreshold`+`collectCoverageFrom` / vitest `coverage.include`+`thresholds`) nos 9
+  workspaces, ratchet só-sobe, job `coverage` no ci.yml com diff-coverage ≥90% (`scripts/diff-coverage.mjs`)
+  + artifact lcov. `perFile` deliberadamente NÃO ligado em workspaces de baixa cobertura (barrels/
+  bootstrap em 0% deixariam main vermelha); rigor por arquivo p/ código novo vem do diff≥90%.
+- **Backfill de cobertura backend (20–28):** subiu `services/api` de **35.5% → 65.2%** linhas, por
+  risco: payment/refund (20), cart+orders (21), substituição+gorjeta (22), auth (23), admin-users+
+  endereços (24), catálogo (25), ERP+enrichment providers (26), notifications+storage (27),
+  dashboard+reviews+geocoding (28). Tudo só-teste, sem mudar lógica — nenhum bug de negócio achado.
+  Providers/scheduler/processor cobertos por spec do disparo (excluídos do coverage por config 19).
+- **Refino app customer (29–34):** modal de resumo do mercado no explore + schema novo
+  (Store.phone/allowsPickup + StoreHours, GET /stores/:id/summary, openNow server-side) (29); barra
+  de endereço + marker "você está aqui" (30); modal de produto add-fecha + toast + slide + migração
+  React Query (31); remoção do nome duplicado na página da loja (32); botão "Seguir" no AppBar (33);
+  e a funcionalidade completa de seguir loja — model StoreFollow + endpoints + OptionalJwtAuthGuard +
+  wiring otimista do botão (34).
+
+Migrations novas (nunca editaram aplicada): **29** (store_summary_phone_pickup_hours) e **34**
+(story34_store_follows). Demais stories sem schema.
+
+Pontos PENDENTE-MANUAL (sem credencial/acesso, não bloqueiam):
+- **19:** marcar o job `coverage` como **required check** na branch protection da `main` no GitHub
+  (Settings → Branches) — precisa admin do repo.
+
+Sem dep externa nova nesta rodada (Cosmos/Pagar.me/Maps/FCM/MinIO já atrás de mock/interface;
+geocoding Nominatim e FCM mockados via fetch nos testes — nenhuma chave commitada, nenhuma chamada real).
+
+Reproduzir os gates (infra docker no ar — Postgres :5433/test, Redis, MinIO):
+- backend: `pnpm --filter @markethub/api test` + `test:coverage` (+ `test:e2e` p/ 29)
+- contratos: `pnpm --filter @markethub/types build && pnpm --filter @markethub/api-client build`
+- customer: `pnpm --filter @markethub/customer test:coverage`
+- geral: `pnpm typecheck` + `pnpm build`; gate de cobertura: `pnpm test:coverage` (turbo) + `pnpm diff-coverage`
+
+**Rodada 19 → 34 ENCERRADA** — 16/16 OK e mergeadas na `main`. Loop encerrado (não reagendar).
 
 ---
 
