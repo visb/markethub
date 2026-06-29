@@ -8,7 +8,7 @@ Cuidados da rodada: rodada **só-testes + config** — sem mudar lógica de prod
 
 | #  | Título | Dep | Status |
 |----|--------|-----|--------|
-| 35 | Cobertura — @markethub/api-client (client/socket/token-store ≥80%) | 19 | todo |
+| 35 | Cobertura — @markethub/api-client (client/socket/token-store ≥80%) | 19 | OK |
 | 36 | Cobertura — @markethub/ui (Button/Text/Screen/tokens ≥80%, ampliar include) | 19 | todo |
 | 37 | Cobertura — admin: auth, shell e infra de dados (fundação) | 19 | todo |
 | 38 | Cobertura — admin: catálogo e enriquecimento | 37 | todo |
@@ -22,10 +22,7 @@ Cuidados da rodada: rodada **só-testes + config** — sem mudar lógica de prod
 ## Log
 
 <!-- [OK|PARCIAL|BLOQUEADO] NN — testes: <resumo> — commit: <hash> — merge: <hash> — <data> — <bloqueio> -->
-
----
-
-# PROGRESS — rodada AUTORUN (stories 19 → 34)
+[OK] 35 — testes: api-client 53/53 (client.test.ts ampliado 24→53); agregado do workspace 43.02%→100% linhas (st 42%→100%, br 38.5%→100%, fn 30.4%→100%); client.ts/socket.ts/token-store.ts todos 100% lin/fn/br (refresh em 401+replay, serialização body/query, auth:false, propagação {code,message}, métodos de frota; socket conexão/subscribe:store/reconexão/disconnect; token-store get/set/clear+fallback); fetch global + socket.io-client mockados, sem rede; ratchet vitest.config.ts 36/31/21/37→98/95/98/98 (st/br/fn/ln, folga mínima vs wobble v8, bem acima da meta 80) — test:coverage exit 0 + typecheck 12/12 + build 9/9 + diff-coverage verdes — commit: 4c28b98 — merge: cf2398c — 2026-06-29 — só testes, contrato intacto (sem mudar packages/types); métodos "follow/summary" citados no plano NÃO existem em client.ts (só frota/veículos, cobertos), critério batido via agregado 100%
 
 Rodada: gate de cobertura (19) + backfill de cobertura backend por risco (20–28) + refino app customer / explore + seguir loja (29–34).
 Ordem: 19 → 20 → 21 → 22 → 23 → 24 → 25 → 26 → 27 → 28 → 29 → 30 → 31 → 32 → 33 → 34.
