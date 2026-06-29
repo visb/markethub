@@ -31,7 +31,11 @@ jest.mock("@/auth-context", () => ({ useAuth: () => ({ api: {} as ApiClient }) }
 let activeClient: QueryClient | null = null;
 
 function renderHook<T>(useHook: () => T) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+  // gcTime: Infinity — onSuccess invalida `all` (["store-follows"]), prefixo da key de
+  // status (["store-follows","status",id]); com gcTime:0 + sem observer, a query de status
+  // inativa era coletada antes do assert (flaky no CI → getQueryData undefined). Mantê-la em
+  // memória torna o assert do status confirmado determinístico; afterEach limpa o client.
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
   activeClient = client;
   const result: { current: T | null } = { current: null };
   function Probe() {
