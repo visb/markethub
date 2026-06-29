@@ -118,6 +118,14 @@ describe("MerchantVehiclesService (story 14)", () => {
         response: expect.objectContaining({ code: "MERCHANT_AMBIGUOUS" }),
       });
     });
+
+    it("múltiplas redes com merchantId do escopo → usa a rede informada", async () => {
+      const { svc, vehicleCreate } = makeService({ myStores: [storeA, storeOther] });
+      await svc.create(owner, { plate: "ABC1D23", type: "van", merchantId: "mer2" });
+      expect(vehicleCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ merchantId: "mer2" }) }),
+      );
+    });
   });
 
   describe("list", () => {
@@ -134,6 +142,14 @@ describe("MerchantVehiclesService (story 14)", () => {
       await expect(svc.list(owner, "mer2")).rejects.toMatchObject({
         response: expect.objectContaining({ code: "MERCHANT_NOT_IN_SCOPE" }),
       });
+    });
+
+    it("filtro por rede do escopo restringe o where àquela rede", async () => {
+      const { svc, vehicleFindMany } = makeService({ myStores: [storeA, storeOther] });
+      await svc.list(owner, "mer1");
+      expect(vehicleFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { merchantId: { in: ["mer1"] } } }),
+      );
     });
 
     it("usuário sem rede → lista vazia", async () => {

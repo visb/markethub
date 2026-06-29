@@ -77,6 +77,23 @@ describe("MerchantStaffService (story 10)", () => {
       );
     });
 
+    it("owner cria admin (story 16) → delega createStaff (assertCanManageRole permite)", async () => {
+      const { svc, createStaff } = makeService({
+        myStores: [storeA],
+        storesInMerchant: [{ id: "sA" }],
+      });
+      await svc.create(owner, {
+        name: "Adm",
+        email: "adm@x.z",
+        password: "secret1",
+        staffRole: "admin",
+        storeId: "sA",
+      });
+      expect(createStaff).toHaveBeenCalledWith(
+        expect.objectContaining({ staffRole: "admin", storeId: "sA" }),
+      );
+    });
+
     it("gerente cria picker/driver só nas suas lojas", async () => {
       const { svc, createStaff } = makeService({ myStores: [storeA] });
       await svc.create(manager, {

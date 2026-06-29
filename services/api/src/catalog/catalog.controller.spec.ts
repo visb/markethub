@@ -47,6 +47,7 @@ function makeFullController() {
     listStoreCategories: jest.fn().mockResolvedValue([]),
     listStoreProducts: jest.fn().mockResolvedValue({}),
     storeSections: jest.fn().mockResolvedValue({}),
+    storeSummary: jest.fn().mockResolvedValue({ id: "s1" }),
     search: jest.fn().mockResolvedValue({}),
     productDetail: jest.fn().mockResolvedValue({}),
   };
@@ -137,5 +138,11 @@ describe("CatalogController delegação", () => {
     const { controller, svc } = makeFullController();
     controller.product("p1");
     expect(svc.productDetail).toHaveBeenCalledWith("p1");
+  });
+
+  it("storeSummary: delega storeSummary (modal explore — story 29)", () => {
+    const { controller, svc } = makeFullController();
+    controller.storeSummary("s1");
+    expect(svc.storeSummary).toHaveBeenCalledWith("s1");
   });
 });

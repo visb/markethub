@@ -75,4 +75,33 @@ describe("marketplace api module", () => {
     await mkt.storesNearby({ north: 1, south: -1, east: 2, west: -2 });
     expect(request).toHaveBeenCalledWith("/stores/nearby?north=1&south=-1&east=2&west=-2");
   });
+
+  it("storeSummary busca o resumo da loja (story 29)", async () => {
+    const { request, mkt } = setup();
+    await mkt.storeSummary("s1");
+    expect(request).toHaveBeenCalledWith("/stores/s1/summary");
+  });
+
+  // Seguir loja (story 34)
+  it("followedStores faz GET autenticado", async () => {
+    const { request, mkt } = setup();
+    await mkt.followedStores();
+    expect(request).toHaveBeenCalledWith("/store-follows", { auth: true });
+  });
+
+  it("followStore faz POST autenticado com o storeId no body", async () => {
+    const { request, mkt } = setup();
+    await mkt.followStore("s1");
+    expect(request).toHaveBeenCalledWith("/store-follows", {
+      method: "POST",
+      auth: true,
+      body: { storeId: "s1" },
+    });
+  });
+
+  it("unfollowStore faz DELETE autenticado na rota da loja", async () => {
+    const { request, mkt } = setup();
+    await mkt.unfollowStore("s1");
+    expect(request).toHaveBeenCalledWith("/store-follows/s1", { method: "DELETE", auth: true });
+  });
 });
