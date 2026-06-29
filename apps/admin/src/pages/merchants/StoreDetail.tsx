@@ -815,9 +815,9 @@ function StoreEditForm({ store, onSaved }: { store: StoreData; onSaved: () => vo
 // ─── Horário de funcionamento (story 29) ─────────────────
 
 const DAY_LABELS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
-const minToHHMM = (m: number) =>
+export const minToHHMM = (m: number) =>
   `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
-const hhmmToMin = (s: string) => {
+export const hhmmToMin = (s: string) => {
   const [h, m] = s.split(":");
   return Math.max(0, Math.min(1439, Number(h) * 60 + Number(m || "0")));
 };

@@ -1,4 +1,3 @@
-import { NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { MarketplaceCategoryService } from "./marketplace-category.service";
 
