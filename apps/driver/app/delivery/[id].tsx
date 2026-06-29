@@ -1,50 +1,28 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import type { DeliveryDTO } from "@markethub/api-client";
 import { Button, Text, colors, radius, spacing } from "@markethub/ui";
-import { useAuth } from "@/auth-context";
+import { useConfirmDelivery, useConfirmPickup, useDeliveryDetail } from "@/api/hooks/useDriverDeliveries";
 
 export default function DeliveryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { client } = useAuth();
   const router = useRouter();
-  const [delivery, setDelivery] = useState<DeliveryDTO | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const detail = useDeliveryDetail(id);
+  const confirmPickup = useConfirmPickup(id);
+  const confirmDelivery = useConfirmDelivery(id);
   const [pickupCode, setPickupCode] = useState("");
   const [deliveryCode, setDeliveryCode] = useState("");
 
-  const load = useCallback(async () => {
-    try {
-      // sem endpoint de detalhe: busca nas atribuídas e localiza por id
-      const list = await client.driverDeliveries({});
-      setDelivery(list.find((d) => d.id === id) ?? null);
-    } catch {
-      setError("Falha ao carregar a entrega");
-    } finally {
-      setLoading(false);
-    }
-  }, [client, id]);
+  const delivery = detail.data;
+  const busy = confirmPickup.isPending || confirmDelivery.isPending;
+  const error =
+    detail.isError
+      ? "Falha ao carregar a entrega"
+      : confirmPickup.isError || confirmDelivery.isError
+        ? "Erro"
+        : null;
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const run = async (fn: () => Promise<DeliveryDTO>) => {
-    setBusy(true);
-    setError(null);
-    try {
-      setDelivery(await fn());
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Erro");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  if (loading) {
+  if (detail.isLoading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={colors.primary} size="large" />
@@ -107,7 +85,7 @@ export default function DeliveryScreen() {
             title="Confirmar coleta"
             loading={busy}
             disabled={pickupCode.trim().length === 0}
-            onPress={() => void run(() => client.driverConfirmPickup(delivery.id, pickupCode.trim()))}
+            onPress={() => confirmPickup.mutate(pickupCode.trim())}
             style={{ marginTop: spacing.sm }}
           />
         </View>
@@ -134,7 +112,7 @@ export default function DeliveryScreen() {
             title="Confirmar entrega"
             loading={busy}
             disabled={deliveryCode.trim().length === 0}
-            onPress={() => void run(() => client.driverConfirmDelivery(delivery.id, deliveryCode.trim()))}
+            onPress={() => confirmDelivery.mutate(deliveryCode.trim())}
             style={{ marginTop: spacing.sm }}
           />
         </View>

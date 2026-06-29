@@ -1,16 +1,16 @@
-import React, { useCallback, useState } from "react";
+import React, { useState } from "react";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
-import { useFocusEffect, useRouter } from "expo-router";
-import type { DeliveryDTO } from "@markethub/api-client";
+import { useRouter } from "expo-router";
 import { Button, Text, colors, radius, spacing } from "@markethub/ui";
 import { useAuth } from "@/auth-context";
 import { VehicleIndicator } from "@/components/VehicleIndicator";
 import { useCurrentVehicle } from "@/api/hooks/useDriverVehicle";
-
-interface Store {
-  id: string;
-  name: string;
-}
+import {
+  useAcceptDelivery,
+  useAvailableDeliveries,
+  useDriverDeliveries,
+  useDriverStores,
+} from "@/api/hooks/useDriverDeliveries";
 
 const STATUS_LABEL: Record<string, string> = {
   assigned: "A coletar",
@@ -18,66 +18,36 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default function HomeScreen() {
-  const { user, client, logout } = useAuth();
+  const { user, logout } = useAuth();
   const router = useRouter();
   const currentVehicle = useCurrentVehicle();
-  const [stores, setStores] = useState<Store[]>([]);
-  const [storeId, setStoreId] = useState<string | null>(null);
-  const [deliveries, setDeliveries] = useState<DeliveryDTO[]>([]);
-  const [available, setAvailable] = useState<DeliveryDTO[]>([]);
-  const [accepting, setAccepting] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(
-    async (sid?: string | null) => {
-      try {
-        const myStores = (await client.driverMyStores()) as Store[];
-        setStores(myStores);
-        const active = sid !== undefined ? sid : (storeId ?? myStores[0]?.id ?? null);
-        setStoreId(active);
-        const scope = active ? { storeId: active } : {};
-        const [mine, pool] = await Promise.all([
-          client.driverDeliveries(scope),
-          client.driverAvailableDeliveries(scope),
-        ]);
-        setDeliveries(mine);
-        setAvailable(pool);
-        setError(null);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Erro ao carregar");
-      } finally {
-        setLoading(false);
-      }
-    },
-    [client, storeId],
-  );
+  const storesQuery = useDriverStores();
+  const stores = storesQuery.data ?? [];
+  const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
+  // Loja ativa: a selecionada manualmente, senão a primeira da lista.
+  const storeId = selectedStoreId ?? stores[0]?.id ?? null;
 
-  const accept = useCallback(
-    async (id: string) => {
-      setAccepting(id);
-      try {
-        await client.driverAcceptDelivery(id);
-        await load();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Não foi possível aceitar");
-      } finally {
-        setAccepting(null);
-      }
-    },
-    [client, load],
-  );
+  const ready = storesQuery.isSuccess;
+  const deliveriesQuery = useDriverDeliveries(storeId, { enabled: ready });
+  const availableQuery = useAvailableDeliveries(storeId, { enabled: ready });
+  const accept = useAcceptDelivery();
 
-  // Recarrega ao focar e a cada 10s.
-  useFocusEffect(
-    useCallback(() => {
-      void load();
-      const t = setInterval(() => void load(), 10000);
-      return () => clearInterval(t);
-    }, [load]),
-  );
+  const deliveries = deliveriesQuery.data ?? [];
+  const available = availableQuery.data ?? [];
+  const loading = storesQuery.isLoading || (ready && deliveriesQuery.isLoading);
+  const error =
+    storesQuery.isError || deliveriesQuery.isError || availableQuery.isError
+      ? "Erro ao carregar"
+      : accept.isError
+        ? "Não foi possível aceitar"
+        : null;
 
-  const selectStore = (id: string) => void load(id);
+  const refresh = () => {
+    void storesQuery.refetch();
+    void deliveriesQuery.refetch();
+    void availableQuery.refetch();
+  };
 
   if (loading) {
     return (
@@ -91,7 +61,7 @@ export default function HomeScreen() {
     <ScrollView
       style={styles.screen}
       contentContainerStyle={{ padding: spacing.md, paddingBottom: spacing.xxl }}
-      refreshControl={<RefreshControl refreshing={false} onRefresh={() => void load()} />}
+      refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} />}
     >
       <View style={styles.top}>
         <Text muted variant="caption">
@@ -117,7 +87,7 @@ export default function HomeScreen() {
             <Pressable
               key={s.id}
               style={[styles.chip, storeId === s.id && styles.chipOn]}
-              onPress={() => selectStore(s.id)}
+              onPress={() => setSelectedStoreId(s.id)}
             >
               <Text style={storeId === s.id ? styles.chipOnText : undefined}>{s.name}</Text>
             </Pressable>
@@ -148,9 +118,9 @@ export default function HomeScreen() {
               </Text>
             </View>
             <Button
-              title={accepting === d.id ? "Aceitando…" : "Aceitar"}
-              onPress={() => void accept(d.id)}
-              disabled={accepting !== null}
+              title={accept.isPending && accept.variables === d.id ? "Aceitando…" : "Aceitar"}
+              onPress={() => accept.mutate(d.id)}
+              disabled={accept.isPending}
             />
           </View>
         ))
