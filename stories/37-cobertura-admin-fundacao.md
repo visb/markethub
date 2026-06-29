@@ -8,8 +8,9 @@
 ## Objetivo
 
 Primeira de três stories pra tirar o `apps/admin` de **7% linhas** (maior buraco do monorepo) rumo
-ao meta-alvo de **70%**. Esta fecha a **fundação**: autenticação, guarda de rota, shell/layout e a
-camada de acesso a dados (api wrapper + hooks base).
+ao **mínimo de 80%** (política da rodada; meta atingida ao fim da story 39). Esta fecha a
+**fundação**: autenticação, guarda de rota, shell/layout e a camada de acesso a dados (api wrapper +
+hooks base).
 
 ## User story
 

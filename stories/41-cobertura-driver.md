@@ -7,8 +7,8 @@
 
 ## Objetivo
 
-Subir o `apps/driver` de **51% linhas** ao meta-alvo de **65%**, cobrindo as telas do entregador
-(home/entregas, login com seleção de veículo) e os hooks de dados ainda descobertos.
+Subir o `apps/driver` de **51% linhas** ao **mínimo de 80%** (política da rodada), cobrindo as telas
+do entregador (home/entregas, login com seleção de veículo) e os hooks de dados ainda descobertos.
 
 ## User story
 
@@ -21,7 +21,8 @@ de status e a seleção de veículo não regridam.
 - **Login + seleção de veículo** (story 15 já cobriu o hook/gate — fechar a tela e os branches de UI
   restantes: `VehiclePicker`, `VehicleIndicator`).
 - Hooks de dados do driver: chave de `queryKeys`, `enabled`, invalidação; realtime se houver.
-- Migrar fetch legado tocado pra React Query. Piso do driver sobe no `jest` config.
+- Migrar fetch legado tocado pra React Query. **Agregado do workspace ≥ 80% linhas**; piso do driver
+  sobe pra 80 no `jest` config.
 
 ## Escopo / Fora de escopo
 

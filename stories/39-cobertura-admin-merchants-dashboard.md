@@ -8,7 +8,7 @@
 ## Objetivo
 
 Terceira das três stories do admin. Cobrir o restante das páginas — **merchants/redes, lojas
-(StoreDetail), usuários/permissões e dashboard** — fechando o `apps/admin` no meta-alvo de **70%**.
+(StoreDetail), usuários/permissões e dashboard** — fechando o `apps/admin` no **mínimo de 80% linhas**.
 
 ## User story
 
@@ -23,7 +23,7 @@ métricas do dashboard não regridam.
   testado no backend — stories 16-18/24).
 - **Dashboard:** render dos cards/métricas, filtros de período (agregações já cobertas no backend —
   story 28; aqui é a camada de view + hooks).
-- Após esta story, `apps/admin` deve estar **≥ 70% linhas**; piso ajustado no `vitest.config.ts`.
+- Após esta story, `apps/admin` deve estar **≥ 80% linhas**; piso ajustado no `vitest.config.ts`.
 
 ## Escopo / Fora de escopo
 
@@ -34,4 +34,4 @@ métricas do dashboard não regridam.
 
 `StoreDetail.tsx` já teve `minToHHMM`/`hhmmToMin` exportados+testados (fix de CI da rodada 14-34);
 aqui cobrir o render/save de `HoursSection`. Mockar `ApiClient`/hooks; sem rede. Subir o piso final
-do admin pra 70.
+do admin pra 80.

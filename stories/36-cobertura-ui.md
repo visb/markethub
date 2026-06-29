@@ -8,8 +8,8 @@
 ## Objetivo
 
 Cobrir os componentes RN compartilhados (`Button`, `Screen`, `Text`, `tokens`) — hoje **30% linhas /
-0% funcs/branches** (só o barrel é tocado). São reusados pelos apps mobile; variação não testada
-quebra UI em vários lugares.
+0% funcs/branches** (só o barrel é tocado) — ao **mínimo de 80% linhas** (política da rodada). São
+reusados pelos apps mobile; variação não testada quebra UI em vários lugares.
 
 ## User story
 
@@ -18,11 +18,11 @@ não quebre os apps que os consomem.
 
 ## Critérios de aceite
 
-- `packages/ui/src/components/Button.tsx` ≥ **50% linhas**: render do texto, variantes, `onPress`,
+- `packages/ui/src/components/Button.tsx` ≥ **80% linhas**: render do texto, variantes, `onPress`,
   estado `disabled` (não dispara), `loading` (se houver).
 - `packages/ui/src/components/Text.tsx` e `Screen.tsx`: render + props de variante/estilo.
 - `packages/ui/src/tokens.ts`: exporta a paleta/escala esperada (smoke).
-- Recalibrar o piso do workspace pra ~50 (meta-alvo story 19) ao fechar — ratchet só sobe.
+- **Agregado do workspace ≥ 80% linhas.** Recalibrar o piso pra 80 ao fechar — ratchet só sobe.
 
 ## Escopo / Fora de escopo
 

@@ -7,7 +7,7 @@
 
 ## Objetivo
 
-Subir o `apps/customer` de **47% linhas** rumo ao meta-alvo de **55%+** (ideal 65%), cobrindo as
+Subir o `apps/customer` de **47% linhas** ao **mínimo de 80%** (política da rodada), cobrindo as
 telas/hooks de compra ainda no padrão legado (`useState`/`useEffect`) ou sem teste.
 
 ## User story
@@ -22,8 +22,8 @@ não regridam — e migrar o que estiver legado pra React Query ao tocar.
 - **Checkout:** seleção de endereço/entrega vs retirada, totais (frete/door surcharge), criar pedido.
 - **Home / listagem de ofertas:** render, busca/filtro, navegação pra produto/loja.
 - **Endereços** (`/delivery`): CRUD via hooks, default.
-- Código legado **tocado migra** pra React Query + react-hook-form (CLAUDE.md). Piso do customer
-  sobe no `jest` config conforme o ganho.
+- Código legado **tocado migra** pra React Query + react-hook-form (CLAUDE.md). **Agregado do
+  workspace ≥ 80% linhas**; piso do customer sobe pra 80 no `jest` config.
 
 ## Escopo / Fora de escopo
 

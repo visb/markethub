@@ -7,7 +7,7 @@
 
 ## Objetivo
 
-Fechar o gap pequeno do `apps/picker` de **63% linhas** ao meta-alvo de **70%**, cobrindo o que
+Subir o `apps/picker` de **63% linhas** ao **mínimo de 80%** (política da rodada), cobrindo o que
 restou do fluxo de separação fora dos hooks já testados.
 
 ## User story
@@ -22,7 +22,7 @@ finalização não regridam.
 - **Substituição na UI:** buscar substituto (autocomplete já tem hook coberto — story 03), aplicar/
   recusar; refletir estado.
 - Hooks restantes do picker sem cobertura: chave de `queryKeys`, `enabled`, invalidação, realtime.
-- Piso do picker sobe pra 70 no `jest` config.
+- **Agregado do workspace ≥ 80% linhas**; piso do picker sobe pra 80 no `jest` config.
 
 ## Escopo / Fora de escopo
 
