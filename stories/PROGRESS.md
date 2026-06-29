@@ -22,7 +22,7 @@ Cuidados da rodada: stories 29/34 mudam **schema** (Store.phone/allowsPickup + S
 | 30 | Explore — barra de endereço + marker da localização do usuário | 29 | OK |
 | 31 | Modal de produto — add fecha (sem redirect) + animações slide | — | OK |
 | 32 | Página do mercado — remover nome duplicado (AppTitle vazio) | — | OK |
-| 33 | Página do mercado — botão "Seguir" no AppBar (no lugar do "?") | — | todo |
+| 33 | Página do mercado — botão "Seguir" no AppBar (no lugar do "?") | — | OK |
 | 34 | Seguir loja — backend (StoreFollow) + wiring do botão | 33 | todo |
 
 ## Log
@@ -55,6 +55,8 @@ Cuidados da rodada: stories 29/34 mudam **schema** (Store.phone/allowsPickup + S
 [OK] 31 — testes: customer 105/105 (19 suítes, +13: useProductDetail + toast + productDetail.screen); frontend-only; Stack.Screen product/[id] presentation:modal+slide_from_bottom no _layout, ToastProvider/useToast (auto-dismiss 2s timer-driven p/ teste determinístico); addFromOffer(id,{closeAfter}) — principal=addItem+toast+router.back(), outras ofertas mantêm router.push("/cart"); migração RQ: useProductDetail/useFavorites/useToggleFavorite/useAddCartItem (queryKeys.products.detail/favorites.all), tela só orquestra; coverage exit 0 (lines 44.77% > piso 30) — typecheck 12/12 + build 9/9 verdes — commit: bb4bbd5 — merge: 5efa9de — 2026-06-28 — use-cart.ts não usa RQ então useAddCartItem só chama mkt.addItem (sem key de carrinho p/ invalidar); slide up/down é verificação manual Expo fora do ambiente
 
 [OK] 32 — testes: customer 107/107 (+2: storeScreen.title source-level); cosmético — Header title="" em store/[id] (showBack+ícone ajuda preservados, param name mantido como fallback do storeName ao lado da logo); teste lê o arquivo via fs.readFileSync + regex title="" (espelho do bloco explore); sem migração RQ (dívida registrada, fora de escopo); coverage exit 0 — typecheck 12/12 + build 9/9 verdes — commit: fc32701 — merge: 8317e04 — 2026-06-28 — "?"→"Seguir" é a story 33
+
+[OK] 33 — testes: customer 115/115 (23 suítes, +3 novas: header.rightAction + followButton + storeScreen.follow + ajuste do source-test da story 32); só UI; Header ganha prop rightAction (default mantém "?", telas existentes intactas); FollowButton (src/components/, pílula vermelha colors.primary + Ionicons heart); store/[id] usa rightAction e remove o Button "♡ Seguir" inline duplicado; onPress placeholder no-op (TODO→story 34); coverage exit 0 (lines 45.08% > piso 30) — typecheck 12/12 + build 9/9 verdes — commit: 536f81c — merge: c51b76b — 2026-06-28 — sem migração RQ (dívida); ajustei regex do storeScreen.title.test.tsx (Header virou multi-linha) preservando a intenção
 
 ---
 
