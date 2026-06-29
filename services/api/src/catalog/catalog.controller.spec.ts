@@ -107,10 +107,20 @@ describe("CatalogController delegação", () => {
     });
   });
 
-  it("sections: parseGeo sem radius", () => {
+  it("sections: parseGeo sem radius; guest → userId undefined", () => {
     const { controller, svc } = makeFullController();
     controller.sections("s1", "-23.5", "-46.6");
-    expect(svc.storeSections).toHaveBeenCalledWith("s1", { lat: -23.5, lng: -46.6 });
+    expect(svc.storeSections).toHaveBeenCalledWith("s1", { lat: -23.5, lng: -46.6 }, undefined);
+  });
+
+  it("sections: cliente logado repassa user.id (following — story 34)", () => {
+    const { controller, svc } = makeFullController();
+    controller.sections("s1", undefined, undefined, {
+      id: "u1",
+      email: "c@x.com",
+      roles: ["customer"],
+    });
+    expect(svc.storeSections).toHaveBeenCalledWith("s1", undefined, "u1");
   });
 
   it("search: default de q vazio e paginação opcional", () => {

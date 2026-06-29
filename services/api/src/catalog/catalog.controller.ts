@@ -1,5 +1,8 @@
-import { BadRequestException, Controller, Get, Param, Query } from "@nestjs/common";
+import { BadRequestException, Controller, Get, Param, Query, UseGuards } from "@nestjs/common";
 import { Public } from "../auth/decorators/public.decorator";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { OptionalJwtAuthGuard } from "../auth/guards/optional-jwt-auth.guard";
+import type { AuthUser } from "../auth/auth.types";
 import { CatalogService, type GeoFilter } from "./catalog.service";
 import { StoresNearbyQueryDto } from "./dto/stores-nearby.dto";
 
@@ -104,13 +107,19 @@ export class CatalogController {
     });
   }
 
+  /**
+   * Vitrine da loja. Auth OPCIONAL (story 34): com token de cliente, `following`
+   * reflete se o usuário já segue a loja; guest → `following: false`.
+   */
+  @UseGuards(OptionalJwtAuthGuard)
   @Get("stores/:id/sections")
   sections(
     @Param("id") id: string,
     @Query("lat") lat?: string,
     @Query("lng") lng?: string,
+    @CurrentUser() user?: AuthUser,
   ) {
-    return this.catalog.storeSections(id, parseGeo(lat, lng, undefined));
+    return this.catalog.storeSections(id, parseGeo(lat, lng, undefined), user?.id);
   }
 
   @Get("search")
