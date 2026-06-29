@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { etaMinutes, haversineKm } from "../common/geo";
 import { CartService } from "../marketplace/cart.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { StoreFollowsService } from "../store-follows/store-follows.service";
 
 export interface Paginated<T> {
   items: T[];
@@ -32,7 +33,10 @@ export const NEARBY_STORES_CAP = 200;
 
 @Injectable()
 export class CatalogService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storeFollows: StoreFollowsService,
+  ) {}
 
   listMerchants() {
     return this.prisma.merchant.findMany({
@@ -236,8 +240,8 @@ export class CatalogService {
     };
   }
 
-  /** Seções da vitrine (MVP: regras simples). */
-  async storeSections(storeId: string, geo?: GeoFilter) {
+  /** Seções da vitrine (MVP: regras simples). `userId` informa `following` (story 34). */
+  async storeSections(storeId: string, geo?: GeoFilter, userId?: string) {
     const store = await this.prisma.store.findUnique({
       where: { id: storeId },
       select: {
@@ -278,6 +282,7 @@ export class CatalogService {
     const distanceKm = hasGeo
       ? round1(haversineKm(geo.lat, geo.lng, store.latitude!, store.longitude!))
       : null;
+    const following = userId ? await this.storeFollows.isFollowing(userId, storeId) : false;
     return {
       store: {
         id: store.id,
@@ -287,6 +292,7 @@ export class CatalogService {
         deliveryFeeCents: store.merchant.deliveryFeeCents,
         distanceKm,
         etaMinutes: etaMinutes(store.avgPrepMinutes, distanceKm ?? 0),
+        following,
       },
       featured: featured.map(toOfferView),
       mostBought: mostBought.map(toOfferView),

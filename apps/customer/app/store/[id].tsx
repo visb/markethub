@@ -13,6 +13,7 @@ import { CategoryMenu, type MenuCategory } from "@/components/CategoryMenu";
 import { Header } from "@/components/Header";
 import { FollowButton } from "@/components/FollowButton";
 import { MerchantLogo } from "@/components/MerchantLogo";
+import { useStoreFollow } from "@/api/hooks/useStoreFollow";
 import { getRadiusKm } from "@/prefs";
 
 export default function StoreHome() {
@@ -31,6 +32,8 @@ export default function StoreHome() {
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<ProductView[] | null>(null);
   const [loading, setLoading] = useState(true);
+  // Seguir loja (story 34): estado inicial vem do sections; toggle via React Query.
+  const follow = useStoreFollow(id ?? "", store?.following);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -104,10 +107,10 @@ export default function StoreHome() {
   return (
     <SafeAreaView style={styles.flex} edges={["top"]}>
       {/* Story 32: título do AppBar vazio — o nome do mercado fica só no storeHead, ao lado da logo. */}
-      {/* Story 33: botão "Seguir" no topo direito (no lugar do "?"); onPress no-op até a story 34. */}
+      {/* Story 33: botão "Seguir" no topo direito (no lugar do "?"). Story 34: wirado ao follow real. */}
       <Header
         title=""
-        rightAction={<FollowButton following={false} onPress={() => {/* TODO story 34: wiring do follow */}} />}
+        rightAction={<FollowButton following={follow.following} onPress={() => { if (!follow.isToggling) follow.toggle(); }} />}
       />
 
       <View style={styles.storeHead}>

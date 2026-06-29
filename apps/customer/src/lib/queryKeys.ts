@@ -13,6 +13,12 @@ export const queryKeys = {
     /** Favoritos de oferta do usuário autenticado (story 31). */
     all: ["favorites"] as const,
   },
+  storeFollows: {
+    /** Lojas seguidas pelo usuário autenticado (story 34). */
+    all: ["store-follows"] as const,
+    /** Estado seguido/não-seguido de uma loja específica. */
+    status: (storeId: string) => ["store-follows", "status", storeId] as const,
+  },
   tracking: {
     /** Snapshot de rastreio (OrderTracking) de um pedido. */
     order: (orderId: string) => ["tracking", "order", orderId] as const,
