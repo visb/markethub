@@ -22,13 +22,21 @@ module.exports = {
     "!**/*.scheduler.ts",
   ],
   coverageReporters: ["text-summary", "lcov", "json-summary"],
-  // Piso do ratchet — só sobe. Baseline medido em 28/06/2026 (linhas 36.3%).
+  // Piso do ratchet — só sobe. Story 43 levou o agregado ao meta-alvo (medido
+  // 29/06/2026: lines 83.07% / branches 75.9% / functions 81.12% / statements 82.45%).
+  // Pisos cravados abaixo do medido com folga p/ não flapar no CI.
   coverageThreshold: {
     global: {
-      statements: 35,
-      branches: 30,
-      functions: 29,
-      lines: 35,
+      statements: 80,
+      branches: 70,
+      functions: 75,
+      lines: 80,
     },
   },
+  // perFile NÃO ligado (nota da story 19): mesmo excluindo modules/dtos/main/
+  // processors/schedulers, sobram ~19 arquivos em 0% — controllers cobertos só
+  // por e2e (auth/checkout/payment/health/…) + bootstrap sem lógica testável
+  // (env.ts, prisma.service.ts, jwt.strategy.ts, all-exceptions.filter.ts,
+  // http-webhook-sender.ts). Um perFile global deixaria a main vermelha. O rigor
+  // por arquivo p/ código novo fica no gate de diff ≥ 90% (story 19).
 };
