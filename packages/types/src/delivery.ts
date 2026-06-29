@@ -42,3 +42,24 @@ export interface StoreDriverDTO {
   /** Entregas em aberto atribuídas a ele (carga atual). */
   activeDeliveries: number;
 }
+
+// ── Seleção de veículo pelo entregador (story 15) ──
+
+/** Tipo do veículo da frota (mesma enum do merchant). */
+export type DriverVehicleTypeDTO = "motorcycle" | "car" | "van";
+
+/**
+ * Veículo da frota da rede do entregador, exibido no app driver para seleção.
+ * É o subconjunto do veículo relevante ao entregador (sem dados de rede/escopo).
+ */
+export interface DriverVehicleDTO {
+  id: string;
+  plate: string;
+  type: DriverVehicleTypeDTO;
+  description: string | null;
+}
+
+/** Corpo de `PUT /driver/vehicle`: o veículo escolhido para o turno. */
+export interface SelectVehicleInput {
+  vehicleId: string;
+}

@@ -1,7 +1,9 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import { etaMinutes, haversineKm } from "../common/geo";
+import { CartService } from "../marketplace/cart.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { StoreFollowsService } from "../store-follows/store-follows.service";
 
 export interface Paginated<T> {
   items: T[];
@@ -31,7 +33,10 @@ export const NEARBY_STORES_CAP = 200;
 
 @Injectable()
 export class CatalogService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storeFollows: StoreFollowsService,
+  ) {}
 
   listMerchants() {
     return this.prisma.merchant.findMany({
@@ -235,8 +240,8 @@ export class CatalogService {
     };
   }
 
-  /** Seções da vitrine (MVP: regras simples). */
-  async storeSections(storeId: string, geo?: GeoFilter) {
+  /** Seções da vitrine (MVP: regras simples). `userId` informa `following` (story 34). */
+  async storeSections(storeId: string, geo?: GeoFilter, userId?: string) {
     const store = await this.prisma.store.findUnique({
       where: { id: storeId },
       select: {
@@ -277,6 +282,7 @@ export class CatalogService {
     const distanceKm = hasGeo
       ? round1(haversineKm(geo.lat, geo.lng, store.latitude!, store.longitude!))
       : null;
+    const following = userId ? await this.storeFollows.isFollowing(userId, storeId) : false;
     return {
       store: {
         id: store.id,
@@ -286,10 +292,74 @@ export class CatalogService {
         deliveryFeeCents: store.merchant.deliveryFeeCents,
         distanceKm,
         etaMinutes: etaMinutes(store.avgPrepMinutes, distanceKm ?? 0),
+        following,
       },
       featured: featured.map(toOfferView),
       mostBought: mostBought.map(toOfferView),
       recommended: recommended.map(toOfferView),
+    };
+  }
+
+  /**
+   * Resumo da loja para o modal do explore (story 29), buscado ao tocar o marker.
+   * Monta endereço, ETA, faixa de frete (piso `deliveryFeeCents` / teto + surcharge
+   * de entrega na porta), logo/merchant, `allowsPickup`, agrega `rating` das reviews
+   * `axis=merchant` e computa `openNow` no servidor (timezone America/Sao_Paulo).
+   * Loja inexistente/inativa → 404 STORE_NOT_FOUND.
+   */
+  async storeSummary(storeId: string, now: Date = new Date()) {
+    const store = await this.prisma.store.findUnique({
+      where: { id: storeId },
+      select: {
+        id: true,
+        name: true,
+        active: true,
+        street: true,
+        number: true,
+        district: true,
+        city: true,
+        state: true,
+        phone: true,
+        allowsPickup: true,
+        avgPrepMinutes: true,
+        merchantId: true,
+        merchant: { select: { name: true, logoUrl: true, deliveryFeeCents: true } },
+        hours: { select: { dayOfWeek: true, opensAt: true, closesAt: true } },
+      },
+    });
+    if (!store || !store.active) throw this.notFound("STORE_NOT_FOUND", "Store not found");
+
+    const agg = await this.prisma.review.aggregate({
+      where: { axis: "merchant", targetMerchantId: store.merchantId },
+      _avg: { rating: true },
+      _count: { _all: true },
+    });
+    const count = agg._count._all;
+    const rating =
+      count > 0 && agg._avg.rating != null
+        ? { average: round1(agg._avg.rating), count }
+        : null;
+
+    const { dayOfWeek, minuteOfDay } = saoPauloDayAndMinute(now);
+    return {
+      id: store.id,
+      name: store.name,
+      merchantName: store.merchant.name,
+      merchantLogoUrl: store.merchant.logoUrl,
+      address: {
+        street: store.street,
+        number: store.number,
+        district: store.district,
+        city: store.city,
+        state: store.state,
+      },
+      phone: store.phone,
+      rating,
+      etaMinutes: store.avgPrepMinutes,
+      deliveryFeeCents: store.merchant.deliveryFeeCents,
+      doorFeeCents: store.merchant.deliveryFeeCents + CartService.DOOR_SURCHARGE_CENTS,
+      allowsPickup: store.allowsPickup,
+      openNow: isOpenAt(store.hours, dayOfWeek, minuteOfDay),
     };
   }
 
@@ -503,3 +573,39 @@ function toFeedView(row: FeedRow, geo?: GeoFilter) {
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
+
+/**
+ * Hora atual em America/Sao_Paulo → dia da semana (0=domingo..6=sábado) + minuto
+ * do dia (0..1439). Computado no servidor p/ evitar bug de timezone no cliente.
+ */
+export function saoPauloDayAndMinute(now: Date): { dayOfWeek: number; minuteOfDay: number } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Sao_Paulo",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(now);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  const wdMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  const dayOfWeek = wdMap[get("weekday")] ?? 0;
+  let hour = Number(get("hour"));
+  if (hour === 24) hour = 0; // alguns runtimes emitem "24" à meia-noite
+  const minuteOfDay = hour * 60 + Number(get("minute"));
+  return { dayOfWeek, minuteOfDay };
+}
+
+/**
+ * Loja aberta se há linha de horário do dia com `opensAt ≤ minuto < closesAt`
+ * (abertura inclusiva, fechamento exclusivo). Dia sem linha = fechado. Janelas que
+ * cruzam a meia-noite ficam fora de escopo (assume `closesAt > opensAt`).
+ */
+export function isOpenAt(
+  hours: { dayOfWeek: number; opensAt: number; closesAt: number }[],
+  dayOfWeek: number,
+  minuteOfDay: number,
+): boolean {
+  const today = hours.find((h) => h.dayOfWeek === dayOfWeek);
+  if (!today) return false;
+  return today.opensAt <= minuteOfDay && minuteOfDay < today.closesAt;
+}

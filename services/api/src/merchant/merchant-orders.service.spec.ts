@@ -34,6 +34,7 @@ function makeService(opts: {
   const prisma = {
     storeStaff: {
       findMany: jest.fn().mockResolvedValue(managerStores.map((s) => ({ store: s }))),
+      findFirst: jest.fn().mockResolvedValue(null), // sem vínculo admin (resolveLevel — story 16)
     },
     store: { findMany: storeFindMany },
     orderGroup: { findMany: orderGroupFindMany },

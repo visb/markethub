@@ -181,7 +181,40 @@ Sem segredos no código. Tudo via env — ver `.env.example`. Nunca commitar `.e
 
 ## CI (`.github/workflows/ci.yml`)
 
-`install → prisma generate → lint → typecheck → build → migrate deploy → test`. Filtros usam **nome** do workspace (`--filter @markethub/api`), não path — mover pastas não quebra CI desde que o nome do pacote não mude.
+Dois jobs paralelos:
+- **`verify`:** `install → prisma generate → lint → typecheck → build → migrate deploy → test`.
+- **`coverage`:** `install → prisma generate → test:coverage → diff-coverage (PR) → artifact lcov`.
+
+Filtros usam **nome** do workspace (`--filter @markethub/api`), não path — mover pastas não quebra CI desde que o nome do pacote não mude.
+
+### Gate de cobertura (rígido) — story 19
+
+`pnpm test:coverage` (turbo) roda a cobertura de todos os workspaces. Cada um declara o piso **no próprio config** — jest `coverageThreshold.global` / vitest `coverage.thresholds` — com o all-files cravado (jest `collectCoverageFrom`; vitest `coverage.include`, que no v4 já reporta todo arquivo do include, testado ou não). Threshold violado = job vermelho.
+
+**Regras:**
+- **Piso só sobe (ratchet).** Baixar um número no config exige justificativa explícita no PR; o caminho normal é subir conforme as stories de backfill cobrem cada módulo.
+- **Diff ≥ 90%.** Em PR, `pnpm diff-coverage` (`scripts/diff-coverage.mjs`) exige que as **linhas novas/alteradas** estejam ≥ 90% cobertas — é o eixo "código novo" do gate (um arquivo novo sem teste reprova aqui mesmo que o agregado passe).
+- **Sem `--passWithNoTests`** em workspace que deve ter teste.
+
+**Pisos vigentes (linhas / branches / functions / statements)** — baseline medido em 28/06/2026 sob all-files, arredondado pra baixo com folga:
+
+| Workspace | lines | branches | functions | statements | Meta-alvo (linhas) |
+|---|---|---|---|---|---|
+| services/api | 35 | 30 | 29 | 35 | 80 |
+| apps/merchant | 90 | 78 | 84 | 90 | 90 |
+| apps/admin | 6 | 5 | 3 | 6 | 70 |
+| apps/customer | 30 | 27 | 24 | 30 | 55 |
+| apps/picker | 62 | 58 | 63 | 62 | 70 |
+| apps/driver | 46 | 40 | 60 | 45 | 65 |
+| packages/api-client | 37 | 31 | 21 | 36 | 70 |
+| packages/types | 15 | 0 | 0 | 15 | 90 |
+| packages/ui | 28 | 0 | 0 | 28 | 50 |
+
+> `admin`, `types` e `ui` foram **recalibrados**: os números altos do plano vinham de escopo falso (admin medido só sobre arquivos tocados por teste; types/ui só sobre o barrel). Sob o all-files obrigatório o baseline real é o da tabela. A meta-alvo é o destino das stories de backfill; o piso só trava o que existe hoje.
+
+> **`perFile` config-level não é usado** nos workspaces de baixa cobertura: com all-files, barrels/bootstrap ficam em 0% e um `perFile: true` deixaria a `main` permanentemente vermelha — contra o princípio "rígido sem travar o desenvolvimento". O rigor por arquivo para **código novo** é garantido pelo gate de **diff ≥ 90%**. Conforme o backfill eleva a cobertura mínima por arquivo de um workspace, `perFile: true` pode ser ligado nele.
+
+> **PENDENTE-MANUAL:** marcar o job `coverage` como **required check** na branch protection da `main` (Settings → Branches) — precisa de acesso de admin ao repositório no GitHub.
 
 ---
 
@@ -191,6 +224,17 @@ Sem segredos no código. Tudo via env — ver `.env.example`. Nunca commitar `.e
 - **pnpm + build scripts:** versões novas exigem aprovar scripts no `pnpm-workspace.yaml` (`allowBuilds`: prisma, @prisma/client, @prisma/engines, argon2, msgpackr-extract). Sem isso `pnpm install` falha com `ERR_PNPM_IGNORED_BUILDS`.
 - **`packages/types` no mobile:** Metro transpila o source; ao mudar tipos, reiniciar o dev server do app que consome.
 - **`prisma generate` antes do typecheck** após mudança de schema (ver acima).
+
+---
+
+## Delegação (subagentes)
+
+Preferir delegar a fazer inline — mantém o contexto principal limpo:
+
+- **Localizar código** ("onde está X", "o que chama Y", mapear pasta) → agent `cavecrew-investigator` (output comprimido), não varredura inline.
+- **Revisar diff/branch** → agent `cavecrew-reviewer`.
+- **Implementar uma story/unidade fechada** → agent `markethub-implementer` (codifica + gates + commit na branch).
+- **Rodar os gates** (typecheck/build/test do escopo) → agent `markethub-validator` (devolve PASS/FAIL).
 
 ---
 

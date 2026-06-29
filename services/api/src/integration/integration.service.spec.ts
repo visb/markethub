@@ -18,6 +18,7 @@ const manager = { id: "u2", roles: ["customer"] };
 
 function makeService(overrides: {
   staff?: { store: { merchantId: string } }[];
+  adminLink?: boolean;
   merchant?: Record<string, unknown> | null;
   apiKey?: Record<string, unknown> | null;
   webhook?: Record<string, unknown> | null;
@@ -38,7 +39,11 @@ function makeService(overrides: {
   );
   const webhookDelete = jest.fn().mockResolvedValue({});
   const prisma = {
-    storeStaff: { findMany: jest.fn().mockResolvedValue(staff) },
+    storeStaff: {
+      findMany: jest.fn().mockResolvedValue(staff),
+      // resolveLevel (story 16): existe vínculo StoreStaff(admin) ativo?
+      findFirst: jest.fn().mockResolvedValue(overrides.adminLink ? { id: "lnk" } : null),
+    },
     merchant: {
       findUniqueOrThrow: jest.fn().mockResolvedValue(
         overrides.merchant ?? { connectorType: null, connectorConfig: null },
@@ -76,17 +81,41 @@ function makeService(overrides: {
   return { svc, prisma, merchantUpdate, apiKeyCreate, apiKeyUpdate, webhookCreate, webhookUpdate, webhookDelete, enqueue, send };
 }
 
-describe("IntegrationService — owner scope (story 09)", () => {
-  it("gerente (sem RoleName merchant) → FORBIDDEN em qualquer rota", async () => {
+describe("IntegrationService — owner scope (story 09 + RBAC 16/17)", () => {
+  it("gerente (sem RoleName merchant, sem vínculo admin) → FORBIDDEN em qualquer rota", async () => {
     const { svc } = makeService();
     await expect(svc.getErpConfig(manager)).rejects.toBeInstanceOf(ForbiddenException);
     await expect(svc.listApiKeys(manager)).rejects.toBeInstanceOf(ForbiddenException);
     await expect(svc.listWebhooks(manager)).rejects.toBeInstanceOf(ForbiddenException);
   });
 
+  it("gerente bloqueado da integração mesmo com RoleName merchant (story 17)", async () => {
+    // backend é a fonte da verdade: sem vínculo admin e marcado como gerente
+    // (storeStaff manager), não pode tocar integração. Sem adminLink → bloqueio
+    // pelo nível efetivo, não pelo RoleName.
+    const { svc } = makeService({ adminLink: false });
+    const fakeMerchantManager = { id: "u3", roles: ["customer"] }; // gerente real: sem merchant
+    await expect(svc.getErpConfig(fakeMerchantManager)).rejects.toMatchObject({
+      response: expect.objectContaining({ code: "INTEGRATION_FORBIDDEN" }),
+    });
+  });
+
+  it("owner (RoleName merchant) acessa a integração", async () => {
+    const { svc } = makeService();
+    const cfg = await svc.getErpConfig(owner);
+    expect(cfg.connectorType).toBeNull();
+  });
+
   it("owner sem rede → BadRequest (não resolve merchant)", async () => {
     const { svc } = makeService({ staff: [] });
     await expect(svc.getErpConfig(owner)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it("admin (story 16) acessa integração: resolve a rede via vínculo admin", async () => {
+    // admin: vínculo StoreStaff(admin) ativo resolve o nível e o merchantId.
+    const { svc } = makeService({ adminLink: true, staff: [{ store: { merchantId: "m1" } }] });
+    const cfg = await svc.getErpConfig({ id: "a1", roles: ["merchant"] });
+    expect(cfg.connectorType).toBeNull();
   });
 });
 

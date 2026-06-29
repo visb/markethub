@@ -8,7 +8,7 @@ export interface CreateMerchantStaffInput {
   name: string;
   email: string;
   password: string;
-  staffRole: StaffRole; // manager | picker | driver
+  staffRole: StaffRole; // admin | manager | picker | driver
   storeId: string;
 }
 
@@ -17,16 +17,21 @@ export interface UpdateMerchantStaffInput {
   staffRole?: StaffRole;
 }
 
+/** Nível efetivo do ator na hierarquia de gestão de equipe (story 16). */
+type ActorLevel = "owner" | "admin" | "manager";
+
 /**
- * Gestão da equipe das lojas pelo app merchant (story 10). Escopo:
+ * Gestão da equipe das lojas pelo app merchant (story 10 + RBAC story 16). Escopo
+ * e hierarquia owner > admin > manager — backend é a fonte da verdade (CLAUDE.md):
  * - owner (RoleName `merchant`): todas as lojas das suas redes; cria/edita/remove
- *   qualquer papel (manager | picker | driver); pode deletar o vínculo de fato.
+ *   qualquer papel (admin | manager | picker | driver); pode deletar o vínculo.
+ * - admin (StoreStaff admin ativo): só as lojas dele; gere manager | picker |
+ *   driver, mas NÃO cria/edita outro admin (escalonamento — só o owner faz admin).
  * - manager (StoreStaff manager ativo): só as lojas dele; gere picker/driver, mas
- *   NÃO cria/edita/remove outro manager (evita escalonamento). Remoção = desativa.
+ *   NÃO mexe em admin nem manager. Remoção = desativa (owner pode hard delete).
  *
  * Reusa AdminUsersService.createStaff para a criação do User+role+vínculo (não
- * duplica). Aqui só ficam o escopo de loja e a regra de papel — sempre reforçados
- * no backend (CLAUDE.md), independente do que o front esconda.
+ * duplica). Aqui só ficam o escopo de loja e a regra de papel.
  */
 @Injectable()
 export class MerchantStaffService {
@@ -36,11 +41,15 @@ export class MerchantStaffService {
     private readonly adminUsers: AdminUsersService,
   ) {}
 
-  /** IDs das lojas no escopo do usuário (owner: todas das redes; manager: as dele). */
+  /**
+   * IDs das lojas no escopo do usuário. Só o **owner** enxerga toda a rede; admin
+   * e manager ficam restritos às lojas dos vínculos (admin NÃO escapa do escopo —
+   * story 16). Backend é a fonte da verdade.
+   */
   private async scopedStoreIds(user: { id: string; roles: string[] }): Promise<string[]> {
-    const isOwner = user.roles.includes("merchant");
+    const level = await this.merchant.resolveLevel(user);
     const mine = await this.merchant.myStores(user.id);
-    if (!isOwner) return mine.map((s) => s.id);
+    if (level !== "owner") return mine.map((s) => s.id);
 
     const merchantIds = [...new Set(mine.map((s) => s.merchantId))];
     if (merchantIds.length === 0) return [];
@@ -51,11 +60,11 @@ export class MerchantStaffService {
     return stores.map((s) => s.id);
   }
 
-  /** Garante que a loja está no escopo do usuário; devolve se ele é owner. */
+  /** Garante que a loja está no escopo do usuário; devolve o nível efetivo dele. */
   private async assertScope(
     user: { id: string; roles: string[] },
     storeId: string,
-  ): Promise<{ isOwner: boolean }> {
+  ): Promise<{ level: ActorLevel }> {
     const ids = await this.scopedStoreIds(user);
     if (ids.length === 0) {
       throw new ForbiddenException({
@@ -69,16 +78,35 @@ export class MerchantStaffService {
         message: "Loja fora do seu escopo",
       });
     }
-    return { isOwner: user.roles.includes("merchant") };
+    return { level: await this.merchant.resolveLevel(user) };
   }
 
-  /** Só o owner pode mexer em (ou criar) papel manager — gerente não escala outro. */
-  private assertCanManageRole(isOwner: boolean, staffRole: StaffRole) {
-    if (staffRole === "manager" && !isOwner) {
-      throw new ForbiddenException({
-        code: "CANNOT_MANAGE_MANAGER",
-        message: "Apenas o dono pode gerenciar gerentes",
-      });
+  /**
+   * Hierarquia de gestão de papel (story 16): admin só o owner faz; manager o owner
+   * e o admin fazem; picker/driver qualquer nível no escopo. Bloqueio de
+   * escalonamento ⇒ `ROLE_ESCALATION_FORBIDDEN`.
+   */
+  private assertCanManageRole(level: ActorLevel, staffRole: StaffRole) {
+    switch (staffRole) {
+      case "admin":
+        if (level !== "owner") {
+          throw new ForbiddenException({
+            code: "ROLE_ESCALATION_FORBIDDEN",
+            message: "Apenas o dono pode gerenciar administradores",
+          });
+        }
+        return;
+      case "manager":
+        if (level === "manager") {
+          throw new ForbiddenException({
+            code: "ROLE_ESCALATION_FORBIDDEN",
+            message: "Apenas dono ou administrador pode gerenciar gerentes",
+          });
+        }
+        return;
+      case "picker":
+      case "driver":
+        return;
     }
   }
 
@@ -120,8 +148,8 @@ export class MerchantStaffService {
 
   /** Cria colaborador: valida escopo + regra de papel, delega a criação do User. */
   async create(user: { id: string; roles: string[] }, input: CreateMerchantStaffInput) {
-    const { isOwner } = await this.assertScope(user, input.storeId);
-    this.assertCanManageRole(isOwner, input.staffRole);
+    const { level } = await this.assertScope(user, input.storeId);
+    this.assertCanManageRole(level, input.staffRole);
     return this.adminUsers.createStaff({
       name: input.name,
       email: input.email,
@@ -140,8 +168,8 @@ export class MerchantStaffService {
     if (!staff) {
       throw new NotFoundException({ code: "STAFF_NOT_FOUND", message: "Vínculo não encontrado" });
     }
-    const { isOwner } = await this.assertScope(user, staff.storeId);
-    return { staff, isOwner };
+    const { level } = await this.assertScope(user, staff.storeId);
+    return { staff, level };
   }
 
   /** Ativa/desativa o vínculo ou troca o papel (dentro das regras). */
@@ -150,10 +178,10 @@ export class MerchantStaffService {
     staffId: string,
     patch: UpdateMerchantStaffInput,
   ) {
-    const { staff, isOwner } = await this.loadInScope(user, staffId);
-    // gerente não mexe em vínculo de manager (nem para desativar/rebaixar)
-    this.assertCanManageRole(isOwner, staff.staffRole);
-    if (patch.staffRole !== undefined) this.assertCanManageRole(isOwner, patch.staffRole);
+    const { staff, level } = await this.loadInScope(user, staffId);
+    // o ator precisa poder gerenciar o papel atual do vínculo (e o novo, se trocar)
+    this.assertCanManageRole(level, staff.staffRole);
+    if (patch.staffRole !== undefined) this.assertCanManageRole(level, patch.staffRole);
 
     const data: { active?: boolean; staffRole?: StaffRole } = {};
     if (patch.active !== undefined) data.active = patch.active;
@@ -171,11 +199,11 @@ export class MerchantStaffService {
    * pedidos/picking). O owner pode deletar o vínculo de fato (`hard=true`).
    */
   async remove(user: { id: string; roles: string[] }, staffId: string, hard: boolean) {
-    const { staff, isOwner } = await this.loadInScope(user, staffId);
-    this.assertCanManageRole(isOwner, staff.staffRole);
+    const { staff, level } = await this.loadInScope(user, staffId);
+    this.assertCanManageRole(level, staff.staffRole);
 
     if (hard) {
-      if (!isOwner) {
+      if (level !== "owner") {
         throw new ForbiddenException({
           code: "DELETE_OWNER_ONLY",
           message: "Apenas o dono pode excluir o vínculo",

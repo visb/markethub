@@ -19,6 +19,10 @@ import type {
   MerchantStaffDTO,
   CreateMerchantStaffInput,
   UpdateMerchantStaffInput,
+  VehicleDTO,
+  CreateVehicleInput,
+  UpdateVehicleInput,
+  DriverVehicleDTO,
   MerchantOrderDTO,
   MerchantReportQuery,
   SalesReportDTO,
@@ -307,6 +311,34 @@ export class ApiClient {
     });
   }
 
+  // ─── Merchant / veículos (frota da rede — story 14) ─────────────
+
+  /** Lista os veículos das redes no escopo do usuário (opcionalmente por rede). */
+  merchantVehicles(merchantId?: string): Promise<VehicleDTO[]> {
+    return this.request(
+      `/merchant/vehicles${merchantId ? `?merchantId=${encodeURIComponent(merchantId)}` : ""}`,
+      { auth: true },
+    );
+  }
+
+  /** Cadastra um veículo na rede do escopo (merchantId resolvido pelo backend). */
+  merchantCreateVehicle(input: CreateVehicleInput): Promise<VehicleDTO> {
+    return this.request("/merchant/vehicles", { method: "POST", body: input, auth: true });
+  }
+
+  /** Atualiza parcialmente um veículo (placa/tipo/descrição/active). */
+  merchantUpdateVehicle(id: string, patch: UpdateVehicleInput): Promise<VehicleDTO> {
+    return this.request(`/merchant/vehicles/${id}`, { method: "PATCH", body: patch, auth: true });
+  }
+
+  /** Remove o veículo. Padrão: desativa; `hard` deleta (bloqueado se em uso). */
+  merchantRemoveVehicle(id: string, hard = false): Promise<{ id: string; active?: boolean; removed?: boolean }> {
+    return this.request(`/merchant/vehicles/${id}${hard ? "?hard=true" : ""}`, {
+      method: "DELETE",
+      auth: true,
+    });
+  }
+
   merchantOffers(params: { storeId?: string; search?: string; categoryId?: string; available?: boolean } = {}): Promise<MerchantOffer[]> {
     const q = new URLSearchParams();
     if (params.storeId) q.set("storeId", params.storeId);
@@ -432,6 +464,22 @@ export class ApiClient {
   /** Entrega ao cliente: valida o deliveryCode → entregue. */
   driverConfirmDelivery(id: string, deliveryCode: string): Promise<DeliveryDTO> {
     return this.request(`/driver/deliveries/${id}/deliver`, { method: "POST", body: { deliveryCode }, auth: true });
+  }
+
+  // ─── Entregador: seleção de veículo (story 15) ───────
+  /** Veículos `active` da rede da(s) loja(s) do entregador, p/ selecionar. */
+  driverVehicles(): Promise<DriverVehicleDTO[]> {
+    return this.request("/driver/vehicles", { auth: true });
+  }
+
+  /** Veículo atualmente selecionado pelo entregador (ou null). */
+  driverCurrentVehicle(): Promise<DriverVehicleDTO | null> {
+    return this.request("/driver/vehicle/current", { auth: true });
+  }
+
+  /** Seleciona/troca o veículo do turno; valida escopo+active no backend. */
+  driverSelectVehicle(vehicleId: string): Promise<DriverVehicleDTO> {
+    return this.request("/driver/vehicle", { method: "PUT", body: { vehicleId }, auth: true });
   }
 
   // ─── Loja: despacho de entregas (manager/picker) ─────

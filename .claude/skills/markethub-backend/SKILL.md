@@ -80,9 +80,8 @@ JWT: access + refresh (`auth/token.service.ts`); segredos via env (`JWT_ACCESS_S
 
 O backend é **standalone** — **não** importa `packages/types` (usa tipos do Prisma). `packages/types` é o contrato consumido pelos **apps** via `@markethub/api-client`. Como não há dep compartilhada, o contrato é mantido por convenção: ao mudar uma resposta/payload da API, atualizar **o backend e** `packages/types` juntos, e rodar `pnpm typecheck` na raiz.
 
-## Validação recomendada
+## Validação
 
-- `pnpm --filter @markethub/api prisma:generate` (se schema mudou) → `pnpm --filter @markethub/api typecheck`.
-- `pnpm --filter @markethub/api build`.
-- `pnpm --filter @markethub/api test` quando tocar lógica (specs em `*.spec.ts`).
-- Migration: aplicar em banco local/teste antes de considerar pronto.
+Gates (prisma generate se schema mudou → typecheck → build → `pnpm --filter @markethub/api test`,
+e2e quando tocar fluxo; migration aplicada antes do e2e): delegar ao agent `markethub-validator` ou
+ver a skill `markethub-workflow`. Specs em `*.spec.ts`; suíte verde é pré-requisito de pronto.

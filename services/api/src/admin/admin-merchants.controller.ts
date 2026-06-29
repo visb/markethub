@@ -1,12 +1,17 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from "@nestjs/common";
+import { Type } from "class-transformer";
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsInt,
   IsNumber,
   IsOptional,
   IsString,
+  Max,
   Min,
   MinLength,
+  ValidateNested,
 } from "class-validator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
@@ -65,9 +70,29 @@ class UpdateStoreDto {
   @IsOptional() @IsString() zipCode?: string;
   @IsOptional() @IsNumber() latitude?: number;
   @IsOptional() @IsNumber() longitude?: number;
+  /** Contato exibido no resumo da loja (modal explore — story 29). */
+  @IsOptional() @IsString() phone?: string;
+  /** Permite retirada de pedidos na loja (badge "Retirar na loja" — story 29). */
+  @IsOptional() @IsBoolean() allowsPickup?: boolean;
   /** Tempo médio de preparo (min) — compõe o ETA real (S6.7). */
   @IsOptional() @IsInt() @Min(1) avgPrepMinutes?: number;
   @IsOptional() @IsBoolean() active?: boolean;
+}
+
+/** Uma faixa abre–fecha de um dia da semana (story 29); minutos desde meia-noite. */
+class StoreHoursEntryDto {
+  @IsInt() @Min(0) @Max(6) dayOfWeek!: number;
+  @IsInt() @Min(0) @Max(1439) opensAt!: number;
+  @IsInt() @Min(0) @Max(1439) closesAt!: number;
+}
+
+/** Substitui o horário semanal inteiro da loja (replace-all) — story 29. */
+class SetStoreHoursDto {
+  @IsArray()
+  @ArrayMaxSize(7)
+  @ValidateNested({ each: true })
+  @Type(() => StoreHoursEntryDto)
+  hours!: StoreHoursEntryDto[];
 }
 
 class UpdateOfferDto {
@@ -172,6 +197,19 @@ export class AdminStoreDetailController {
   @Get(":id/staff")
   staff(@Param("id") id: string) {
     return this.merchants.storeStaff(id);
+  }
+
+  // ── Horário de funcionamento (story 29) ──
+
+  @Get(":id/hours")
+  hours(@Param("id") id: string) {
+    return this.merchants.storeHours(id);
+  }
+
+  /** Substitui o horário semanal inteiro (replace-all): uma faixa por dia. */
+  @Put(":id/hours")
+  setHours(@Param("id") id: string, @Body() dto: SetStoreHoursDto) {
+    return this.merchants.setStoreHours(id, dto.hours);
   }
 
   // ── Ofertas / estoque ──

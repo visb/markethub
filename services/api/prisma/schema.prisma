@@ -34,6 +34,11 @@ model User {
   tipsReceived     Tip[]         @relation("DriverTips")
   deviceTokens     DeviceToken[]
   favorites        Favorite[]
+  storeFollows     StoreFollow[]
+  // Veículo da frota que o entregador selecionou para o turno corrente (story 15).
+  // Opcional; relação fraca (SetNull) para não bloquear soft-delete de veículo.
+  activeVehicle    Vehicle?      @relation("DriverActiveVehicle", fields: [activeVehicleId], references: [id], onDelete: SetNull)
+  activeVehicleId  String?
 
   @@map("users")
 }
@@ -74,9 +79,39 @@ model Session {
 
 // Papel do funcionário dentro de uma loja.
 enum StaffRole {
+  admin // administrador da loja: acesso total à loja (inclui integração) e gere manager|picker|driver (story 16)
   manager // usuário do merchant que gerencia a loja
   picker // separador (faz o picking)
   driver // entregador da loja (entrega própria, SF-delivery)
+}
+
+// Tipo do veículo de entrega da frota da rede (story 14).
+enum VehicleType {
+  motorcycle // moto
+  car // carro
+  van // utilitário/van
+}
+
+// Veículo de entrega da frota da rede (story 14). Pertence ao MERCHANT (rede),
+// não à loja: a frota é compartilhada entre as lojas; o entregador (que pertence a
+// uma loja) escolhe entre os veículos da rede dona da loja (story 15). Desativação
+// é soft (`active=false`) para preservar histórico de quem entregou com qual veículo.
+model Vehicle {
+  id          String      @id @default(cuid())
+  merchant    Merchant    @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  merchantId  String
+  plate       String // placa
+  type        VehicleType
+  description String? // texto livre, ex.: "Fiorino branca"
+  active      Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  deliveries  Delivery[]
+  // Entregadores que selecionaram este veículo como ativo no turno (story 15).
+  activeDrivers User[]    @relation("DriverActiveVehicle")
+
+  @@index([merchantId])
+  @@map("vehicles")
 }
 
 // Vínculo de um usuário (funcionário) a uma loja específica, com papel operacional.
@@ -136,6 +171,7 @@ model Merchant {
   coupons          Coupon[]
   apiKeys          ApiKey[]
   webhooks         Webhook[]
+  vehicles         Vehicle[]
 
   @@map("merchants")
 }
@@ -195,6 +231,10 @@ model Store {
   zipCode       String?
   latitude      Float?
   longitude     Float?
+  // contato exibido no resumo da loja (modal explore — story 29)
+  phone         String?
+  // permite retirada de pedidos na loja (badge "Retirar na loja" — story 29)
+  allowsPickup  Boolean        @default(true)
   // tempo médio de preparo do pedido (min) — compõe o ETA real (S6.7)
   avgPrepMinutes Int           @default(15)
   active        Boolean        @default(true)
@@ -205,10 +245,29 @@ model Store {
   staff         StoreStaff[]
   orderGroups   OrderGroup[]
   deliverySlots DeliverySlot[]
+  hours         StoreHours[]
+  followers     StoreFollow[]
 
   @@unique([merchantId, externalId])
   @@index([merchantId])
   @@map("stores")
+}
+
+// Horário de funcionamento da loja por dia da semana (story 29). Uma faixa
+// abre–fecha por dia (`dayOfWeek` 0=domingo..6=sábado); `opensAt`/`closesAt` em
+// minutos desde a meia-noite (ex.: 8h = 480) p/ comparação livre de timezone.
+// Dia sem linha = fechado nesse dia. Janelas que cruzam a meia-noite ficam fora
+// de escopo (assume `closesAt > opensAt`).
+model StoreHours {
+  id        String   @id @default(cuid())
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  storeId   String
+  dayOfWeek Int // 0=domingo .. 6=sábado
+  opensAt   Int // minutos desde a meia-noite
+  closesAt  Int // minutos desde a meia-noite
+
+  @@index([storeId])
+  @@map("store_hours")
 }
 
 // Categoria CRUA (origem ERP/Cosmos, criada automaticamente). Mapeia para uma categoria
@@ -457,6 +516,21 @@ model Favorite {
   @@unique([userId, offerId])
   @@index([userId])
   @@map("favorites")
+}
+
+// Loja seguida pelo cliente (story 34). Espelha Favorite, mas referencia a LOJA
+// (não a oferta): casa com a rota /store/:id. Idempotente via @@unique.
+model StoreFollow {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  storeId   String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, storeId])
+  @@index([userId])
+  @@map("store_follows")
 }
 
 model Address {
@@ -795,6 +869,10 @@ model Delivery {
   storeId      String // denormalizado p/ fila por loja
   driver       User?          @relation("DriverDeliveries", fields: [driverId], references: [id])
   driverId     String?
+  // Veículo usado nesta entrega (story 14): histórico de qual veículo da frota fez a
+  // entrega. Opcional; só é preenchido a partir da story 15 (seleção pelo entregador).
+  vehicle      Vehicle?       @relation(fields: [vehicleId], references: [id])
+  vehicleId    String?
   status       DeliveryStatus @default(unassigned)
   assignedAt   DateTime?
   pickedUpAt   DateTime?

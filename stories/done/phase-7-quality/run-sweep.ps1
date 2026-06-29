@@ -1,3 +1,9 @@
+# [SUPERSEDED 2026-06-28] Mecanismo de run autônomo via Windows Task Scheduler — aposentado.
+# Go-forward: skill /autorun + /loop (ver .claude/skills/autorun e stories/AUTORUN.md), que
+# sobrevive ao limite de sessão pelo próprio harness, sem schtasks/lock/watchdog. Mantido só
+# como registro histórico do run phase-7-quality (já concluído — ver FINAL-REPORT.md).
+# Se ainda houver tarefa agendada: schtasks /delete /tn markethub-sweep /f
+#
 # run-sweep.ps1 — UM disparo, limitado no tempo, do run autônomo de qualidade.
 # Chamado pelo Windows Task Scheduler a cada 30min. Três garantias:
 #   - LOCK: nunca dois runs ao mesmo tempo.

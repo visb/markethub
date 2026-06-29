@@ -200,6 +200,54 @@ describe("Merchant integration (e2e)", () => {
       .expect(403);
   });
 
+  it("gerente real (RoleName customer, só vínculo manager) → 403 no service de integração (story 17)", async () => {
+    // O gerente é o usuário SEM RoleName `merchant` e com StoreStaff(manager). O guard
+    // @Roles já o barra no controller (sem `merchant`/`admin`), e o service também: sem
+    // vínculo admin e sem RoleName merchant → INTEGRATION_FORBIDDEN. Backend é a fonte
+    // da verdade (CLAUDE.md) — não confia em storeId/merchantId do cliente.
+    const prisma = getPrisma(app);
+    const seeded = await seedOffer(prisma);
+    const manager = await registerUser(app); // RoleName customer
+    const row = await prisma.user.findFirstOrThrow({ where: { email: manager.email } });
+    await prisma.storeStaff.create({
+      data: { userId: row.id, storeId: seeded.storeId, staffRole: "manager", active: true },
+    });
+
+    await request(app.getHttpServer())
+      .get(url("/merchant/integration/erp"))
+      .set(authHeader(manager))
+      .expect(403);
+    await request(app.getHttpServer())
+      .get(url("/merchant/integration/api-keys"))
+      .set(authHeader(manager))
+      .expect(403);
+    await request(app.getHttpServer())
+      .post(url("/merchant/integration/webhooks"))
+      .set(authHeader(manager))
+      .send({ url: "https://x.example" })
+      .expect(403);
+  });
+
+  it("admin (story 16): acessa a integração (resolve a rede via vínculo admin)", async () => {
+    const prisma = getPrisma(app);
+    const seeded = await seedOffer(prisma);
+    const admin = await registerUser(app, { roles: ["merchant"] });
+    const row = await prisma.user.findFirstOrThrow({ where: { email: admin.email } });
+    await prisma.storeStaff.create({
+      data: { userId: row.id, storeId: seeded.storeId, staffRole: "admin", active: true },
+    });
+
+    await request(app.getHttpServer())
+      .put(url("/merchant/integration/erp"))
+      .set(authHeader(admin))
+      .send({ connectorType: "csv", connectorConfig: { dir: "/data", apiKey: "s" } })
+      .expect(200);
+    await request(app.getHttpServer())
+      .get(url("/merchant/integration/erp"))
+      .set(authHeader(admin))
+      .expect(200);
+  });
+
   it("não autenticado → 401", async () => {
     await request(app.getHttpServer()).get(url("/merchant/integration/erp")).expect(401);
   });

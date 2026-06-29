@@ -4,11 +4,14 @@ import { z } from "zod";
 import type { MerchantStoreDTO, StaffRoleName } from "@markethub/api-client";
 
 /**
- * Formulário de novo colaborador (story 10) — react-hook-form + zod (CLAUDE.md).
- * As opções de papel são limitadas pelo chamador (`allowManager`): o gerente não
- * cadastra outro gerente. A loja vem do escopo do usuário (seletor).
+ * Formulário de novo colaborador (story 10 + RBAC story 16) — react-hook-form +
+ * zod (CLAUDE.md). As opções de papel são limitadas pelo chamador (`allowedRoles`)
+ * conforme o nível do ator: só o dono oferece "Administrador"; dono/admin oferecem
+ * "Gerente"; gerente só picker/driver. O backend SEMPRE reforça. A loja vem do
+ * escopo do usuário (seletor).
  */
 const ROLE_LABEL: Record<StaffRoleName, string> = {
+  admin: "Administrador",
   manager: "Gerente",
   picker: "Separador",
   driver: "Entregador",
@@ -18,29 +21,27 @@ const staffSchema = z.object({
   name: z.string().trim().min(1, "Informe o nome"),
   email: z.string().trim().email("E-mail inválido"),
   password: z.string().min(6, "Mínimo de 6 caracteres"),
-  staffRole: z.enum(["manager", "picker", "driver"]),
+  staffRole: z.enum(["admin", "manager", "picker", "driver"]),
   storeId: z.string().min(1, "Selecione a loja"),
 });
 export type StaffFormValues = z.infer<typeof staffSchema>;
 
 export function StaffForm({
   stores,
-  allowManager,
+  allowedRoles,
   onSubmit,
   onCancel,
   submitting,
   error,
 }: {
   stores: MerchantStoreDTO[];
-  allowManager: boolean;
+  allowedRoles: StaffRoleName[];
   onSubmit: (values: StaffFormValues) => void;
   onCancel: () => void;
   submitting?: boolean;
   error?: string | null;
 }) {
-  const roleOptions: StaffRoleName[] = allowManager
-    ? ["manager", "picker", "driver"]
-    : ["picker", "driver"];
+  const roleOptions: StaffRoleName[] = allowedRoles;
 
   const {
     register,

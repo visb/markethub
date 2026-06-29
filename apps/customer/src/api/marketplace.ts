@@ -1,8 +1,8 @@
 import type { ApiClient } from "@markethub/api-client";
-import type { NearbyStoreDTO, ViewportBoundsDTO } from "@markethub/types";
+import type { NearbyStoreDTO, StoreSummaryDTO, ViewportBoundsDTO } from "@markethub/types";
 
-// Re-export dos contratos compartilhados do mapa (stories 04/05/06) — fonte única em packages/types.
-export type { NearbyStoreDTO, ViewportBoundsDTO } from "@markethub/types";
+// Re-export dos contratos compartilhados do mapa (stories 04/05/06/29) — fonte única em packages/types.
+export type { NearbyStoreDTO, StoreSummaryDTO, ViewportBoundsDTO } from "@markethub/types";
 
 export type SaleType = "unit" | "weight";
 
@@ -219,6 +219,15 @@ export interface StoreMeta {
   deliveryFeeCents: number;
   distanceKm: number | null;
   etaMinutes: number;
+  /** Se o cliente logado já segue esta loja (story 34). Guest → false. */
+  following: boolean;
+}
+
+/** Loja seguida pelo cliente (story 34). */
+export interface FollowedStoreView {
+  storeId: string;
+  createdAt: string;
+  store: { id: string; name: string; merchantName: string; merchantLogoUrl: string | null };
 }
 
 /** Favorito de oferta (S6.5). */
@@ -301,6 +310,8 @@ export function marketplace(api: ApiClient) {
       api.request<NearbyStoreDTO[]>(
         `/stores/nearby?north=${bounds.north}&south=${bounds.south}&east=${bounds.east}&west=${bounds.west}`,
       ),
+    /** Resumo da loja para o modal do explore (story 29), buscado ao tocar o marker. */
+    storeSummary: (id: string) => api.request<StoreSummaryDTO>(`/stores/${id}/summary`),
     products: (storeId: string, page = 1) =>
       api.request<Paginated<ProductView>>(`/stores/${storeId}/products?page=${page}&pageSize=30`),
     search: (storeId: string, q: string) =>
@@ -308,12 +319,13 @@ export function marketplace(api: ApiClient) {
         `/search?storeId=${storeId}&q=${encodeURIComponent(q)}`,
       ),
     sections: (storeId: string, geo?: GeoQuery) =>
+      // auth opcional (story 34): com token, `store.following` reflete o usuário.
       api.request<{
         store: StoreMeta;
         featured: ProductView[];
         mostBought: ProductView[];
         recommended: ProductView[];
-      }>(`/stores/${storeId}/sections?${geoQs(new URLSearchParams(), geo)}`),
+      }>(`/stores/${storeId}/sections?${geoQs(new URLSearchParams(), geo)}`, { auth: true }),
     categories: () =>
       api.request<{ id: string; name: string; slug: string }[]>(
         "/marketplace-categories",
@@ -346,6 +358,16 @@ export function marketplace(api: ApiClient) {
       api.request<{ id: string }>("/favorites", { method: "POST", auth: true, body: { offerId } }),
     removeFavorite: (offerId: string) =>
       api.request<{ removed: boolean }>(`/favorites/${offerId}`, { method: "DELETE", auth: true }),
+
+    // Seguir loja (story 34)
+    followedStores: () => api.request<FollowedStoreView[]>("/store-follows", { auth: true }),
+    followStore: (storeId: string) =>
+      api.request<{ id: string }>("/store-follows", { method: "POST", auth: true, body: { storeId } }),
+    unfollowStore: (storeId: string) =>
+      api.request<{ storeId: string; removed: boolean }>(`/store-follows/${storeId}`, {
+        method: "DELETE",
+        auth: true,
+      }),
 
     slots: (storeId: string) => api.request<SlotView[]>(`/stores/${storeId}/slots`, { auth: true }),
     checkout: (body: {

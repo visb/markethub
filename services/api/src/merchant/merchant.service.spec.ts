@@ -12,6 +12,8 @@ function makeService(opts: {
   stores?: { id: string; name: string; merchantId: string }[];
   geocode?: jest.Mock;
   store?: Record<string, unknown> | null;
+  /** simula vínculo StoreStaff(admin) ativo p/ resolveLevel (story 16). */
+  hasAdminLink?: boolean;
 }) {
   const stores = opts.stores ?? [];
   const create = jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: "new", ...data }));
@@ -21,16 +23,19 @@ function makeService(opts: {
       findMany: jest
         .fn()
         .mockResolvedValue(stores.map((s) => ({ store: s }))),
+      findFirst: jest.fn().mockResolvedValue(opts.hasAdminLink ? { id: "lnk" } : null),
     },
     store: {
       findUnique: jest.fn().mockResolvedValue(opts.store ?? null),
+      findMany: jest.fn().mockResolvedValue(stores),
       create,
       update,
     },
   } as never;
   const geocode = opts.geocode ?? jest.fn().mockResolvedValue({ latitude: -25.4, longitude: -49.2 });
   const geocoding = { geocode } as never;
-  return { svc: new MerchantService(prisma, geocoding), create, update, geocode };
+  const storeFindMany = (prisma as unknown as { store: { findMany: jest.Mock } }).store.findMany;
+  return { svc: new MerchantService(prisma, geocoding), create, update, geocode, storeFindMany };
 }
 
 const owner = { id: "u1", roles: ["merchant"] };
@@ -61,6 +66,16 @@ describe("MerchantService — lojas (story 08)", () => {
       const { svc, create } = makeService({ stores: [{ ...ownerStore }] });
       await expect(svc.createStore(manager, { name: "X" })).rejects.toBeInstanceOf(ForbiddenException);
       await expect(svc.createStore(manager, { name: "X" })).rejects.toMatchObject({
+        response: expect.objectContaining({ code: "NOT_AN_OWNER" }),
+      });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it("admin (story 16) recebe FORBIDDEN (NOT_AN_OWNER): criar loja é owner-only", async () => {
+      // admin tem RoleName merchant (guards) + vínculo admin → nível admin, não owner.
+      const adminUser = { id: "u3", roles: ["merchant"] };
+      const { svc, create } = makeService({ stores: [{ ...ownerStore }], hasAdminLink: true });
+      await expect(svc.createStore(adminUser, { name: "X" })).rejects.toMatchObject({
         response: expect.objectContaining({ code: "NOT_AN_OWNER" }),
       });
       expect(create).not.toHaveBeenCalled();
@@ -105,6 +120,30 @@ describe("MerchantService — lojas (story 08)", () => {
       await expect(svc.createStore(owner, { name: "N" })).rejects.toMatchObject({
         response: expect.objectContaining({ code: "MERCHANT_NOT_RESOLVED" }),
       });
+    });
+  });
+
+  describe("listStores (story 08/16)", () => {
+    it("owner lista todas as lojas das suas redes (where por merchantId)", async () => {
+      const { svc, storeFindMany } = makeService({ stores: [ownerStore] });
+      await svc.listStores(owner);
+      expect(storeFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { merchantId: { in: ["m1"] } } }),
+      );
+    });
+
+    it("admin/manager listam só as lojas do vínculo (where por id)", async () => {
+      const { svc, storeFindMany } = makeService({ stores: [ownerStore], hasAdminLink: true });
+      await svc.listStores({ id: "u3", roles: ["merchant"] });
+      expect(storeFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: { in: ["s1"] } } }),
+      );
+    });
+
+    it("usuário sem loja → lista vazia (sem ir ao banco)", async () => {
+      const { svc, storeFindMany } = makeService({ stores: [] });
+      expect(await svc.listStores(manager)).toEqual([]);
+      expect(storeFindMany).not.toHaveBeenCalled();
     });
   });
 

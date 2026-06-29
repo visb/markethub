@@ -57,47 +57,67 @@ export class MerchantService {
   ) {}
 
   /**
-   * Contexto de identidade do app merchant (story 07). Resolve o papel efetivo:
+   * Contexto de identidade do app merchant. Resolve o **nível efetivo** do usuário
+   * na hierarquia owner > admin > manager (story 16):
    * - owner: usuário com RoleName `merchant` → vê todas as lojas das redes que
-   *   possui (vínculo manager nessas redes; MVP usa StoreStaff como posse).
-   * - manager: sem RoleName `merchant`, mas com StoreStaff(manager) ativo → vê
-   *   só as lojas dos vínculos dele.
-   * Nega (FORBIDDEN) quem não é nenhum dos dois.
+   *   possui (vínculo de loja nessas redes; MVP usa StoreStaff como posse).
+   * - admin: sem RoleName `merchant`, mas com StoreStaff(admin) ativo → administra
+   *   só as lojas dos vínculos dele (acesso total à loja, inclui integração).
+   * - manager: sem RoleName `merchant`, com StoreStaff(manager) ativo → gere só as
+   *   lojas dos vínculos dele.
+   * Nega (FORBIDDEN) quem não é nenhum dos três.
    */
   async getContext(user: {
     id: string;
     roles: string[];
-  }): Promise<{ role: "owner" | "manager"; merchantId: string | null; stores: { id: string; name: string; merchantId: string }[] }> {
+  }): Promise<{ role: "owner" | "admin" | "manager"; merchantId: string | null; stores: { id: string; name: string; merchantId: string }[] }> {
     const stores = await this.myStores(user.id);
-    const isOwner = user.roles.includes("merchant");
+    const role = await this.resolveLevel(user);
 
-    if (!isOwner && stores.length === 0) {
+    if (stores.length === 0 && role !== "owner") {
       throw new ForbiddenException({
         code: "NOT_A_MERCHANT_USER",
-        message: "Usuário não é dono nem gerente de nenhuma loja",
+        message: "Usuário não é dono, administrador nem gerente de nenhuma loja",
       });
     }
 
     return {
-      role: isOwner ? "owner" : "manager",
+      role,
       merchantId: stores[0]?.merchantId ?? null,
       stores,
     };
   }
 
-  /** IDs das lojas onde o usuário é manager ativo. */
+  /**
+   * Nível efetivo do usuário na hierarquia owner > admin > manager (story 16).
+   * Um vínculo StoreStaff(admin) ativo o torna **admin da loja** (mesmo tendo
+   * RoleName `merchant` p/ passar nos guards de controller); só o dono da rede
+   * SEM vínculo admin é `owner`. Sem RoleName `merchant` e sem admin → `manager`.
+   * O gate de escopo bloqueia quem não tem loja nenhuma.
+   */
+  async resolveLevel(user: { id: string; roles: string[] }): Promise<"owner" | "admin" | "manager"> {
+    const adminLink = await this.prisma.storeStaff.findFirst({
+      where: { userId: user.id, staffRole: "admin", active: true },
+      select: { id: true },
+    });
+    if (adminLink) return "admin";
+    if (user.roles.includes("merchant")) return "owner";
+    return "manager";
+  }
+
+  /** IDs das lojas onde o usuário é manager ativo (gestão de oferta/estoque). */
   async managerStoreIds(userId: string): Promise<string[]> {
     const staff = await this.prisma.storeStaff.findMany({
-      where: { userId, staffRole: "manager", active: true },
+      where: { userId, staffRole: { in: ["admin", "manager"] }, active: true },
       select: { storeId: true },
     });
     return staff.map((s) => s.storeId);
   }
 
-  /** Lojas geridas pelo manager (para o seletor de loja). */
+  /** Lojas no escopo do usuário (admin/manager ativo) — p/ seletor de loja. */
   async myStores(userId: string) {
     const staff = await this.prisma.storeStaff.findMany({
-      where: { userId, staffRole: "manager", active: true },
+      where: { userId, staffRole: { in: ["admin", "manager"] }, active: true },
       include: { store: { select: { id: true, name: true, merchantId: true } } },
     });
     return staff.map((s) => s.store);
@@ -113,7 +133,8 @@ export class MerchantService {
     const scoped = await this.myStores(user.id);
     if (scoped.length === 0) return [];
 
-    const isOwner = user.roles.includes("merchant");
+    // Só o owner lista toda a rede; admin/manager listam as lojas do vínculo (story 16).
+    const isOwner = (await this.resolveLevel(user)) === "owner";
     const where: Prisma.StoreWhereInput = isOwner
       ? { merchantId: { in: [...new Set(scoped.map((s) => s.merchantId))] } }
       : { id: { in: scoped.map((s) => s.id) } };
@@ -122,11 +143,12 @@ export class MerchantService {
   }
 
   /**
-   * Garante que o usuário é dono da rede (RoleName `merchant`). Criar/editar loja
-   * é owner-only; gerente recebe FORBIDDEN. O backend SEMPRE reforça (CLAUDE.md).
+   * Garante que o usuário é dono da rede (nível owner). Criar/editar loja é
+   * owner-only (nível de rede); admin e gerente recebem FORBIDDEN. O backend
+   * SEMPRE reforça (CLAUDE.md) — admin tem RoleName `merchant`, mas não é owner.
    */
-  private assertOwner(user: { roles: string[] }) {
-    if (!user.roles.includes("merchant")) {
+  private async assertOwner(user: { id: string; roles: string[] }) {
+    if ((await this.resolveLevel(user)) !== "owner") {
       throw new ForbiddenException({
         code: "NOT_AN_OWNER",
         message: "Apenas o dono da rede pode gerenciar lojas",
@@ -177,7 +199,7 @@ export class MerchantService {
   }
 
   async createStore(user: { id: string; roles: string[] }, input: CreateStoreInput) {
-    this.assertOwner(user);
+    await this.assertOwner(user);
     const merchantId = await this.resolveOwnerMerchantId(user.id, input.merchantId);
 
     // Override manual de lat/lng tem prioridade; senão geocodifica o endereço.
@@ -210,7 +232,7 @@ export class MerchantService {
   }
 
   async updateStore(user: { id: string; roles: string[] }, storeId: string, patch: UpdateStoreInput) {
-    this.assertOwner(user);
+    await this.assertOwner(user);
     const store = await this.prisma.store.findUnique({ where: { id: storeId } });
     if (!store) {
       throw new NotFoundException({ code: "STORE_NOT_FOUND", message: "Loja não encontrada" });
@@ -279,7 +301,8 @@ export class MerchantService {
     const scoped = await this.myStores(user.id);
     if (scoped.length === 0) return { storeIds: [], merchantIds: [] };
     const merchantIds = [...new Set(scoped.map((s) => s.merchantId))];
-    if (user.roles.includes("merchant")) {
+    // Só o owner enxerga toda a rede; admin e manager ficam nas lojas do vínculo (story 16).
+    if ((await this.resolveLevel(user)) === "owner") {
       const stores = await this.prisma.store.findMany({
         where: { merchantId: { in: merchantIds } },
         select: { id: true },

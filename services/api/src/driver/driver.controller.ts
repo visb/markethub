@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Put, Query } from "@nestjs/common";
 import { IsString, MinLength } from "class-validator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
 import type { AuthUser } from "../auth/auth.types";
 import { DriverService } from "./driver.service";
+import { DriverVehicleService } from "./driver-vehicle.service";
 
 class ConfirmPickupDto {
   @IsString() @MinLength(1) pickupCode!: string;
@@ -13,11 +14,18 @@ class ConfirmDeliveryDto {
   @IsString() @MinLength(1) deliveryCode!: string;
 }
 
+class SelectVehicleDto {
+  @IsString() @MinLength(1) vehicleId!: string;
+}
+
 /** App do entregador (entrega própria): lojas, fila de entregas, coleta e entrega. */
 @Roles("driver")
 @Controller("driver")
 export class DriverController {
-  constructor(private readonly driver: DriverService) {}
+  constructor(
+    private readonly driver: DriverService,
+    private readonly vehicles: DriverVehicleService,
+  ) {}
 
   /** Lojas em que o usuário atua como entregador. */
   @Get("stores")
@@ -57,5 +65,23 @@ export class DriverController {
   @Post("deliveries/:id/deliver")
   deliver(@CurrentUser() user: AuthUser, @Param("id") id: string, @Body() dto: ConfirmDeliveryDto) {
     return this.driver.confirmDelivery(user.id, id, dto.deliveryCode);
+  }
+
+  /** Veículos `active` da rede do entregador, p/ seleção no login (story 15). */
+  @Get("vehicles")
+  vehicles_(@CurrentUser() user: AuthUser) {
+    return this.vehicles.listAvailable(user.id);
+  }
+
+  /** Veículo atualmente selecionado pelo entregador (ou null). */
+  @Get("vehicle/current")
+  currentVehicle(@CurrentUser() user: AuthUser) {
+    return this.vehicles.current(user.id);
+  }
+
+  /** Seleciona/troca o veículo do turno (valida escopo+active no backend). */
+  @Put("vehicle")
+  selectVehicle(@CurrentUser() user: AuthUser, @Body() dto: SelectVehicleDto) {
+    return this.vehicles.select(user.id, dto.vehicleId);
   }
 }

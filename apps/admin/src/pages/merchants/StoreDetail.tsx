@@ -4,6 +4,13 @@ import { useAuth } from "@/auth/auth-context";
 
 // ─── Tipos ───────────────────────────────────────────────
 
+interface StoreHoursRow {
+  id: string;
+  dayOfWeek: number;
+  opensAt: number;
+  closesAt: number;
+}
+
 interface StoreData {
   id: string;
   name: string;
@@ -16,9 +23,12 @@ interface StoreData {
   zipCode: string | null;
   latitude: number | null;
   longitude: number | null;
+  phone: string | null;
+  allowsPickup: boolean;
   avgPrepMinutes: number;
   active: boolean;
   merchant: { id: string; name: string };
+  hours: StoreHoursRow[];
   counts: {
     offers: number;
     staff: number;
@@ -681,6 +691,8 @@ function DataTab({ store, onChange }: { store: StoreData; onChange: () => void }
               Geo: {store.latitude ?? "—"}, {store.longitude ?? "—"}
             </p>
             <p className="muted">Tempo de preparo médio: {store.avgPrepMinutes} min</p>
+            <p className="muted">Telefone: {store.phone ?? "—"}</p>
+            <p className="muted">Retirada na loja: {store.allowsPickup ? "permitida" : "não"}</p>
             <p className="muted">
               Ofertas: {store.counts.offers} · Funcionários: {store.counts.staff} · Slots:{" "}
               {store.counts.slots}
@@ -691,6 +703,8 @@ function DataTab({ store, onChange }: { store: StoreData; onChange: () => void }
           </>
         )}
       </section>
+
+      <HoursSection store={store} onChange={onChange} />
 
       <SlotsSection storeId={store.id} onChange={onChange} />
 
@@ -731,8 +745,10 @@ function StoreEditForm({ store, onSaved }: { store: StoreData; onSaved: () => vo
     zipCode: store.zipCode ?? "",
     latitude: store.latitude == null ? "" : String(store.latitude),
     longitude: store.longitude == null ? "" : String(store.longitude),
+    phone: store.phone ?? "",
     avgPrepMinutes: String(store.avgPrepMinutes),
   });
+  const [allowsPickup, setAllowsPickup] = useState(store.allowsPickup);
   const [msg, setMsg] = useState<string | null>(null);
 
   async function save() {
@@ -747,6 +763,8 @@ function StoreEditForm({ store, onSaved }: { store: StoreData; onSaved: () => vo
         city: f.city,
         state: f.state,
         zipCode: f.zipCode,
+        phone: f.phone,
+        allowsPickup,
       };
       if (f.latitude !== "") body.latitude = Number(f.latitude);
       if (f.longitude !== "") body.longitude = Number(f.longitude);
@@ -775,13 +793,125 @@ function StoreEditForm({ store, onSaved }: { store: StoreData; onSaved: () => vo
         {field("zipCode", "CEP")}
         {field("latitude", "Latitude")}
         {field("longitude", "Longitude")}
+        {field("phone", "Telefone/WhatsApp")}
         {field("avgPrepMinutes", "Tempo de preparo (min)")}
+        <label className="lockwrap" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <input
+            type="checkbox"
+            checked={allowsPickup}
+            onChange={(e) => setAllowsPickup(e.target.checked)}
+          />
+          Permite retirada na loja
+        </label>
         <button className="btn-primary" onClick={save}>
           Salvar
         </button>
       </div>
       {msg && <p style={{ color: "#C0182A" }}>{msg}</p>}
     </div>
+  );
+}
+
+// ─── Horário de funcionamento (story 29) ─────────────────
+
+const DAY_LABELS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+export const minToHHMM = (m: number) =>
+  `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+export const hhmmToMin = (s: string) => {
+  const [h, m] = s.split(":");
+  return Math.max(0, Math.min(1439, Number(h) * 60 + Number(m || "0")));
+};
+
+interface DayState {
+  open: boolean;
+  opensAt: string;
+  closesAt: string;
+}
+
+function HoursSection({ store, onChange }: { store: StoreData; onChange: () => void }) {
+  const { api } = useAuth();
+  const [days, setDays] = useState<DayState[]>(() =>
+    DAY_LABELS.map((_, d) => {
+      const row = store.hours.find((h) => h.dayOfWeek === d);
+      return row
+        ? { open: true, opensAt: minToHHMM(row.opensAt), closesAt: minToHHMM(row.closesAt) }
+        : { open: false, opensAt: "08:00", closesAt: "22:00" };
+    }),
+  );
+  const [msg, setMsg] = useState<string | null>(null);
+
+  function patchDay(d: number, partial: Partial<DayState>) {
+    setDays((prev) => prev.map((day, i) => (i === d ? { ...day, ...partial } : day)));
+  }
+
+  async function save() {
+    setMsg(null);
+    try {
+      const hours = days
+        .map((day, d) =>
+          day.open
+            ? { dayOfWeek: d, opensAt: hhmmToMin(day.opensAt), closesAt: hhmmToMin(day.closesAt) }
+            : null,
+        )
+        .filter((x): x is { dayOfWeek: number; opensAt: number; closesAt: number } => x !== null);
+      await api.request(`/admin/stores/${store.id}/hours`, { method: "PUT", auth: true, body: { hours } });
+      setMsg("Horário salvo.");
+      onChange();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Erro ao salvar horário");
+    }
+  }
+
+  return (
+    <section className="card" style={{ marginTop: 16 }}>
+      <h2>Horário de funcionamento</h2>
+      <table className="table">
+        <thead>
+          <tr>
+            <th>Dia</th>
+            <th>Aberto</th>
+            <th>Abre</th>
+            <th>Fecha</th>
+          </tr>
+        </thead>
+        <tbody>
+          {days.map((day, d) => (
+            <tr key={d}>
+              <td>{DAY_LABELS[d]}</td>
+              <td>
+                <input
+                  type="checkbox"
+                  checked={day.open}
+                  onChange={(e) => patchDay(d, { open: e.target.checked })}
+                />
+              </td>
+              <td>
+                <input
+                  className="input input-sm"
+                  type="time"
+                  value={day.opensAt}
+                  disabled={!day.open}
+                  onChange={(e) => patchDay(d, { opensAt: e.target.value })}
+                />
+              </td>
+              <td>
+                <input
+                  className="input input-sm"
+                  type="time"
+                  value={day.closesAt}
+                  disabled={!day.open}
+                  onChange={(e) => patchDay(d, { closesAt: e.target.value })}
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <button className="btn-primary" onClick={save}>
+        Salvar horário
+      </button>
+      {msg && <p className="muted">{msg}</p>}
+    </section>
   );
 }
 

@@ -29,6 +29,17 @@ describe("can (matriz de permissão — story 07)", () => {
     expect(can("manager", "stores.create")).toBe(false);
   });
 
+  it("admin (story 16): integração + equipe + catálogo, mas NÃO cria lojas", () => {
+    expect(can("admin", "integration.manage")).toBe(true);
+    expect(can("admin", "staff.manage")).toBe(true);
+    expect(can("admin", "catalog.manage")).toBe(true);
+    expect(can("admin", "vehicles.manage")).toBe(true);
+    expect(can("admin", "orders.view")).toBe(true);
+    expect(can("admin", "reports.view")).toBe(true);
+    expect(can("admin", "stores.view")).toBe(true);
+    expect(can("admin", "stores.create")).toBe(false);
+  });
+
   it("sem papel (null/undefined) nega tudo", () => {
     expect(can(null, "stores.view")).toBe(false);
     expect(can(undefined, "catalog.manage")).toBe(false);

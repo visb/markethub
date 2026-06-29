@@ -137,6 +137,66 @@ describe("ApiClient.request", () => {
   });
 });
 
+// ── Endpoints de frota / veículo (stories 14 e 15) ──
+describe("ApiClient — frota merchant + veículo do entregador", () => {
+  function withFetch() {
+    const fetchMock = vi.fn().mockResolvedValue(jsonRes(200, { ok: 1 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { client } = makeClient({ tokens: { accessToken: "acc", refreshToken: "ref" } });
+    return { client, fetchMock };
+  }
+  const url = (fetchMock: ReturnType<typeof vi.fn>, i = 0) => String(fetchMock.mock.calls[i][0]);
+  const init = (fetchMock: ReturnType<typeof vi.fn>, i = 0) => fetchMock.mock.calls[i][1];
+
+  it("merchantVehicles: GET sem/com merchantId (querystring encodada)", async () => {
+    const { client, fetchMock } = withFetch();
+    await client.merchantVehicles();
+    expect(url(fetchMock)).toBe("http://api.test/api/v1/merchant/vehicles");
+    await client.merchantVehicles("mer 1");
+    expect(url(fetchMock, 1)).toBe("http://api.test/api/v1/merchant/vehicles?merchantId=mer%201");
+  });
+
+  it("merchantCreateVehicle: POST com body", async () => {
+    const { client, fetchMock } = withFetch();
+    await client.merchantCreateVehicle({ plate: "ABC1D23", type: "car" });
+    expect(url(fetchMock)).toBe("http://api.test/api/v1/merchant/vehicles");
+    expect(init(fetchMock).method).toBe("POST");
+    expect(JSON.parse(init(fetchMock).body)).toEqual({ plate: "ABC1D23", type: "car" });
+  });
+
+  it("merchantUpdateVehicle: PATCH no id", async () => {
+    const { client, fetchMock } = withFetch();
+    await client.merchantUpdateVehicle("v1", { active: false });
+    expect(url(fetchMock)).toBe("http://api.test/api/v1/merchant/vehicles/v1");
+    expect(init(fetchMock).method).toBe("PATCH");
+  });
+
+  it("merchantRemoveVehicle: DELETE soft x hard", async () => {
+    const { client, fetchMock } = withFetch();
+    await client.merchantRemoveVehicle("v1");
+    expect(url(fetchMock)).toBe("http://api.test/api/v1/merchant/vehicles/v1");
+    await client.merchantRemoveVehicle("v1", true);
+    expect(url(fetchMock, 1)).toBe("http://api.test/api/v1/merchant/vehicles/v1?hard=true");
+    expect(init(fetchMock, 1).method).toBe("DELETE");
+  });
+
+  it("driverVehicles / driverCurrentVehicle: GET nas rotas do entregador", async () => {
+    const { client, fetchMock } = withFetch();
+    await client.driverVehicles();
+    expect(url(fetchMock)).toBe("http://api.test/api/v1/driver/vehicles");
+    await client.driverCurrentVehicle();
+    expect(url(fetchMock, 1)).toBe("http://api.test/api/v1/driver/vehicle/current");
+  });
+
+  it("driverSelectVehicle: PUT /driver/vehicle com o vehicleId", async () => {
+    const { client, fetchMock } = withFetch();
+    await client.driverSelectVehicle("v1");
+    expect(url(fetchMock)).toBe("http://api.test/api/v1/driver/vehicle");
+    expect(init(fetchMock).method).toBe("PUT");
+    expect(JSON.parse(init(fetchMock).body)).toEqual({ vehicleId: "v1" });
+  });
+});
+
 describe("MemoryTokenStore", () => {
   it("set/get/clear", () => {
     const s = new MemoryTokenStore();

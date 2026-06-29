@@ -3,7 +3,7 @@ import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, TextInp
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Button, Text, colors, radius, spacing } from "@markethub/ui";
+import { Text, colors, radius, spacing } from "@markethub/ui";
 import { useAuth } from "@/auth-context";
 import { brl, marketplace, type ProductView, type StoreMeta } from "@/api/marketplace";
 import { useCart } from "@/use-cart";
@@ -11,7 +11,9 @@ import { CartFab } from "@/components/CartFab";
 import { ProductCard } from "@/components/ProductCard";
 import { CategoryMenu, type MenuCategory } from "@/components/CategoryMenu";
 import { Header } from "@/components/Header";
+import { FollowButton } from "@/components/FollowButton";
 import { MerchantLogo } from "@/components/MerchantLogo";
+import { useStoreFollow } from "@/api/hooks/useStoreFollow";
 import { getRadiusKm } from "@/prefs";
 
 export default function StoreHome() {
@@ -30,6 +32,8 @@ export default function StoreHome() {
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<ProductView[] | null>(null);
   const [loading, setLoading] = useState(true);
+  // Seguir loja (story 34): estado inicial vem do sections; toggle via React Query.
+  const follow = useStoreFollow(id ?? "", store?.following);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -102,7 +106,12 @@ export default function StoreHome() {
 
   return (
     <SafeAreaView style={styles.flex} edges={["top"]}>
-      <Header title={name ?? "Loja"} />
+      {/* Story 32: título do AppBar vazio — o nome do mercado fica só no storeHead, ao lado da logo. */}
+      {/* Story 33: botão "Seguir" no topo direito (no lugar do "?"). Story 34: wirado ao follow real. */}
+      <Header
+        title=""
+        rightAction={<FollowButton following={follow.following} onPress={() => { if (!follow.isToggling) follow.toggle(); }} />}
+      />
 
       <View style={styles.storeHead}>
         <MerchantLogo name={store?.merchantName ?? name ?? "Loja"} logoUrl={store?.merchantLogoUrl} size={48} />
@@ -116,7 +125,6 @@ export default function StoreHome() {
             ⏱ {store ? `${store.etaMinutes} min` : "30 min"} ou programada
           </Text>
         </View>
-        <Button title="♡ Seguir" size="sm" onPress={() => {}} />
       </View>
 
       {/* Busca no header da loja */}

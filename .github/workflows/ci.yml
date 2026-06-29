@@ -65,3 +65,70 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+  coverage:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: markethub
+          POSTGRES_PASSWORD: markethub
+          POSTGRES_DB: markethub
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U markethub"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://markethub:markethub@localhost:5432/markethub?schema=public
+      JWT_ACCESS_SECRET: ci_access_secret_change_me
+      JWT_REFRESH_SECRET: ci_refresh_secret_change_me
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # histórico completo para o diff-coverage comparar com a base do PR
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.3.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Prisma generate
+        run: pnpm --filter @markethub/api prisma:generate
+
+      # Gate rígido: thresholds vivem no config de cada workspace (jest
+      # coverageThreshold / vitest coverage.thresholds, com all-files cravado).
+      # Qualquer piso violado => exit != 0 e o job reprova.
+      - name: Test coverage (gate de piso por workspace)
+        run: pnpm test:coverage
+
+      - name: Diff coverage (linhas novas >= 90%)
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          pnpm diff-coverage --base "origin/${{ github.base_ref }}" --threshold 90
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            **/coverage/lcov.info
+            **/coverage/coverage-summary.json
+          if-no-files-found: warn
+          retention-days: 14
