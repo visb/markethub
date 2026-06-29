@@ -1,3 +1,30 @@
+# PROGRESS — rodada AUTORUN (stories 35 → 44)
+
+Rodada: backfill de cobertura frontend + libs (api-client 35, ui 36, admin 37-39, customer 40, driver 41, picker 42) + fechar services/api no meta-alvo 80% (43) + travar piso global de 80% linhas em todos os workspaces (44).
+Ordem: 35 → 36 → 37 → 38 → 39 → 40 → 41 → 42 → 43 → 44.
+Branch base: main | Merge na main por unidade: sim (--no-ff) | sem push, sem PR.
+Deps rígidas: 19 → {35..43} (gate de cobertura já fechado/OK na rodada anterior — pré-requisito satisfeito). 37 → {38, 39} (fundação do admin antes das páginas; 38 catálogo e 39 merchants/dashboard reusam auth/shell/infra de dados da 37). 44 → {35..43} (só trava o piso global de 80 DEPOIS que cada workspace bateu a meta — se algum não fechou, 44 bloqueia e não baixa nada).
+Cuidados da rodada: rodada **só-testes + config** — sem mudar lógica de produto (exceto migração legado→React Query/rhf+zod ao TOCAR, conforme CLAUDE.md; bug achado vira fix à parte, não silenciar). Ratchet de piso **só sobe**: ao fechar cada workspace subir o threshold no próprio config (jest `coverageThreshold.global` / vitest `coverage.thresholds`) rumo a 80 linhas; nunca baixar número sem justificativa. Ampliar specs existentes (`client.test.ts`, `ProductDetail.test.tsx`, `Login.test.tsx`, `auth-context.test`, telas já cobertas) — **não duplicar**. Mock global de `fetch`/`socket.io-client`/`ApiClient`/`expo-router` — sem rede/DB real, sem credencial. `packages/ui` (36) precisa ampliar o `include` do coverage pra cobrir o módulo real (hoje só o barrel) antes de travar. 44 edita os 9 configs de teste + a seção CI do `CLAUDE.md` (troca a tabela de meta-alvo pela regra única "piso = 80% linhas, só sobe") e reavalia `perFile: true` por workspace. Diff-coverage ≥ 90% (story 19) permanece. Required check do job `coverage` na branch protection da main segue PENDENTE-MANUAL (sem acesso admin ao repo no GitHub).
+
+| #  | Título | Dep | Status |
+|----|--------|-----|--------|
+| 35 | Cobertura — @markethub/api-client (client/socket/token-store ≥80%) | 19 | todo |
+| 36 | Cobertura — @markethub/ui (Button/Text/Screen/tokens ≥80%, ampliar include) | 19 | todo |
+| 37 | Cobertura — admin: auth, shell e infra de dados (fundação) | 19 | todo |
+| 38 | Cobertura — admin: catálogo e enriquecimento | 37 | todo |
+| 39 | Cobertura — admin: merchants, lojas, usuários e dashboard (fecha admin ≥80%) | 37 | todo |
+| 40 | Cobertura — app customer (carrinho/checkout/home/endereços ≥80%) | 19 | todo |
+| 41 | Cobertura — app driver (home/entregas/login+veículo ≥80%) | 19 | todo |
+| 42 | Cobertura — app picker (telas/hooks de picking restantes ≥80%) | 19 | todo |
+| 43 | Cobertura — services/api: fechar no meta-alvo 80% (branches 70%) | 19 | todo |
+| 44 | Travar piso global de cobertura em 80% linhas (9 configs + CLAUDE.md) | 35,36,37,38,39,40,41,42,43 | todo |
+
+## Log
+
+<!-- [OK|PARCIAL|BLOQUEADO] NN — testes: <resumo> — commit: <hash> — merge: <hash> — <data> — <bloqueio> -->
+
+---
+
 # PROGRESS — rodada AUTORUN (stories 19 → 34)
 
 Rodada: gate de cobertura (19) + backfill de cobertura backend por risco (20–28) + refino app customer / explore + seguir loja (29–34).
