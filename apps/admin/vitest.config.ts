@@ -8,16 +8,17 @@ export default mergeConfig(
       environment: "jsdom",
       setupFiles: ["./src/test/setup.ts"],
       coverage: {
-        provider: "v8",
+        provider: "v8",
         include: ["src/**/*.{ts,tsx}"],
         exclude: ["src/**/*.test.{ts,tsx}", "src/test/**", "src/main.tsx", "src/vite-env.d.ts"],
         reporter: ["text-summary", "lcov", "json-summary"],
-        // Piso do ratchet — só sobe. Baseline real medido sob all:true (linhas 6.3%).
+        // Piso do ratchet — só sobe. Story 37 cobriu a fundação (auth/shell/router
+        // + wrapper do ApiClient): linhas 7.4% → 14.1%. Piso com folga p/ variação.
         thresholds: {
-          statements: 6,
-          branches: 5,
-          functions: 3,
-          lines: 6,
+          statements: 13,
+          branches: 9,
+          functions: 8,
+          lines: 13,
         },
       },
     },
