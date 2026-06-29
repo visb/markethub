@@ -3,7 +3,7 @@ import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, TextInp
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Button, Text, colors, radius, spacing } from "@markethub/ui";
+import { Text, colors, radius, spacing } from "@markethub/ui";
 import { useAuth } from "@/auth-context";
 import { brl, marketplace, type ProductView, type StoreMeta } from "@/api/marketplace";
 import { useCart } from "@/use-cart";
@@ -11,6 +11,7 @@ import { CartFab } from "@/components/CartFab";
 import { ProductCard } from "@/components/ProductCard";
 import { CategoryMenu, type MenuCategory } from "@/components/CategoryMenu";
 import { Header } from "@/components/Header";
+import { FollowButton } from "@/components/FollowButton";
 import { MerchantLogo } from "@/components/MerchantLogo";
 import { getRadiusKm } from "@/prefs";
 
@@ -103,7 +104,11 @@ export default function StoreHome() {
   return (
     <SafeAreaView style={styles.flex} edges={["top"]}>
       {/* Story 32: título do AppBar vazio — o nome do mercado fica só no storeHead, ao lado da logo. */}
-      <Header title="" />
+      {/* Story 33: botão "Seguir" no topo direito (no lugar do "?"); onPress no-op até a story 34. */}
+      <Header
+        title=""
+        rightAction={<FollowButton following={false} onPress={() => {/* TODO story 34: wiring do follow */}} />}
+      />
 
       <View style={styles.storeHead}>
         <MerchantLogo name={store?.merchantName ?? name ?? "Loja"} logoUrl={store?.merchantLogoUrl} size={48} />
@@ -117,7 +122,6 @@ export default function StoreHome() {
             ⏱ {store ? `${store.etaMinutes} min` : "30 min"} ou programada
           </Text>
         </View>
-        <Button title="♡ Seguir" size="sm" onPress={() => {}} />
       </View>
 
       {/* Busca no header da loja */}
