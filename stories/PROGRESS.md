@@ -9,7 +9,7 @@ Cuidados da rodada: rodada **só-testes + config** — sem mudar lógica de prod
 | #  | Título | Dep | Status |
 |----|--------|-----|--------|
 | 35 | Cobertura — @markethub/api-client (client/socket/token-store ≥80%) | 19 | OK |
-| 36 | Cobertura — @markethub/ui (Button/Text/Screen/tokens ≥80%, ampliar include) | 19 | todo |
+| 36 | Cobertura — @markethub/ui (Button/Text/Screen/tokens ≥80%, ampliar include) | 19 | OK |
 | 37 | Cobertura — admin: auth, shell e infra de dados (fundação) | 19 | todo |
 | 38 | Cobertura — admin: catálogo e enriquecimento | 37 | todo |
 | 39 | Cobertura — admin: merchants, lojas, usuários e dashboard (fecha admin ≥80%) | 37 | todo |
@@ -23,6 +23,7 @@ Cuidados da rodada: rodada **só-testes + config** — sem mudar lógica de prod
 
 <!-- [OK|PARCIAL|BLOQUEADO] NN — testes: <resumo> — commit: <hash> — merge: <hash> — <data> — <bloqueio> -->
 [OK] 35 — testes: api-client 53/53 (client.test.ts ampliado 24→53); agregado do workspace 43.02%→100% linhas (st 42%→100%, br 38.5%→100%, fn 30.4%→100%); client.ts/socket.ts/token-store.ts todos 100% lin/fn/br (refresh em 401+replay, serialização body/query, auth:false, propagação {code,message}, métodos de frota; socket conexão/subscribe:store/reconexão/disconnect; token-store get/set/clear+fallback); fetch global + socket.io-client mockados, sem rede; ratchet vitest.config.ts 36/31/21/37→98/95/98/98 (st/br/fn/ln, folga mínima vs wobble v8, bem acima da meta 80) — test:coverage exit 0 + typecheck 12/12 + build 9/9 + diff-coverage verdes — commit: 4c28b98 — merge: cf2398c — 2026-06-29 — só testes, contrato intacto (sem mudar packages/types); métodos "follow/summary" citados no plano NÃO existem em client.ts (só frota/veículos, cobertos), critério batido via agregado 100%
+[OK] 36 — testes: ui 24/24 (3 specs novos Button/Text/Screen + 2 mocks RN); agregado do workspace 30.76%→100% linhas (br 0%→100%, fn 0%→100%); Button/Text/Screen/tokens todos 100% (variantes/tamanho, onPress, disabled NÃO dispara, loading); render via react-test-renderer com primitivas RN substituídas por host components leves (Pressable resolve style-função e remove onPress quando disabled, espelha RN real); vitest.config.ts: test.include ampliado p/ .tsx, test.alias react-native/safe-area-context→mocks, src/test/** no coverage.exclude (coverage.include já era src/**/*.{ts,tsx}, o 30% vinha de componentes nunca carregados por teste); +react-test-renderer em devDeps (pnpm-lock tocado); ratchet 28/0/0/28→80/80/80/80 (mirou 80 da meta, não cravou 100 p/ não engessar) — test:coverage exit 0 + typecheck 12/12 + build 9/9 + diff-coverage verdes — commit: 3a50063 — merge: d46870e — 2026-06-29 — só testes, sem componente novo nem mudança de API
 
 Rodada: gate de cobertura (19) + backfill de cobertura backend por risco (20–28) + refino app customer / explore + seguir loja (29–34).
 Ordem: 19 → 20 → 21 → 22 → 23 → 24 → 25 → 26 → 27 → 28 → 29 → 30 → 31 → 32 → 33 → 34.
