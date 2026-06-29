@@ -9,10 +9,16 @@ interface HeaderProps {
   onBack?: () => void;
   showHelp?: boolean;
   showBack?: boolean;
+  /**
+   * Ação custom à direita (ex.: botão "Seguir" na página da loja, story 33).
+   * Quando presente, substitui o ícone de ajuda "?"; sem ela o comportamento
+   * padrão (showHelp) é mantido — telas existentes seguem com o "?".
+   */
+  rightAction?: React.ReactNode;
 }
 
-/** Cabeçalho das telas: ‹ voltar + TÍTULO vermelho caps + ? ajuda. */
-export function Header({ title, onBack, showHelp = true, showBack = true }: HeaderProps) {
+/** Cabeçalho das telas: ‹ voltar + TÍTULO vermelho caps + ? ajuda (ou ação custom à direita). */
+export function Header({ title, onBack, showHelp = true, showBack = true, rightAction }: HeaderProps) {
   const router = useRouter();
   return (
     <View style={styles.row}>
@@ -25,7 +31,9 @@ export function Header({ title, onBack, showHelp = true, showBack = true }: Head
       )}
       <Text style={styles.title}>{title.toUpperCase()}</Text>
       <View style={{ flex: 1 }} />
-      {showHelp ? (
+      {rightAction != null ? (
+        rightAction
+      ) : showHelp ? (
         <Ionicons name="help-circle-outline" size={24} color={colors.primary} />
       ) : (
         <View style={{ width: 24 }} />

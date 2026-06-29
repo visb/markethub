@@ -17,7 +17,8 @@ describe("tela store — título do AppBar vazio (story 32)", () => {
   const screen = fsMod.readFileSync(`${cwd}/app/store/[id].tsx`, "utf8");
 
   it("renderiza o Header com title vazio (não duplica o nome do mercado)", () => {
-    expect(screen).toMatch(/<Header\s+title=""\s*\/>/);
+    // story 33 deixou o Header multi-linha (ganhou rightAction); o título segue vazio.
+    expect(screen).toMatch(/<Header\b[\s\S]*?\btitle=""/);
     expect(screen).not.toMatch(/<Header\s+title=\{name/);
   });
 
