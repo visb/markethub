@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiClient, ApiClientError } from "./client";
 import { createRealtimeClient } from "./socket";
 import { MemoryTokenStore } from "./token-store";
@@ -197,6 +197,375 @@ describe("ApiClient — frota merchant + veículo do entregador", () => {
   });
 });
 
+describe("ApiClient.request — serialização e modos", () => {
+  it("auth=true sem access token não envia Authorization", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonRes(200, {}));
+    vi.stubGlobal("fetch", fetchMock);
+    const { client } = makeClient(); // store vazio
+
+    await client.request("/auth/me", { auth: true });
+    expect(fetchMock.mock.calls[0]![1].headers.Authorization).toBeUndefined();
+  });
+
+  it("serializa body com JSON.stringify e default Content-Type", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonRes(200, {}));
+    vi.stubGlobal("fetch", fetchMock);
+    const { client } = makeClient();
+
+    await client.request("/x", { method: "POST", body: { a: 1, b: "z" }, auth: false });
+    const init = fetchMock.mock.calls[0]![1];
+    expect(init.method).toBe("POST");
+    expect(init.headers["Content-Type"]).toBe("application/json");
+    expect(JSON.parse(init.body)).toEqual({ a: 1, b: "z" });
+  });
+
+  it("sem body não envia campo body no fetch", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonRes(200, {}));
+    vi.stubGlobal("fetch", fetchMock);
+    const { client } = makeClient();
+
+    await client.request("/x", { method: "POST", auth: false });
+    expect(fetchMock.mock.calls[0]![1].body).toBeUndefined();
+  });
+
+  it("normaliza prefixo customizado e baseUrl com barra final", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonRes(200, {}));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new ApiClient({ baseUrl: "http://api.test/", prefix: "/api/v2/" });
+
+    await client.request("/ping", { auth: false });
+    expect(String(fetchMock.mock.calls[0]![0])).toBe("http://api.test/api/v2/ping");
+  });
+
+  it("401 sem auth não dispara refresh (propaga o erro)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonRes(401, { code: "UNAUTH", message: "x" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { client } = makeClient();
+
+    await expect(client.request("/x", { auth: false })).rejects.toBeInstanceOf(ApiClientError);
+    expect(fetchMock).toHaveBeenCalledTimes(1); // sem chamada de refresh
+  });
+
+  it("refresh sem refresh token armazenado falha sem chamar /auth/refresh", async () => {
+    const onAuthError = vi.fn();
+    const fetchMock = vi.fn().mockResolvedValue(jsonRes(401, { code: "UNAUTH", message: "x" }));
+    vi.stubGlobal("fetch", fetchMock);
+    // auth=true porém store sem refresh: define só o access
+    const store = new MemoryTokenStore();
+    store.setTokens({ accessToken: "acc", refreshToken: "" });
+    const client = new ApiClient({ baseUrl: "http://api.test", tokenStore: store, onAuthError });
+
+    await expect(client.request("/auth/me", { auth: true })).rejects.toBeInstanceOf(ApiClientError);
+    expect(onAuthError).toHaveBeenCalled();
+    // só a chamada original (refresh abortou por não ter refreshToken)
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("refresh com !res.ok limpa os tokens", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonRes(401, { code: "U", message: "x" }))
+      .mockResolvedValueOnce(jsonRes(500, { code: "ERR", message: "boom" }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { client, store } = makeClient({ tokens: { accessToken: "old", refreshToken: "ref" } });
+
+    await expect(client.request("/auth/me", { auth: true })).rejects.toBeInstanceOf(ApiClientError);
+    expect(store.getAccess()).toBeNull();
+    expect(store.getRefresh()).toBeNull();
+  });
+
+  it("refresh que lança exceção (fetch rejeita) retorna false", async () => {
+    const onAuthError = vi.fn();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonRes(401, { code: "U", message: "x" }))
+      .mockRejectedValueOnce(new Error("network down"));
+    vi.stubGlobal("fetch", fetchMock);
+    const { client } = makeClient({ tokens: { accessToken: "old", refreshToken: "ref" }, onAuthError });
+
+    await expect(client.request("/auth/me", { auth: true })).rejects.toBeInstanceOf(ApiClientError);
+    expect(onAuthError).toHaveBeenCalled();
+  });
+});
+
+describe("ApiClient — auth", () => {
+  function withFetch(res: unknown = { accessToken: "a", refreshToken: "r" }) {
+    const fetchMock = vi.fn().mockResolvedValue(jsonRes(200, res));
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+  const url = (m: ReturnType<typeof vi.fn>, i = 0) => String(m.mock.calls[i]![0]);
+  const init = (m: ReturnType<typeof vi.fn>, i = 0) => m.mock.calls[i]![1];
+
+  it("register persiste os tokens devolvidos", async () => {
+    const fetchMock = withFetch({ accessToken: "ra", refreshToken: "rr" });
+    const { client, store } = makeClient();
+    const tokens = await client.register({ email: "a@b.com", password: "x", name: "N" } as never);
+    expect(url(fetchMock)).toBe("http://api.test/api/v1/auth/register");
+    expect(init(fetchMock).method).toBe("POST");
+    expect(tokens).toEqual({ accessToken: "ra", refreshToken: "rr" });
+    expect(store.getAccess()).toBe("ra");
+  });
+
+  it("login persiste os tokens devolvidos", async () => {
+    const fetchMock = withFetch({ accessToken: "la", refreshToken: "lr" });
+    const { client, store } = makeClient();
+    await client.login({ email: "a@b.com", password: "x" } as never);
+    expect(url(fetchMock)).toBe("http://api.test/api/v1/auth/login");
+    expect(store.getRefresh()).toBe("lr");
+  });
+
+  it("logout com refresh token: posta logout e limpa o store", async () => {
+    const fetchMock = withFetch({});
+    const { client, store } = makeClient({ tokens: { accessToken: "a", refreshToken: "r" } });
+    await client.logout();
+    expect(url(fetchMock)).toBe("http://api.test/api/v1/auth/logout");
+    expect(JSON.parse(init(fetchMock).body)).toEqual({ refreshToken: "r" });
+    expect(store.getAccess()).toBeNull();
+  });
+
+  it("logout sem refresh token: não chama a rede, só limpa", async () => {
+    const fetchMock = withFetch({});
+    const { client } = makeClient(); // store vazio
+    await client.logout();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("logout ignora erro da chamada de logout (catch)", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error("net"));
+    vi.stubGlobal("fetch", fetchMock);
+    const { client, store } = makeClient({ tokens: { accessToken: "a", refreshToken: "r" } });
+    await expect(client.logout()).resolves.toBeUndefined();
+    expect(store.getRefresh()).toBeNull();
+  });
+
+  it("me e health usam as rotas corretas", async () => {
+    const fetchMock = withFetch({});
+    const { client } = makeClient({ tokens: { accessToken: "a", refreshToken: "r" } });
+    await client.me();
+    await client.health();
+    expect(url(fetchMock, 0)).toBe("http://api.test/api/v1/auth/me");
+    expect(init(fetchMock, 0).headers.Authorization).toBe("Bearer a");
+    expect(url(fetchMock, 1)).toBe("http://api.test/api/v1/health");
+    expect(init(fetchMock, 1).headers.Authorization).toBeUndefined(); // health é público
+  });
+});
+
+// Helper de asserção de rota p/ os blocos de endpoints abaixo.
+describe("ApiClient — endpoints (rota + método + body)", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+  let client: ApiClient;
+  beforeEach(() => {
+    fetchMock = vi.fn().mockResolvedValue(jsonRes(200, { ok: 1 }));
+    vi.stubGlobal("fetch", fetchMock);
+    client = makeClient({ tokens: { accessToken: "acc", refreshToken: "ref" } }).client;
+  });
+  const call = (i = 0) => fetchMock.mock.calls[i]!;
+  const url = (i = 0) => String(call(i)[0]);
+  const init = (i = 0) => call(i)[1] as { method?: string; body?: string; headers: Record<string, string> };
+  const B = "http://api.test/api/v1";
+
+  it("picking: rotas e ações", async () => {
+    await client.pickStores();
+    expect(url(0)).toBe(`${B}/pick-tasks/stores`);
+    await client.pickQueue("st 1");
+    expect(url(1)).toBe(`${B}/pick-tasks?storeId=st%201`);
+    await client.pickTask("t1");
+    expect(url(2)).toBe(`${B}/pick-tasks/t1`);
+    await client.pickAssign("t1");
+    expect(url(3)).toBe(`${B}/pick-tasks/t1/assign`);
+    expect(init(3).method).toBe("POST");
+    await client.pickRelease("t1");
+    expect(url(4)).toBe(`${B}/pick-tasks/t1/release`);
+    await client.pickStart("t1");
+    expect(url(5)).toBe(`${B}/pick-tasks/t1/start`);
+    await client.pickCompletePicking("t1");
+    expect(url(6)).toBe(`${B}/pick-tasks/t1/complete-picking`);
+    await client.pickReady("t1");
+    expect(url(7)).toBe(`${B}/pick-tasks/t1/ready`);
+  });
+
+  it("picking: item, substituição e release-pickup com body", async () => {
+    await client.pickUpdateItem("t1", "i1", { action: "pick", quantityPicked: 2 });
+    expect(url(0)).toBe(`${B}/pick-tasks/t1/items/i1`);
+    expect(init(0).method).toBe("PATCH");
+    expect(JSON.parse(init(0).body!)).toEqual({ action: "pick", quantityPicked: 2 });
+    await client.pickSubstitute("t1", "i1", "off9");
+    expect(url(1)).toBe(`${B}/pick-tasks/t1/items/i1/substitute`);
+    expect(JSON.parse(init(1).body!)).toEqual({ substituteOfferId: "off9" });
+    await client.pickReleasePickup("t1", "1234");
+    expect(url(2)).toBe(`${B}/pick-tasks/t1/release-pickup`);
+    expect(JSON.parse(init(2).body!)).toEqual({ pickupCode: "1234" });
+  });
+
+  it("merchant: lojas e contexto", async () => {
+    await client.merchantContext();
+    expect(url(0)).toBe(`${B}/merchant/context`);
+    await client.merchantStores();
+    expect(url(1)).toBe(`${B}/merchant/stores`);
+    await client.merchantStoresDetail();
+    expect(url(2)).toBe(`${B}/merchant/stores/detail`);
+    await client.merchantCreateStore({ name: "Loja" } as never);
+    expect(init(3).method).toBe("POST");
+    expect(url(3)).toBe(`${B}/merchant/stores`);
+    await client.merchantUpdateStore("s1", { active: false } as never);
+    expect(url(4)).toBe(`${B}/merchant/stores/s1`);
+    expect(init(4).method).toBe("PATCH");
+  });
+
+  it("merchant: integração ERP / api-keys / webhooks", async () => {
+    await client.merchantErpConfig();
+    expect(url(0)).toBe(`${B}/merchant/integration/erp`);
+    await client.merchantPutErpConfig({ connectorType: "csv" } as never);
+    expect(init(1).method).toBe("PUT");
+    await client.merchantApiKeys();
+    expect(url(2)).toBe(`${B}/merchant/integration/api-keys`);
+    await client.merchantCreateApiKey("chave");
+    expect(JSON.parse(init(3).body!)).toEqual({ name: "chave" });
+    await client.merchantRevokeApiKey("k1");
+    expect(url(4)).toBe(`${B}/merchant/integration/api-keys/k1`);
+    expect(init(4).method).toBe("DELETE");
+    await client.merchantWebhooks();
+    expect(url(5)).toBe(`${B}/merchant/integration/webhooks`);
+    await client.merchantCreateWebhook({ url: "https://x" } as never);
+    expect(init(6).method).toBe("POST");
+    await client.merchantUpdateWebhook("w1", { active: false } as never);
+    expect(url(7)).toBe(`${B}/merchant/integration/webhooks/w1`);
+    expect(init(7).method).toBe("PATCH");
+    await client.merchantDeleteWebhook("w1");
+    expect(init(8).method).toBe("DELETE");
+    await client.merchantTestWebhook("w1");
+    expect(url(9)).toBe(`${B}/merchant/integration/webhooks/w1/test`);
+    expect(init(9).method).toBe("POST");
+  });
+
+  it("merchant: staff (querystring + soft/hard)", async () => {
+    await client.merchantStaff();
+    expect(url(0)).toBe(`${B}/merchant/staff`);
+    await client.merchantStaff("st 1");
+    expect(url(1)).toBe(`${B}/merchant/staff?storeId=st%201`);
+    await client.merchantCreateStaff({ email: "a@b.com" } as never);
+    expect(init(2).method).toBe("POST");
+    await client.merchantUpdateStaff("u1", { active: true } as never);
+    expect(url(3)).toBe(`${B}/merchant/staff/u1`);
+    expect(init(3).method).toBe("PATCH");
+    await client.merchantRemoveStaff("u1");
+    expect(url(4)).toBe(`${B}/merchant/staff/u1`);
+    await client.merchantRemoveStaff("u1", true);
+    expect(url(5)).toBe(`${B}/merchant/staff/u1?hard=true`);
+    expect(init(5).method).toBe("DELETE");
+  });
+
+  it("merchant: offers (query opcional) + update/unlock", async () => {
+    await client.merchantOffers();
+    expect(url(0)).toBe(`${B}/merchant/offers`);
+    await client.merchantOffers({ storeId: "s1", search: "leite", categoryId: "c1", available: false });
+    expect(url(1)).toBe(`${B}/merchant/offers?storeId=s1&search=leite&categoryId=c1&available=false`);
+    await client.merchantUpdateOffer("o1", { priceCents: 100 });
+    expect(url(2)).toBe(`${B}/merchant/offers/o1`);
+    expect(init(2).method).toBe("PATCH");
+    await client.merchantUnlockOffer("o1", "priceCents");
+    expect(url(3)).toBe(`${B}/merchant/offers/o1/locks/priceCents`);
+    expect(init(3).method).toBe("DELETE");
+  });
+
+  it("merchant: stocks (query opcional) + update/unlock", async () => {
+    await client.merchantStocks();
+    expect(url(0)).toBe(`${B}/merchant/stocks`);
+    await client.merchantStocks("s1");
+    expect(url(1)).toBe(`${B}/merchant/stocks?storeId=s1`);
+    await client.merchantUpdateStock("k1", { quantity: 5 });
+    expect(url(2)).toBe(`${B}/merchant/stocks/k1`);
+    expect(init(2).method).toBe("PATCH");
+    await client.merchantUnlockStock("k1", "quantity");
+    expect(url(3)).toBe(`${B}/merchant/stocks/k1/locks/quantity`);
+    expect(init(3).method).toBe("DELETE");
+  });
+
+  it("merchant: orders (query opcional)", async () => {
+    await client.merchantOrders();
+    expect(url(0)).toBe(`${B}/merchant/orders`);
+    await client.merchantOrders({ storeId: "s1", status: "picking" });
+    expect(url(1)).toBe(`${B}/merchant/orders?storeId=s1&status=picking`);
+  });
+
+  it("merchant: relatórios usam reportQuery", async () => {
+    await client.merchantSalesReport();
+    expect(url(0)).toBe(`${B}/merchant/reports/sales`);
+    await client.merchantSalesReport({ from: "2026-01-01", to: "2026-02-01", storeId: "s1" });
+    expect(url(1)).toBe(`${B}/merchant/reports/sales?from=2026-01-01&to=2026-02-01&storeId=s1`);
+    await client.merchantOperationsReport({ storeId: "s1" });
+    expect(url(2)).toBe(`${B}/merchant/reports/operations?storeId=s1`);
+    await client.merchantTopProductsReport({ limit: 10 });
+    expect(url(3)).toBe(`${B}/merchant/reports/top-products?limit=10`);
+    await client.merchantReviewsReport();
+    expect(url(4)).toBe(`${B}/merchant/reports/reviews`);
+  });
+
+  it("merchant: upload-url + produtos", async () => {
+    await client.merchantUploadUrl("a.png", "image/png");
+    expect(url(0)).toBe(`${B}/merchant/products/upload-url`);
+    expect(JSON.parse(init(0).body!)).toEqual({ filename: "a.png", contentType: "image/png" });
+    await client.merchantCreateProduct({ name: "X" });
+    expect(url(1)).toBe(`${B}/merchant/products`);
+    expect(init(1).method).toBe("POST");
+    await client.merchantUpdateProduct("p1", { name: "Y" });
+    expect(url(2)).toBe(`${B}/merchant/products/p1`);
+    expect(init(2).method).toBe("PATCH");
+  });
+
+  it("driver: stores, deliveries (query) e ações com código", async () => {
+    await client.driverMyStores();
+    expect(url(0)).toBe(`${B}/driver/stores`);
+    await client.driverDeliveries();
+    expect(url(1)).toBe(`${B}/driver/deliveries`);
+    await client.driverDeliveries({ storeId: "s1", status: "out" });
+    expect(url(2)).toBe(`${B}/driver/deliveries?storeId=s1&status=out`);
+    await client.driverAvailableDeliveries();
+    expect(url(3)).toBe(`${B}/driver/deliveries/available`);
+    await client.driverAvailableDeliveries({ storeId: "s1" });
+    expect(url(4)).toBe(`${B}/driver/deliveries/available?storeId=s1`);
+    await client.driverAcceptDelivery("d1");
+    expect(url(5)).toBe(`${B}/driver/deliveries/d1/accept`);
+    expect(init(5).method).toBe("POST");
+    await client.driverConfirmPickup("d1", "PC");
+    expect(url(6)).toBe(`${B}/driver/deliveries/d1/pickup`);
+    expect(JSON.parse(init(6).body!)).toEqual({ pickupCode: "PC" });
+    await client.driverConfirmDelivery("d1", "DC");
+    expect(url(7)).toBe(`${B}/driver/deliveries/d1/deliver`);
+    expect(JSON.parse(init(7).body!)).toEqual({ deliveryCode: "DC" });
+  });
+
+  it("store: despacho de entregas e handover", async () => {
+    await client.storeDeliveries("s1");
+    expect(url(0)).toBe(`${B}/store/deliveries?storeId=s1`);
+    await client.storeDeliveries("s1", "ready");
+    expect(url(1)).toBe(`${B}/store/deliveries?storeId=s1&status=ready`);
+    await client.storeDrivers("s 1");
+    expect(url(2)).toBe(`${B}/store/drivers?storeId=s%201`);
+    await client.assignDelivery("d1", "drv1");
+    expect(url(3)).toBe(`${B}/store/deliveries/d1/assign`);
+    expect(JSON.parse(init(3).body!)).toEqual({ driverId: "drv1" });
+    await client.unassignDelivery("d1");
+    expect(url(4)).toBe(`${B}/store/deliveries/d1/unassign`);
+    expect(init(4).method).toBe("POST");
+    await client.storeHandover("og1", "9999");
+    expect(url(5)).toBe(`${B}/store/order-groups/og1/handover`);
+    expect(JSON.parse(init(5).body!)).toEqual({ code: "9999" });
+  });
+
+  it("notificações: registra e remove device token", async () => {
+    await client.registerDeviceToken("tok", "ios");
+    expect(url(0)).toBe(`${B}/notifications/device-tokens`);
+    expect(init(0).method).toBe("POST");
+    expect(JSON.parse(init(0).body!)).toEqual({ token: "tok", platform: "ios" });
+    await client.unregisterDeviceToken("tok");
+    expect(url(1)).toBe(`${B}/notifications/device-tokens`);
+    expect(init(1).method).toBe("DELETE");
+    expect(JSON.parse(init(1).body!)).toEqual({ token: "tok" });
+  });
+});
+
 describe("MemoryTokenStore", () => {
   it("set/get/clear", () => {
     const s = new MemoryTokenStore();
@@ -270,6 +639,17 @@ describe("createRealtimeClient", () => {
     rt.connect();
     rt.on("order.updated", handler);
     expect(fakeSocket.on).toHaveBeenCalledWith("order.updated", handler);
+  });
+
+  it("dois handlers no mesmo evento são ambos registrados", () => {
+    const rt = createRealtimeClient({ url: "x", getToken: () => null });
+    const h1 = vi.fn();
+    const h2 = vi.fn();
+    rt.connect();
+    rt.on("order.updated", h1);
+    rt.on("order.updated", h2); // reusa o Set existente do evento
+    expect(fakeSocket.on).toHaveBeenCalledWith("order.updated", h1);
+    expect(fakeSocket.on).toHaveBeenCalledWith("order.updated", h2);
   });
 
   it("handlers registrados antes do connect são reaplicados ao conectar", () => {

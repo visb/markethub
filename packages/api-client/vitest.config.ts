@@ -9,12 +9,14 @@ export default defineConfig({
       include: ["src/**/*.ts"],
       exclude: ["src/**/*.test.ts", "src/index.ts"],
       reporter: ["text-summary", "lcov", "json-summary"],
-      // Piso do ratchet — só sobe. Baseline medido em 28/06/2026 (linhas 38.3%).
+      // Piso do ratchet — só sobe. Story 35 cobriu client/socket/token-store: agregado
+      // medido em 100/100/100/100 (st/br/fn/ln). Piso elevado pro real, com folga mínima
+      // contra wobble do v8 — bem acima da meta de 80% linhas da rodada.
       thresholds: {
-        statements: 36,
-        branches: 31,
-        functions: 21,
-        lines: 37,
+        statements: 98,
+        branches: 95,
+        functions: 98,
+        lines: 98,
       },
     },
   },
