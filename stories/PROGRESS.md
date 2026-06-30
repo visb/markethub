@@ -17,7 +17,7 @@ Cuidados da rodada: rodada **só-testes + config** — sem mudar lógica de prod
 | 41 | Cobertura — app driver (home/entregas/login+veículo ≥80%) | 19 | OK |
 | 42 | Cobertura — app picker (telas/hooks de picking restantes ≥80%) | 19 | OK |
 | 43 | Cobertura — services/api: fechar no meta-alvo 80% (branches 70%) | 19 | OK |
-| 44 | Travar piso global de cobertura em 80% linhas (9 configs + CLAUDE.md) | 35,36,37,38,39,40,41,42,43 | todo |
+| 44 | Travar piso global de cobertura em 80% linhas (9 configs + CLAUDE.md) | 35,36,37,38,39,40,41,42,43 | OK |
 
 ## Log
 
@@ -31,6 +31,39 @@ Cuidados da rodada: rodada **só-testes + config** — sem mudar lógica de prod
 [OK] 41 — testes: driver 77/77 (15 suítes, +9 specs: deliveries.api/useDriverDeliveries/home.screen/delivery.screen/login.screen/vehicleComponents/authContext/config/token-store.web); **agregado do workspace 51.68%→99.21% linhas** (st 99.2%, br 96.8%, fn 98.4%); auth-context 0→96.7%, config.ts 0→100%, VehicleIndicator 0→100%, VehiclePicker 72.7→100%, token-store 78.9→100%, novos deliveries.ts/useDriverDeliveries.ts 100%; **migração legado→RQ feita**: home.tsx + delivery/[id].tsx fetch useState/useEffect+setInterval → hooks React Query (query keys centralizadas, enabled no escopo de loja, polling via refetchInterval, invalidação por prefixo ao aceitar, setQueryData no cache do detalhe ao confirmar); telas app/ fora do escopo de cobertura (padrão do picker) — ganho conta dos hooks/módulos src/; ratchet jest 45/40/60/46→80/80/80/80 — test:coverage exit 0 + typecheck 12/12 + build 9/9 + diff-coverage 39/39=100% verdes — commit: 858a083 — merge: daeb48a — 2026-06-29 — concluída via SendMessage após 2 quedas do agente (limite de sessão, depois ConnectionRefused) — WIP preservada na branch e finalizada; fix de teste: 2 asserts de cache flakeavam com gcTime:0 sob workers paralelos → gcTime:Infinity (mesma classe do fix useStoreFollow já no repo), nenhum teste silenciado; warning pré-existente "worker failed to exit gracefully" (timers refetchInterval) não afeta exit 0
 [OK] 42 — testes: picker 71/71 (9 suítes, +37: picking.api/authContext/token-store.web/taskScreen); **agregado do workspace 63.82%→98.58% linhas** (st 98%, br 93.8%, fn 95.8%); src/api/picking.ts 0→100%, auth-context.tsx 0→96.96%, token-store.ts 78.9→100%; hooks já cobertos (01/02/03) não duplicados (resta só usePickQueue.ts linha 73 — branch realtime já-conectado-no-mount, linha pré-existente fora do diff); specs da tela app/task/[id].tsx por render (separar un/peso, recusar via Alert, autocomplete+aplicar substituto, concluir, liberar coleta, confirmar retirada) — não contam no agregado (app/ fora do collectCoverageFrom, padrão 40/41); mocks expo-router/ApiClient/createRealtimeClient/expo-secure-store, sem rede; ratchet jest 62/58/63/62→80/85/90/90 (ln/br/fn/st) — test:coverage exit 0 + typecheck 12/12 + build 9/9 verdes — commit: 655f56d — merge: 2be1339 — 2026-06-29 — sem migração RQ no escopo tocado (app/deliveries.tsx segue useState/useEffect mas é fluxo de entregas, não picking — fora de escopo, não tocado)
 [OK] 43 — testes: api 912/912 (82 suítes, 789→+123: merchant/addresses/cart/picking/integration.controller.spec novos + admin-merchants/merchant/merchant-product.service.spec estendidos); **agregado 71.23%→83.07% linhas / 67.24%→75.9% branches** (fn 81.1%, st 82.5%) — bate meta-alvo 80/70; alvos de maior peso: admin-merchants.service 43→~100% (95 lin+103 br), merchant.controller 0→100% (85 lin, era só-e2e), merchant.service 54→~100% (80 lin+49 br), merchant-product.service 38→~100%, controllers addresses/picking/cart/integration 0→100% (eram só-e2e); Prisma/BullMQ/HTTP mockados, sem DB/rede, migration intacta; **perFile NÃO ligado** (justificado: ~19 arquivos em 0% — controllers só-e2e auth/checkout/payment/health/enrichment/erp/favorites/notifications/scheduling/substitution/store-deliveries/merchant-context/orders/reports + bootstrap env.ts/prisma.service/jwt.strategy/all-exceptions.filter/http-webhook-sender; perFile global deixaria main vermelha — nota story 19; rigor de código novo via diff≥90%); ratchet jest 35/30/29/35→80/70/75/80 (ln/br/fn/st) — test:coverage exit 0 + typecheck 12/12 + build 9/9 + diff-coverage verdes — commit: 8425215 — merge: 8e82002 — 2026-06-29 — só testes, nenhum bug (lógica conforme contrato {code,message}/lockedFields)
+[OK] 44 — config+docs (sem spec novo): piso global de cobertura travado em ≥80 linhas nos 9 workspaces; pré-condição reconfirmada exit 0 (api-client 100%, ui 100%, driver 99.21%, picker 98.58%, merchant 92.51%, admin 92.5%, types 85.36%, api 83.07%, customer 82.56%); pisos de linhas: **types 15→80** (única mudança funcional — br/fn 0→80 trivial 0/0=100%), merchant mantido 90 (ratchet não baixa, 90 satisfaz), api-client mantido 98, ui/admin/api/customer/picker/driver já 80; **perFile ON** em api-client e ui (100% em todos os eixos), **OFF** em types/admin/merchant/api/customer/picker/driver (arquivos <80 por arquivo apesar do agregado alto — barrels/rotas/controllers só-e2e/bootstrap; documentado centralmente no CLAUDE.md); CLAUDE.md (seção CI) — tabela de meta-alvo substituída pela regra única "piso = 80% linhas em todos os workspaces, só sobe", diff-coverage ≥90% mantido; arquivos: types/ui/api-client/merchant/admin vitest.config.ts + services/api jest.config.js + CLAUDE.md — pnpm test:coverage 12/12 verde exit 0 + typecheck 12/12 + build 9/9 verdes — commit: 0730673 — merge: 79f40ae — 2026-06-29 — PENDENTE-MANUAL pré-existente segue (job coverage como required check na branch protection — precisa admin do repo, fora de escopo)
+
+## Resumo final da rodada 35 → 44
+
+**10/10 unidades OK**, todas mergeadas na `main` local (--no-ff, sem push, branches preservadas).
+Nenhuma BLOQUEADA. Loop AUTORUN encerrado (CronDelete do job ebc83ee6).
+
+Tema: backfill de cobertura frontend + libs + fechar backend no meta-alvo, e **travar o piso global de 80% linhas em todos os workspaces**.
+
+Por workspace (linhas, antes → depois):
+- **packages/api-client (35):** 43% → **100%** (client/socket/token-store; refresh+replay, subscribe:store, fallback de storage).
+- **packages/ui (36):** 31% → **100%** (Button/Text/Screen/tokens; ampliou include p/ módulo real + alias RN no vitest).
+- **apps/admin (37→38→39):** **7.36% → 92.5%** — fundação auth/shell/infra de dados (37), catálogo/enriquecimento/lockedFields (38), merchants/lojas/StoreDetail+HoursSection/usuários/dashboard (39). Sem React Query (admin não tem a camada; cobriu useState/useEffect+api.request como está).
+- **apps/customer (40):** 47.5% → **82.56%** (carrinho un/peso, checkout, home, endereços; telas app/ fora do collectCoverageFrom).
+- **apps/driver (41):** 51.68% → **99.21%** (home/entregas, login+veículo, VehiclePicker/Indicator; migração legado→React Query em home+detalhe).
+- **apps/picker (42):** 63.82% → **98.58%** (picking.api, auth-context, token-store; specs de tela por render).
+- **services/api (43):** 71.23% → **83.07% linhas / 75.9% branches** — controllers só-e2e ganharam spec unit + branches de erro (admin-merchants/merchant/merchant-product services + 5 controllers).
+- **packages/types / apps/merchant:** já ≥80 (85.36% / 92.51%); só tiveram o piso travado pela 44.
+
+Política selada (44): **piso = 80% linhas em TODO workspace, ratchet só sobe**; `perFile` ON onde 100% (api-client, ui), OFF onde o agregado é alto mas há arquivos <80 (barrels/rotas/controllers só-e2e/bootstrap) — rigor de código novo garantido pelo **diff-coverage ≥90%**. CLAUDE.md atualizado (regra única no lugar da tabela de meta-alvo).
+
+Nenhuma mudança de lógica de produto (exceto migração legado→React Query em customer/driver/picker ao tocar). Nenhum bug de negócio achado. Nenhuma migration (rodada sem schema). Notas não-bloqueantes: AddressForm disabled→undefined (40); 2 quedas de agente na 41 (limite de sessão + ConnectionRefused) resolvidas via resume preservando WIP, fix de flake gcTime:Infinity (41).
+
+Pontos PENDENTE-MANUAL (sem credencial/acesso, não bloqueiam):
+- marcar o job `coverage` como **required check** na branch protection da `main` no GitHub (precisa admin do repo) — herdado da story 19.
+
+Reproduzir o gate global: `pnpm test:coverage` (turbo, 12/12 verde) + `pnpm typecheck` + `pnpm build`; diff em PR: `pnpm diff-coverage` (≥90% linhas novas).
+
+**Rodada 35 → 44 ENCERRADA** — 10/10 OK e mergeadas na `main`. Loop encerrado (não reagendar).
+
+---
+
+# PROGRESS — rodada AUTORUN (stories 19 → 34)
 
 Rodada: gate de cobertura (19) + backfill de cobertura backend por risco (20–28) + refino app customer / explore + seguir loja (29–34).
 Ordem: 19 → 20 → 21 → 22 → 23 → 24 → 25 → 26 → 27 → 28 → 29 → 30 → 31 → 32 → 33 → 34.
