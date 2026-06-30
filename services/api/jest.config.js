@@ -24,6 +24,7 @@ module.exports = {
   coverageReporters: ["text-summary", "lcov", "json-summary"],
   // Piso do ratchet — só sobe. Story 43 levou o agregado ao meta-alvo (medido
   // 29/06/2026: lines 83.07% / branches 75.9% / functions 81.12% / statements 82.45%).
+  // Story 44 sela o piso global de 80% linhas; este já está em 80 (linhas).
   // Pisos cravados abaixo do medido com folga p/ não flapar no CI.
   coverageThreshold: {
     global: {
