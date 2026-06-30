@@ -196,23 +196,22 @@ Filtros usam **nome** do workspace (`--filter @markethub/api`), não path — mo
 - **Diff ≥ 90%.** Em PR, `pnpm diff-coverage` (`scripts/diff-coverage.mjs`) exige que as **linhas novas/alteradas** estejam ≥ 90% cobertas — é o eixo "código novo" do gate (um arquivo novo sem teste reprova aqui mesmo que o agregado passe).
 - **Sem `--passWithNoTests`** em workspace que deve ter teste.
 
-**Pisos vigentes (linhas / branches / functions / statements)** — baseline medido em 28/06/2026 sob all-files, arredondado pra baixo com folga:
+**Piso único (story 44):** **mínimo de 80% linhas em TODOS os workspaces**, declarado no config de cada um (jest `coverageThreshold.global.lines` / vitest `coverage.thresholds.lines`). As stories 35-43 levaram cada workspace ao alvo; a 44 selou o piso. O número **só sobe** (ratchet) — vários workspaces já estão acima de 80 (ex.: `api-client` 98, `merchant`/`admin` por outros eixos) e mantêm o piso mais alto que tinham; **nunca baixar**. Branches/functions/statements ficam em um piso atingível abaixo do medido (com folga p/ não flapar no CI), nunca acima do real.
 
-| Workspace | lines | branches | functions | statements | Meta-alvo (linhas) |
-|---|---|---|---|---|---|
-| services/api | 35 | 30 | 29 | 35 | 80 |
-| apps/merchant | 90 | 78 | 84 | 90 | 90 |
-| apps/admin | 6 | 5 | 3 | 6 | 70 |
-| apps/customer | 30 | 27 | 24 | 30 | 55 |
-| apps/picker | 62 | 58 | 63 | 62 | 70 |
-| apps/driver | 46 | 40 | 60 | 45 | 65 |
-| packages/api-client | 37 | 31 | 21 | 36 | 70 |
-| packages/types | 15 | 0 | 0 | 15 | 90 |
-| packages/ui | 28 | 0 | 0 | 28 | 50 |
+> O eixo "código novo" continua sendo o **diff ≥ 90%** (`pnpm diff-coverage`): um arquivo novo sem teste reprova o PR mesmo que o agregado do workspace passe os 80%.
 
-> `admin`, `types` e `ui` foram **recalibrados**: os números altos do plano vinham de escopo falso (admin medido só sobre arquivos tocados por teste; types/ui só sobre o barrel). Sob o all-files obrigatório o baseline real é o da tabela. A meta-alvo é o destino das stories de backfill; o piso só trava o que existe hoje.
+**`perFile: true` (vitest) — decisão por workspace:**
 
-> **`perFile` config-level não é usado** nos workspaces de baixa cobertura: com all-files, barrels/bootstrap ficam em 0% e um `perFile: true` deixaria a `main` permanentemente vermelha — contra o princípio "rígido sem travar o desenvolvimento". O rigor por arquivo para **código novo** é garantido pelo gate de **diff ≥ 90%**. Conforme o backfill eleva a cobertura mínima por arquivo de um workspace, `perFile: true` pode ser ligado nele.
+| Workspace | perFile | Motivo |
+|---|---|---|
+| packages/api-client | **on** | 100% em todos os eixos → todo arquivo passa o piso por arquivo. |
+| packages/ui | **on** | 100% em todos os eixos; superfície pequena e estável. |
+| packages/types | off | 85% agregado vem de linhas não cobertas concentradas em arquivo(s) que ficariam < 80 por arquivo. |
+| apps/admin · apps/merchant | off | páginas/rotas/providers individuais < 80 por arquivo apesar do agregado alto; ligar deixaria a `main` vermelha. |
+| services/api (jest) | off | controllers cobertos só por e2e + bootstrap (env/prisma/strategy/filter) em 0% por arquivo (story 43). |
+| apps/customer · apps/picker · apps/driver (jest) | off | rotas/telas individuais < 80 por arquivo; jest usaria thresholds por glob, não ligados. |
+
+> Em todos os "off", o rigor por arquivo para **código novo** vem do gate de **diff ≥ 90%**. Conforme o backfill eleva a cobertura mínima por arquivo de um workspace, `perFile` pode ser ligado nele.
 
 > **PENDENTE-MANUAL:** marcar o job `coverage` como **required check** na branch protection da `main` (Settings → Branches) — precisa de acesso de admin ao repositório no GitHub.
 
