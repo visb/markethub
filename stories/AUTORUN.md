@@ -96,6 +96,10 @@ Após cada unidade, anexar:
 [OK|PARCIAL|BLOQUEADO] NN — testes: <resumo> — commit: <hash> — merge: <hash> — <data> — <bloqueio se houver>
 ```
 
+**Entrada curta — máx. ~3 linhas.** O ledger existe pra retomar (status + contagem de testes +
+hashes + bloqueio + no máx. 1 nota crítica). Detalhe rico (lista de specs, percentuais por arquivo,
+racional) vai no **corpo do commit** ou no `.md` da story ao arquivar — não no ledger.
+
 ## Encerrar o loop
 
 Quando **todas** as unidades estiverem `done` ou `blocked`/PENDENTE-MANUAL no ledger: escrever o
@@ -105,6 +109,11 @@ resumo final (ver "Ao terminar") e **encerrar o loop** — não reagendar.
 
 Resumo final no ledger: o que passou, o que ficou BLOQUEADO/PENDENTE-MANUAL e por quê, branches e
 commits/merges, comandos exatos pra reproduzir os gates. Deixar os serviços de pé.
+
+**Arquivar a rodada:** mover o conteúdo da rodada encerrada para `stories/done/PROGRESS-NN-MM.md`
+e restaurar o stub em `stories/PROGRESS.md` (o ledger ativo fica pequeno — ele é relido a cada
+disparo do loop; rodadas mortas não podem acumular nele). Commit
+`docs(stories): arquiva rodada NN-MM`.
 
 ## Proibido
 

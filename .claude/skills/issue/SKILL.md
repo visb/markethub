@@ -17,7 +17,8 @@ Pode receber um título/descrição como argumento (`/issue corrigir filtro de r
 ## Convenções do repo (já existentes — respeitar)
 
 - Stories novas ficam em `stories/NN-slug-em-kebab.md` (flat na raiz de `stories/`), numeração
-  sequencial crescente com **dois dígitos** (`01-slug.md`, `02-slug.md`, ...).
+  sequencial crescente, zero-pad **mínimo de dois dígitos** (`01-slug.md`, ..., `99-slug.md`,
+  `100-slug.md` — a partir de 100 segue com três dígitos, sem re-padear as antigas).
 - Stories legadas vivem em `stories/done/phase-*/` e `stories/phase-7-quality/` no formato antigo
   (`SN.N-slug.md`). **Não** seguem a numeração flat — não contam para o próximo NN.
 - Concluídas são arquivadas em `stories/done/` (via `git mv`) — isso acontece **depois**, ao
@@ -27,7 +28,7 @@ Pode receber um título/descrição como argumento (`/issue corrigir filtro de r
 - **A Validação é obrigatória e SEMPRE inclui instruções explícitas de teste** (ver
   "Validação e gate de cobertura" abaixo). Nenhuma story é escrita sem elas.
 - Commits seguem o CLAUDE.md: Conventional Commits em **pt-BR**, mensagem em português.
-- Co-author: `Claude Opus 4.8 <noreply@anthropic.com>` (ou o modelo corrente).
+- Co-author: o modelo corrente (`Claude <modelo> <noreply@anthropic.com>` — o harness já injeta o rodapé correto; não cravar nome de modelo).
 
 ## Fluxo
 

@@ -56,8 +56,8 @@ devolva BLOQUEADO explicando o que faltou.
    - (Pode delegar a bateria final ao agent `markethub-validator` se o orquestrador preferir.)
 9. **Commit** (Conventional Commits pt-BR, escopo da story): `feat(story-NN): <título>`. Commitar o
    `.md` do plano primeiro se ainda não estiver versionado (`docs(stories): plano da story NN — …`).
-   `git add` só os arquivos da unidade + testes. Rodapé:
-   `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>` (ou o modelo corrente). **Sem push.**
+   `git add` só os arquivos da unidade + testes. Rodapé `Co-Authored-By:` do modelo corrente
+   (o harness injeta o correto; não cravar nome de modelo). **Sem push.**
 10. **Não mergeia na main** — isso é do orquestrador. Não deletar branch, não arquivar story salvo se
     o prompt pedir explicitamente.
 

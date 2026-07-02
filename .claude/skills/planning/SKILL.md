@@ -47,7 +47,7 @@ Sem essas flags, vale o fluxo interativo padrão (refina conversando + confirma 
 ## Convenções herdadas da skill `issue` (respeitar à risca)
 
 - Stories novas em `stories/NN-slug-em-kebab.md` (flat na raiz de `stories/`), numeração
-  sequencial crescente com **dois dígitos**.
+  sequencial crescente, zero-pad mínimo de dois dígitos (a partir de 100, três).
 - **Descobrir o próximo NN:** varrer **só** `stories/*.md` na raiz (flat), pegar o maior `NN`,
   somar 1. Se não houver nenhuma story flat, começar em `01`. Stories legadas em `phase-*/SN.N` e
   `stories/done/` **não** contam. Incrementar a cada story criada na sessão.
@@ -61,8 +61,8 @@ Sem essas flags, vale o fluxo interativo padrão (refina conversando + confirma 
   sem `skip`/`only`/`xfail` injustificado). Adaptar ao escopo (frontend-only vs backend). Nenhuma
   story sai da sessão sem isso — vale inclusive no modo auto.
 - Slug em kebab-case curto.
-- Commits seguem o CLAUDE.md (Conventional Commits pt-BR). Co-author:
-  `Claude Opus 4.8 <noreply@anthropic.com>`.
+- Commits seguem o CLAUDE.md (Conventional Commits pt-BR). Co-author: o modelo corrente
+  (o harness injeta o rodapé correto; não cravar nome de modelo).
 
 ## Fluxo da sessão
 
