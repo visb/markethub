@@ -8,6 +8,7 @@ import { HealthModule } from "./health/health.module";
 import { AuthModule } from "./auth/auth.module";
 import { QueueModule } from "./queue/queue.module";
 import { ErpModule } from "./erp/erp.module";
+import { EventsModule } from "./events/events.module";
 import { EnrichmentModule } from "./enrichment/enrichment.module";
 import { CatalogModule } from "./catalog/catalog.module";
 import { UsersModule } from "./users/users.module";
@@ -36,6 +37,7 @@ import { RolesGuard } from "./auth/guards/roles.guard";
     AuthModule,
     EnrichmentModule,
     ErpModule,
+    EventsModule,
     CatalogModule,
     UsersModule,
     MarketplaceModule,

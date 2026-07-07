@@ -15,6 +15,11 @@ export const envSchema = z.object({
   SYNC_SCHEDULE_ENABLED: z.coerce.boolean().default(false),
   SYNC_CRON: z.string().default("*/30 * * * *"),
 
+  // Eventos de domínio (story 45): relay do transactional outbox (poll BullMQ).
+  OUTBOX_RELAY_ENABLED: z.coerce.boolean().default(true),
+  OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2000),
+  OUTBOX_RELAY_BATCH_SIZE: z.coerce.number().int().positive().default(50),
+
   // Enriquecimento (S1.5). Sem token => usa MockEnrichmentProvider.
   COSMOS_TOKEN: z.string().optional(),
   COSMOS_BASE_URL: z.string().default("https://api.cosmos.bluesoft.com.br"),
