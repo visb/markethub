@@ -108,8 +108,6 @@ function makeDeps(opts: {
     getCart: jest.fn().mockResolvedValue(view),
     clear: jest.fn().mockResolvedValue({}),
   };
-  const erp = { pushOrderGroup: jest.fn().mockResolvedValue({}) };
-  const picking = { generateForOrder: jest.fn().mockResolvedValue({}) };
   const tracking = {
     build: jest.fn().mockResolvedValue({ steps: [] }),
     emit: jest.fn().mockResolvedValue({}),
@@ -121,19 +119,19 @@ function makeDeps(opts: {
   const refund = { issueCancelRefund: jest.fn().mockResolvedValue({}) };
   const integration = { emit: jest.fn().mockResolvedValue({}) };
   const orderEvents = { created: jest.fn(), statusChanged: jest.fn() };
+  const outbox = { publish: jest.fn().mockResolvedValue({ id: "evt1" }) };
 
   const svc = new OrdersService(
     prisma,
     cart as never,
-    erp as never,
-    picking as never,
     tracking as never,
     scheduling as never,
     refund as never,
     integration as never,
     orderEvents as never,
+    outbox as never,
   );
-  return { svc, prisma, tx, cart, erp, picking, tracking, scheduling, refund, integration, orderEvents };
+  return { svc, prisma, tx, cart, tracking, scheduling, refund, integration, orderEvents, outbox };
 }
 
 const deliveryInput: CreateOrderInput = { fulfillment: "delivery", addressId: "addr1", deliveryMethod: "gate" };
@@ -305,40 +303,58 @@ describe("OrdersService.getTracking", () => {
   });
 });
 
-describe("OrdersService.markPaid (transição created→preparing)", () => {
-  it("created → preparing: atualiza, empurra ERP, gera picking e emite", async () => {
-    const { svc, prisma, erp, picking, tracking, integration } = makeDeps();
-    const p = prisma as never as { order: { findUnique: jest.Mock; update: jest.Mock }; orderGroup: { updateMany: jest.Mock } };
-    p.order.findUnique.mockResolvedValue({
-      id: "order1",
-      status: "created",
-      groups: [{ id: "g1", merchantId: "m1", storeId: "store1" }],
+describe("OrdersService.markPaid (transição created→preparing + evento order.paid — story 45)", () => {
+  it.each(["created", "paid"])("status=%s → preparing e emite order.paid NA MESMA TX", async (status) => {
+    const { svc, prisma, tx, outbox } = makeDeps();
+    const p = prisma as never as { order: { findUnique: jest.Mock } };
+    p.order.findUnique.mockResolvedValue({ id: "order1", status });
+
+    await svc.markPaid("order1");
+
+    expect(tx.order.update).toHaveBeenCalledWith({ where: { id: "order1" }, data: { status: "preparing" } });
+    expect(tx.orderGroup.updateMany).toHaveBeenCalledWith({ where: { orderId: "order1" }, data: { status: "preparing" } });
+    // o publish recebe o CLIENT TRANSACIONAL — atômico com a transição
+    expect(outbox.publish).toHaveBeenCalledTimes(1);
+    expect(outbox.publish).toHaveBeenCalledWith(tx, {
+      type: "order.paid",
+      payload: { orderId: "order1" },
+      aggregateId: "order1",
     });
-    await svc.markPaid("order1");
-    expect(p.order.update).toHaveBeenCalledWith({ where: { id: "order1" }, data: { status: "preparing" } });
-    expect(p.orderGroup.updateMany).toHaveBeenCalledWith({ where: { orderId: "order1" }, data: { status: "preparing" } });
-    expect(erp.pushOrderGroup).toHaveBeenCalledWith("g1");
-    expect(picking.generateForOrder).toHaveBeenCalledWith("order1");
-    expect(tracking.emit).toHaveBeenCalledWith("order1");
-    expect(integration.emit).toHaveBeenCalledWith("m1", "order.status_changed", expect.objectContaining({ status: "preparing" }));
   });
 
-  it("pedido inexistente: no-op", async () => {
-    const { svc, prisma, picking } = makeDeps();
-    const p = prisma as never as { order: { findUnique: jest.Mock; update: jest.Mock } };
+  it("não orquestra mais side-effects inline (viraram handlers do evento)", async () => {
+    const { svc, prisma, tracking, integration, orderEvents } = makeDeps();
+    const p = prisma as never as { order: { findUnique: jest.Mock } };
+    p.order.findUnique.mockResolvedValue({ id: "order1", status: "created" });
+
+    await svc.markPaid("order1");
+
+    expect(tracking.emit).not.toHaveBeenCalled();
+    expect(integration.emit).not.toHaveBeenCalled();
+    expect(orderEvents.statusChanged).not.toHaveBeenCalled();
+  });
+
+  it("pedido inexistente: no-op (não transiciona nem emite)", async () => {
+    const { svc, prisma, tx, outbox } = makeDeps();
+    const p = prisma as never as { order: { findUnique: jest.Mock } };
     p.order.findUnique.mockResolvedValue(null);
+
     await svc.markPaid("x");
-    expect(p.order.update).not.toHaveBeenCalled();
-    expect(picking.generateForOrder).not.toHaveBeenCalled();
+
+    expect(tx.order.update).not.toHaveBeenCalled();
+    expect(outbox.publish).not.toHaveBeenCalled();
   });
 
-  it("status fora de {created,paid}: idempotente, não reprocessa", async () => {
-    const { svc, prisma, picking } = makeDeps();
-    const p = prisma as never as { order: { findUnique: jest.Mock; update: jest.Mock } };
-    p.order.findUnique.mockResolvedValue({ id: "order1", status: "delivered", groups: [] });
+  it("status fora de {created,paid}: idempotente — não retransiciona nem reemite", async () => {
+    const { svc, prisma, tx, outbox } = makeDeps();
+    const p = prisma as never as { order: { findUnique: jest.Mock } };
+    p.order.findUnique.mockResolvedValue({ id: "order1", status: "delivered" });
+
     await svc.markPaid("order1");
-    expect(p.order.update).not.toHaveBeenCalled();
-    expect(picking.generateForOrder).not.toHaveBeenCalled();
+
+    expect(tx.order.update).not.toHaveBeenCalled();
+    expect(tx.orderGroup.updateMany).not.toHaveBeenCalled();
+    expect(outbox.publish).not.toHaveBeenCalled();
   });
 });
 

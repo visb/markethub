@@ -2,12 +2,11 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import { Prisma } from "@prisma/client";
 import type { DeliveryMethod, FulfillmentType } from "@prisma/client";
 import { shortCode } from "../common/codes";
-import { ErpService } from "../erp/erp.service";
+import { OutboxPublisher } from "../events/outbox.publisher";
 import { IntegrationService } from "../integration/integration.service";
 import { RefundService } from "../payment/refund.service";
 import { OrderEvents } from "../picking/order.events";
 import { OrderTrackingService } from "../picking/order-tracking.service";
-import { PickingService } from "../picking/picking.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { SchedulingService } from "../scheduling/scheduling.service";
 import { CartService } from "./cart.service";
@@ -28,13 +27,12 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cart: CartService,
-    private readonly erp: ErpService,
-    private readonly picking: PickingService,
     private readonly tracking: OrderTrackingService,
     private readonly scheduling: SchedulingService,
     private readonly refund: RefundService,
     private readonly integration: IntegrationService,
     private readonly orderEvents: OrderEvents,
+    private readonly outbox: OutboxPublisher,
   ) {}
 
   /** Snapshot de rastreio do pedido por etapas (S5.1). Só o dono acessa. */
@@ -212,44 +210,35 @@ export class OrdersService {
     return order;
   }
 
-  /** Pagamento confirmado → preparing + push ao ERP de cada grupo. Idempotente. */
+  /**
+   * Pagamento confirmado → preparing + evento `order.paid` no outbox, na MESMA
+   * transação (story 45). Os side-effects (push ERP, gerar picking, notificar)
+   * viraram handlers do evento — retry isolado, sem pedido órfão. Idempotente.
+   */
   async markPaid(orderId: string): Promise<void> {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { groups: true },
+      select: { id: true, status: true },
     });
     if (!order) return;
     if (order.status !== "created" && order.status !== "paid") return; // idempotente
 
-    await this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: "preparing" },
-    });
-    await this.prisma.orderGroup.updateMany({
-      where: { orderId },
-      data: { status: "preparing" },
-    });
-    for (const g of order.groups) await this.erp.pushOrderGroup(g.id);
-
-    // gera tarefas de separação (queued) p/ os separadores assumirem (S3.2)
-    await this.picking.generateForOrder(orderId);
-    // rastreio em tempo real (S5.1): pago → preparando
-    await this.tracking.emit(orderId);
-    // webhook order.status_changed → preparing (story 09) + socket (story 12)
-    for (const g of order.groups) {
-      void this.integration.emit(g.merchantId, "order.status_changed", {
-        orderId,
-        merchantId: g.merchantId,
-        storeId: g.storeId,
-        status: "preparing",
+    await this.prisma.$transaction(async (tx) => {
+      await tx.order.update({
+        where: { id: orderId },
+        data: { status: "preparing" },
       });
-      this.orderEvents.statusChanged({
-        orderId,
-        merchantId: g.merchantId,
-        storeId: g.storeId,
-        status: "preparing",
+      await tx.orderGroup.updateMany({
+        where: { orderId },
+        data: { status: "preparing" },
       });
-    }
+      // atômico com a transição: commit sem evento (órfão) é impossível
+      await this.outbox.publish(tx, {
+        type: "order.paid",
+        payload: { orderId },
+        aggregateId: orderId,
+      });
+    });
   }
 
   /**

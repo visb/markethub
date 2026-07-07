@@ -991,6 +991,38 @@ model DeviceToken {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Eventos de domínio (story 45) — transactional outbox
+// O agregado grava o evento NA MESMA TX da mudança de estado (OutboxPublisher);
+// o relay (poll BullMQ) faz fan-out de 1 job por handler inscrito e marca
+// publishedAt. Idempotência de handler em ProcessedEvent (eventId+handler).
+// ─────────────────────────────────────────────────────────────
+
+model OutboxEvent {
+  id          String    @id @default(cuid())
+  type        String // ex.: "order.paid"
+  payload     Json
+  aggregateId String // ex.: orderId — consulta/debug por agregado
+  createdAt   DateTime  @default(now())
+  publishedAt DateTime? // null = pendente de relay
+
+  @@index([publishedAt])
+  @@index([aggregateId])
+  @@map("outbox_events")
+}
+
+// Dedupe de entrega at-least-once: 1 linha por (evento, handler) processado.
+// eventId é fk LÓGICA p/ OutboxEvent.id (sem FK física — permite expurgo do outbox
+// sem perder a trava). O PK composto é a unique de idempotência.
+model ProcessedEvent {
+  eventId     String
+  handler     String
+  processedAt DateTime @default(now())
+
+  @@id([eventId, handler])
+  @@map("processed_events")
+}
+
+// ─────────────────────────────────────────────────────────────
 // Qualidade de catálogo (S5.5) — snapshot de cobertura ao longo do tempo
 // ─────────────────────────────────────────────────────────────
 
