@@ -185,9 +185,9 @@ describe("OrdersService.preview", () => {
 });
 
 describe("OrdersService.checkout", () => {
-  it("cria pedido + grupos, limpa carrinho e emite eventos", async () => {
+  it("cria pedido + grupos, limpa carrinho e emite order.created NA MESMA TX (story 46)", async () => {
     const order = { id: "order1", userId: "u1", status: "created", groups: [] };
-    const { svc, tx, cart, integration, orderEvents } = makeDeps({
+    const { svc, tx, cart, outbox } = makeDeps({
       address: validAddress,
       order,
     });
@@ -195,9 +195,30 @@ describe("OrdersService.checkout", () => {
     expect(tx.order.create).toHaveBeenCalled();
     expect(tx.orderGroup.create).toHaveBeenCalled();
     expect(cart.clear).toHaveBeenCalledWith("u1");
-    expect(integration.emit).toHaveBeenCalledWith("m1", "order.created", expect.objectContaining({ status: "created" }));
-    expect(orderEvents.created).toHaveBeenCalled();
+    // o publish recebe o CLIENT TRANSACIONAL — atômico com a criação do pedido
+    expect(outbox.publish).toHaveBeenCalledTimes(1);
+    expect(outbox.publish).toHaveBeenCalledWith(tx, {
+      type: "order.created",
+      payload: { orderId: "order1" },
+      aggregateId: "order1",
+    });
     expect(res).toBe(order); // detail() devolve o pedido
+  });
+
+  it("não notifica mais inline (webhook/socket viraram handlers do order.created)", async () => {
+    const order = { id: "order1", userId: "u1", status: "created", groups: [] };
+    const { svc, integration, orderEvents } = makeDeps({ address: validAddress, order });
+    await svc.checkout("u1", deliveryInput);
+    expect(integration.emit).not.toHaveBeenCalled();
+    expect(orderEvents.created).not.toHaveBeenCalled();
+  });
+
+  it("falha na TX não emite evento pós-commit nem limpa o carrinho", async () => {
+    const order = { id: "order1", userId: "u1", status: "created", groups: [] };
+    const { svc, prisma, cart } = makeDeps({ address: validAddress, order });
+    (prisma as never as { $transaction: jest.Mock }).$transaction.mockRejectedValue(new Error("db caiu"));
+    await expect(svc.checkout("u1", deliveryInput)).rejects.toThrow("db caiu");
+    expect(cart.clear).not.toHaveBeenCalled();
   });
 
   it("calcula lineTotal por peso (weight)", async () => {

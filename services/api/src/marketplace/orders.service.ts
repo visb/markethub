@@ -135,27 +135,20 @@ export class OrdersService {
           },
         });
       }
+
+      // atômico com a criação do pedido (story 46): commit sem evento (órfão) é
+      // impossível. Cobrança PIX, webhook order.created ao merchant (story 09)
+      // e socket à store room (story 12) viraram handlers do evento — duráveis,
+      // com retry isolado (antes eram fire-and-forget pós-commit).
+      await this.outbox.publish(tx, {
+        type: "order.created",
+        payload: { orderId: created.id },
+        aggregateId: created.id,
+      });
       return created;
     });
 
     await this.cart.clear(userId);
-
-    // Webhook order.created (story 09) + socket à store room (story 12), por
-    // merchant da rede que recebeu grupo.
-    for (const g of view.groups) {
-      void this.integration.emit(g.merchantId, "order.created", {
-        orderId: order.id,
-        merchantId: g.merchantId,
-        storeId: g.storeId,
-        status: "created",
-      });
-      this.orderEvents.created({
-        orderId: order.id,
-        merchantId: g.merchantId,
-        storeId: g.storeId,
-        status: "created",
-      });
-    }
 
     return this.detail(userId, order.id);
   }

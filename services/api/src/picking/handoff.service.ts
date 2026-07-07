@@ -5,23 +5,23 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { shortCode } from "../common/codes";
+import { OutboxPublisher } from "../events/outbox.publisher";
 import { IntegrationService } from "../integration/integration.service";
 import { PushService } from "../notifications/push.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { OrderEvents } from "./order.events";
 import { OrderTrackingService } from "./order-tracking.service";
-import { PickingEvents } from "./picking.events";
 import { PICK_TASK_INCLUDE, toPickTaskDto } from "./picking.mapper";
 
 @Injectable()
 export class HandoffService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly events: PickingEvents,
     private readonly tracking: OrderTrackingService,
     private readonly push: PushService,
     private readonly integration: IntegrationService,
     private readonly orderEvents: OrderEvents,
+    private readonly outbox: OutboxPublisher,
   ) {}
 
   /**
@@ -52,8 +52,11 @@ export class HandoffService {
 
   /**
    * Handoff (S3.6): packed → ready_for_pickup. Transiciona OrderGroup →
-   * ready_for_pickup, gera o pickupCode (exibido ao entregador) e expõe a tarefa
-   * na fila de coleta. Idempotente — não regenera o código se já existir.
+   * ready_for_pickup, gera o pickupCode (exibido ao entregador) e emite
+   * `picking.done` no outbox NA MESMA TX (story 46) — o início da entrega
+   * (criação da Delivery) e as notificações (tracking/webhook/socket/push)
+   * viraram handlers do evento. Idempotente — não regenera o código se já
+   * existir; já ready_for_pickup não re-transiciona nem reemite.
    */
   async markReady(userId: string, taskId: string) {
     const task = await this.prisma.pickTask.findUnique({
@@ -84,32 +87,15 @@ export class HandoffService {
           pickupCode: task.orderGroup.pickupCode ?? shortCode(),
         },
       }),
-      // entrega própria: cria a entrega (unassigned) p/ a loja atribuir um entregador.
-      // Retirada na loja (pickup) não gera entrega. Idempotente (orderGroupId @unique).
-      ...(task.orderGroup.fulfillment === "delivery"
-        ? [
-            this.prisma.delivery.upsert({
-              where: { orderGroupId: task.orderGroupId },
-              create: { orderGroupId: task.orderGroupId, storeId: task.orderGroup.storeId },
-              update: {},
-            }),
-          ]
-        : []),
+      // atômico com a transição (story 46): commit sem evento é impossível. A
+      // criação da Delivery (entrega própria) e as notificações viraram
+      // handlers do picking.done — duráveis, com retry isolado.
+      this.outbox.publish(this.prisma, {
+        type: "picking.done",
+        payload: { orderGroupId: task.orderGroupId },
+        aggregateId: task.orderGroupId,
+      }),
     ]);
-    await this.tracking.recomputeAndEmit(task.orderGroupId);
-    await this.emitGroupStatus(task.orderGroupId, "ready_for_pickup");
-
-    this.events.readyForPickup({
-      pickTaskId: task.id,
-      storeId: task.storeId,
-      orderGroupId: task.orderGroupId,
-    });
-    await this.pushOwner(
-      task.orderGroupId,
-      task.orderGroup.fulfillment === "pickup"
-        ? { title: "Pedido pronto", body: "Seu pedido está pronto para retirada na loja." }
-        : { title: "Pedido pronto", body: "Seu pedido foi separado e aguarda coleta." },
-    );
     return this.detail(taskId);
   }
 

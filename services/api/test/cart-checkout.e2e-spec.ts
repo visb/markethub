@@ -4,6 +4,7 @@ import { API_PREFIX, createTestApp } from "./helpers/app";
 import { authHeader, registerUser, type TestUser } from "./helpers/auth";
 import { getPrisma, resetDatabase } from "./helpers/db";
 import { seedOffer } from "./helpers/seed";
+import { waitFor } from "./helpers/wait";
 
 /**
  * C12: carrinho multi-loja → checkout (retirada) → criação do pedido. Cobre a
@@ -79,6 +80,43 @@ describe("Cart → checkout (e2e)", () => {
       .set(authHeader(customer))
       .expect(200);
     expect(cart.body.itemCount).toBe(0);
+  });
+
+  // Story 46: o checkout emite `order.created` NA MESMA TX (transactional
+  // outbox); a cobrança PIX vira efeito assíncrono (handler gerar-cobranca-pix),
+  // preservando o contrato do endpoint (detail imediato; /pay reaproveita).
+  it("checkout grava order.created no outbox e a cobrança PIX nasce por handler", async () => {
+    const prisma = getPrisma(app);
+    const a = await seedOffer(prisma, { priceCents: 1000 });
+    await addItem(a.offerId, 1);
+
+    const order = await request(app.getHttpServer())
+      .post(url("/checkout"))
+      .set(authHeader(customer))
+      .send({ fulfillment: "pickup" })
+      .expect(201);
+    const orderId: string = order.body.id;
+
+    // evento gravado atomicamente com o pedido
+    const evt = await prisma.outboxEvent.findFirst({
+      where: { type: "order.created", aggregateId: orderId },
+    });
+    expect(evt).not.toBeNull();
+    expect(evt!.payload).toMatchObject({ orderId });
+
+    // efeito assíncrono: relay + handler geram a cobrança pendente no gateway mock
+    const payment = await waitFor(() => prisma.payment.findUnique({ where: { orderId } }), {
+      label: "cobrança PIX do order.created",
+    });
+    expect(payment.status).toBe("pending");
+    expect(payment.pixQrCode).toEqual(expect.any(String));
+
+    // o endpoint /pay segue funcionando e REAPROVEITA a cobrança pendente válida
+    const pay = await request(app.getHttpServer())
+      .post(url(`/orders/${orderId}/pay`))
+      .set(authHeader(customer))
+      .expect(201);
+    expect(pay.body.qrCode).toBe(payment.pixQrCode);
   });
 
   it("checkout com carrinho vazio → CART_EMPTY", async () => {

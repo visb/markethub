@@ -7,13 +7,19 @@ import type { DomainEventType } from "./event-types";
  * O nome do handler É o nome da fila — 1:1 por construção.
  */
 
+export const ORDER_CREATED_GERAR_COBRANCA_PIX = "order-created.gerar-cobranca-pix";
+export const ORDER_CREATED_NOTIFICAR = "order-created.notificar";
 export const ORDER_PAID_PUSH_ERP = "order-paid.push-erp";
 export const ORDER_PAID_GERAR_PICKING = "order-paid.gerar-picking";
 export const ORDER_PAID_NOTIFICAR = "order-paid.notificar";
+export const PICKING_DONE_INICIAR_ENTREGA = "picking-done.iniciar-entrega";
+export const PICKING_DONE_NOTIFICAR = "picking-done.notificar";
 
-/** eventType → handlers inscritos. Story 46 adiciona novos tipos/handlers aqui. */
+/** eventType → handlers inscritos. */
 export const SUBSCRIPTIONS: Record<DomainEventType, readonly string[]> = {
+  "order.created": [ORDER_CREATED_GERAR_COBRANCA_PIX, ORDER_CREATED_NOTIFICAR],
   "order.paid": [ORDER_PAID_PUSH_ERP, ORDER_PAID_GERAR_PICKING, ORDER_PAID_NOTIFICAR],
+  "picking.done": [PICKING_DONE_INICIAR_ENTREGA, PICKING_DONE_NOTIFICAR],
 };
 
 /** Todas as filas de handler (p/ registerQueue + injeção do mapa no relay). */
@@ -24,7 +30,13 @@ export const HANDLER_QUEUE_NAMES: readonly string[] = [
 /** Token do mapa handler → Queue BullMQ consumido pelo relay. */
 export const HANDLER_QUEUES = Symbol("HANDLER_QUEUES");
 
-/** jobId determinístico do fan-out — dedupe de enfileiramento no BullMQ. */
+/**
+ * jobId determinístico do fan-out — dedupe de enfileiramento no BullMQ.
+ * Separador `__` (não `:`): o BullMQ REJEITA jobId customizado contendo `:`
+ * ("Custom Id cannot contain :") — com `:` todo tick do relay falhava no
+ * enqueue e nenhum evento era entregue (bug latente da story 45, invisível nos
+ * units porque a Queue é mock; pego no e2e da story 46).
+ */
 export function handlerJobId(eventId: string, handler: string): string {
-  return `${eventId}:${handler}`;
+  return `${eventId}__${handler}`;
 }

@@ -4,14 +4,26 @@
  * fica obsoleto entre a emissão e o processamento.
  */
 
+/** Pedido criado no checkout (status created), com seus grupos, na mesma TX. */
+export interface OrderCreatedPayload {
+  orderId: string;
+}
+
 /** Pagamento confirmado; pedido transicionou para preparing. */
 export interface OrderPaidPayload {
   orderId: string;
 }
 
-/** Mapa tipo → payload. Story 46 adiciona order.created / picking.done aqui. */
+/** Separação do grupo concluída/pronta (OrderGroup → ready_for_pickup). */
+export interface PickingDonePayload {
+  orderGroupId: string;
+}
+
+/** Mapa tipo → payload. */
 export interface DomainEventMap {
+  "order.created": OrderCreatedPayload;
   "order.paid": OrderPaidPayload;
+  "picking.done": PickingDonePayload;
 }
 
 export type DomainEventType = keyof DomainEventMap;

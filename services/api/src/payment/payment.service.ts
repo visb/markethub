@@ -1,7 +1,4 @@
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { Prisma } from "@prisma/client";
-import type { Env } from "../config/env";
 import { OrdersService } from "../marketplace/orders.service";
 import { PrismaService } from "../prisma/prisma.service";
 import {
@@ -9,6 +6,7 @@ import {
   type PaymentProvider,
   type WebhookEvent,
 } from "./payment-provider.interface";
+import { PixChargeService } from "./pix-charge.service";
 
 @Injectable()
 export class PaymentService {
@@ -18,14 +16,18 @@ export class PaymentService {
     private readonly prisma: PrismaService,
     @Inject(PAYMENT_PROVIDER) private readonly provider: PaymentProvider,
     private readonly orders: OrdersService,
-    private readonly config: ConfigService<Env, true>,
+    private readonly pixCharge: PixChargeService,
   ) {}
 
-  /** Cria (ou retorna) a cobrança PIX do pedido. */
+  /**
+   * Cria (ou retorna) a cobrança PIX do pedido. Desde a story 46 a cobrança
+   * costuma já existir (handler `gerar-cobranca-pix` do `order.created`) — aqui
+   * fica a validação de posse/estado e o fallback síncrono (reuso/expirada).
+   */
   async createPixForOrder(userId: string, orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { user: true, payment: true },
+      select: { userId: true, status: true },
     });
     if (!order || order.userId !== userId) {
       throw new NotFoundException({ code: "ORDER_NOT_FOUND", message: "Pedido não encontrado" });
@@ -34,49 +36,11 @@ export class PaymentService {
       throw new BadRequestException({ code: "ORDER_NOT_PAYABLE", message: "Pedido não está aberto" });
     }
 
-    // Já existe cobrança pendente e válida → reaproveita.
-    if (
-      order.payment &&
-      order.payment.status === "pending" &&
-      order.payment.expiresAt &&
-      order.payment.expiresAt > new Date()
-    ) {
-      return this.view(order.payment);
+    const payment = await this.pixCharge.ensureForOrder(orderId);
+    if (!payment) {
+      // corrida: pedido deixou de estar aberto entre a checagem e a cobrança
+      throw new BadRequestException({ code: "ORDER_NOT_PAYABLE", message: "Pedido não está aberto" });
     }
-
-    const charge = await this.provider.createPixCharge({
-      orderId: order.id,
-      amountCents: order.totalCents,
-      customer: { name: order.user.name, email: order.user.email },
-      expiresInSeconds: this.config.get("PIX_EXPIRES_SECONDS", { infer: true }),
-    });
-
-    const payment = await this.prisma.payment.upsert({
-      where: { orderId: order.id },
-      create: {
-        orderId: order.id,
-        provider: this.provider.name,
-        providerChargeId: charge.chargeId,
-        method: "pix",
-        status: "pending",
-        amountCents: order.totalCents,
-        pixQrCode: charge.qrCode,
-        pixQrCodeUrl: charge.qrCodeUrl,
-        expiresAt: charge.expiresAt,
-        raw: charge.raw as Prisma.InputJsonValue,
-      },
-      update: {
-        provider: this.provider.name,
-        providerChargeId: charge.chargeId,
-        status: "pending",
-        amountCents: order.totalCents,
-        pixQrCode: charge.qrCode,
-        pixQrCodeUrl: charge.qrCodeUrl,
-        expiresAt: charge.expiresAt,
-        paidAt: null,
-        raw: charge.raw as Prisma.InputJsonValue,
-      },
-    });
     return this.view(payment);
   }
 

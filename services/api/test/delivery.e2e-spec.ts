@@ -4,6 +4,7 @@ import { API_PREFIX, createTestApp } from "./helpers/app";
 import { authHeader, registerUser, type TestUser } from "./helpers/auth";
 import { getPrisma, resetDatabase } from "./helpers/db";
 import { seedOffer } from "./helpers/seed";
+import { waitFor } from "./helpers/wait";
 
 /**
  * C15: entrega própria ponta a ponta. Pedido de entrega separado e marcado
@@ -65,7 +66,11 @@ describe("Delivery (e2e)", () => {
     await prisma.storeStaff.create({
       data: { userId: pickerId, storeId: seeded.storeId, staffRole: "picker", active: true },
     });
-    const task = await prisma.pickTask.findFirstOrThrow({ where: { storeId: seeded.storeId } });
+    // gerar picking é handler do evento order.paid (story 45) — efeito assíncrono
+    const task = await waitFor(
+      () => prisma.pickTask.findFirst({ where: { storeId: seeded.storeId } }),
+      { label: "PickTask do order.paid" },
+    );
     await request(app.getHttpServer()).post(url(`/pick-tasks/${task.id}/assign`)).set(authHeader(picker)).expect(201);
     await request(app.getHttpServer()).post(url(`/pick-tasks/${task.id}/start`)).set(authHeader(picker)).expect(201);
     const detail = await request(app.getHttpServer()).get(url(`/pick-tasks/${task.id}`)).set(authHeader(picker)).expect(200);
@@ -77,7 +82,11 @@ describe("Delivery (e2e)", () => {
     await request(app.getHttpServer()).post(url(`/pick-tasks/${task.id}/complete-picking`)).set(authHeader(picker)).expect(201);
     await request(app.getHttpServer()).post(url(`/pick-tasks/${task.id}/ready`)).set(authHeader(picker)).expect(201);
 
-    const delivery = await prisma.delivery.findFirstOrThrow({ where: { storeId: seeded.storeId } });
+    // criar a Delivery é handler do evento picking.done (story 46) — efeito assíncrono
+    const delivery = await waitFor(
+      () => prisma.delivery.findFirst({ where: { storeId: seeded.storeId } }),
+      { label: "Delivery do picking.done" },
+    );
     const group = await prisma.orderGroup.findFirstOrThrow({ where: { id: delivery.orderGroupId } });
     const orderRow = await prisma.order.findUniqueOrThrow({ where: { id: orderId } });
 
