@@ -1,12 +1,17 @@
-# PROGRESS — ledger da rodada AUTORUN ativa
+# PROGRESS — rodada AUTORUN (event-driven backend: outbox, fronteiras, push assíncrono)
 
-**Nenhuma rodada ativa.** Rodadas encerradas ficam arquivadas em `stories/done/PROGRESS-NN-MM.md`:
+Ordem: 45 → 46 → 47 → 48 → 49   |   Branch base: main   |   Merge na main por unidade: sim
+Deps rígidas: 45→46 e 45→48 (infra outbox/relay/ProcessedEvent — se 45 bloquear, 46 e 48 bloqueiam, não pular). 46→48 preferencial (48 reusa `picking.done`), mas 48 pode seguir se 46 bloquear por motivo alheio à infra. 47 e 49 independentes entre si; 47 pressupõe 45/46 mergeadas para a parte "comunicação por evento".
+Cuidados da rodada: migrations novas (OutboxEvent, ProcessedEvent na 45) — nunca editar migration aplicada; `prisma generate` antes de typecheck; gate de cobertura rígido (piso 80, diff ≥ 90) — handlers/relay novos precisam de teste; 47 introduz regra de lint de fronteira + allow-list explícita (não "consertar" o ciclo payment↔marketplace nesta rodada, só vedar código novo); 49 NÃO usa outbox (decisão travada — fila BullMQ simples, fachada `sendToUser` preservada); nada de push/PR; sem credencial externa (Pagar.me/FCM ficam atrás de interface + mock, marcar PENDENTE-MANUAL se algo exigir ambiente real).
 
-- `done/PROGRESS-01-13.md` — picker (01–03) + explore mapa (04–06) + app merchant (07–13)
-- `done/PROGRESS-14-18.md` — veículos (14–15) + RBAC merchant (16–18)
-- `done/PROGRESS-19-34.md` — gate de cobertura (19) + backfill backend (20–28) + refino customer/seguir loja (29–34)
-- `done/PROGRESS-35-44.md` — backfill cobertura frontend/libs (35–43) + piso global 80 (44)
+| #  | Título | Dep | Status |
+|----|--------|-----|--------|
+| 45 | Eventos de domínio — outbox + relay + migração `order.paid` | — | todo |
+| 46 | Eventos de domínio p2 — `order.created` → PIX · `picking.done` → entrega | 45 | todo |
+| 47 | Modular monolith — travar fronteiras de contexto (lint + allow-list) | 45,46 | todo |
+| 48 | Eventos de domínio p3 — `order.canceled` + estorno durável com retry | 45 (46 pref.) | todo |
+| 49 | Push notifications assíncronas — fila BullMQ atrás do `PushService` | — | todo |
 
-Ao abrir uma rodada nova, substituir este stub pelo cabeçalho de Config da rodada
-(schema em `AUTORUN.md` → "Config da rodada") + tabela de unidades. Ao encerrar,
-mover a rodada para `stories/done/PROGRESS-NN-MM.md` e restaurar este stub.
+## Log
+
+(entradas `[OK|PARCIAL|BLOQUEADO] NN — testes — commit — merge — data — bloqueio` após cada unidade)
