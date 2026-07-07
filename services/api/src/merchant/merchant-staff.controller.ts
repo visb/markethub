@@ -9,8 +9,8 @@ import {
   Query,
 } from "@nestjs/common";
 import { IsBoolean, IsEmail, IsIn, IsOptional, IsString, MinLength } from "class-validator";
-import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import type { AuthUser } from "../auth/auth.types";
+import { CurrentUser } from "../auth";
+import type { AuthUser } from "../auth";
 import { MerchantStaffService } from "./merchant-staff.service";
 
 const STAFF_ROLES = ["admin", "manager", "picker", "driver"] as const;

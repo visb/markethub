@@ -76,6 +76,7 @@ pnpm --filter @markethub/api db:seed           # seed
 
 Módulos por domínio em `src/`: `auth · catalog · marketplace · merchant · picking · driver · payment · enrichment · erp · reviews · scheduling · notifications · geocoding · storage · queue · users · admin`.
 
+- **Fronteiras de contexto (lint):** os módulos agrupam-se em bounded contexts (mapa em `services/api/eslint.config.mjs`). Cross-context SÓ via barrel público (`src/<mod>/index.ts`), `*.module` (DI) de contexto permitido na matriz, ou **evento de domínio** (outbox). Deep import de internals de outro contexto = erro de lint; exceções herdadas vivem na allow-list do config e são vedadas p/ código novo. Detalhe: `docs/context-boundaries.md`.
 - **Controller fino:** valida com DTO + `class-validator`, roteia. Sem regra de negócio.
 - **DTO de PATCH:** campos `@IsOptional()` → body parcial é esperado. Tratar `undefined` (ausente) ≠ `null`. Padrão de "salvar só o alterado" depende disso (ver `lockedFields`).
 - **Erros:** lançar com shape `{ code, message }` — `code` em SCREAMING_SNAKE para o front discriminar (ex.: `PRODUCT_NOT_FOUND`).

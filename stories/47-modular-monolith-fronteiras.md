@@ -129,3 +129,33 @@ mudança de comportamento de runtime esperada.
   transformaram efeito cross-context em evento (`order.paid`, `order.created`, `picking.done`), a
   regra (b) desta story passa a exigir o evento em vez do import direto. Ideal implementar após 45/46
   para já refletir os eventos existentes na allow-list.
+
+## Implementação (concluída)
+
+- **Enforcement:** regra ESLint local `markethub/context-boundaries`
+  (`services/api/eslint.boundaries.mjs` + `services/api/eslint.config.mjs`, que estende o config
+  raiz). Escolhida no lugar de `eslint-plugin-boundaries`/`import/no-restricted-paths` ("decidir na
+  impl"): resolução por path-math puro (imports relativos em `src/`), zero dependência nova e
+  allow-list por aresta `arquivo -> alvo`. Roda no `pnpm --filter @markethub/api lint` normal (CI).
+- **Semântica:** intra-contexto livre; kernel (`shared/common/config/prisma`) livre; cross-context
+  só via barrel `src/<mod>/index.ts` ou `*.module` (DI) entre pares da matriz
+  `ALLOWED_DEPENDENCIES`; fora da matriz → evento de domínio (outbox). `*.module` não é
+  re-exportado nos barrels de propósito (evita ciclo de require entre contextos).
+- **Contextos:** catalog (catalog/enrichment/erp), fulfillment (marketplace/picking/driver/
+  scheduling), payment, identity (auth/users), merchant, admin, engagement (reviews/favorites/
+  store-follows), support (events/integration/notifications/geocoding/storage/queue/health),
+  shared (kernel).
+- **Drenagem nesta story:** `erp/catalog-normalize` e `marketplace/pricing` movidos p/
+  `src/shared/` (specs junto, sem perder asserção); `DOOR_SURCHARGE_CENTS` virou const de
+  `shared/pricing` (CartService mantém o getter estático); ~60 arquivos reapontados p/ os 12
+  barrels novos (auth, users, erp, picking, payment, events, integration, notifications,
+  geocoding, storage, reviews, store-follows).
+- **Allow-list herdada (7 entradas):** só o ciclo `payment ↔ fulfillment`
+  (payment.module/payment.service → marketplace; marketplace.module/orders.service e
+  picking.module/picking-session.service → payment/refund). Follow-up: fachada de order-status +
+  reembolso por evento.
+- **Validação:** probe de deep import de propósito reprovou o lint (regra morde) e foi removido;
+  lint/typecheck/build verdes; `@markethub/api` 967/967 unit + 111/111 e2e; coverage 83.57%
+  linhas (piso 80 preservado; barrels `index.ts` excluídos do collectCoverageFrom — só re-export);
+  diff-coverage OK.
+- **Docs:** bullet em `CLAUDE.md` (Arquitetura — backend) + `docs/context-boundaries.md`.

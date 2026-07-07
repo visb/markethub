@@ -1,6 +1,6 @@
 import { StoreFollowsController } from "./store-follows.controller";
 import type { StoreFollowsService } from "./store-follows.service";
-import type { AuthUser } from "../auth/auth.types";
+import type { AuthUser } from "../auth";
 
 /** Story 34: controller fino delega ao service com o id do usuário corrente. */
 function make() {

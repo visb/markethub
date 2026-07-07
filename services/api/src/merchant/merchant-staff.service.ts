@@ -1,7 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { StaffRole } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
-import { AdminUsersService } from "../users/admin-users.service";
+import { AdminUsersService } from "../users";
 import { MerchantService } from "./merchant.service";
 
 export interface CreateMerchantStaffInput {

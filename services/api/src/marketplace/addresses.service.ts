@@ -2,7 +2,7 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from "@nes
 import {
   GEOCODING_PROVIDER,
   type GeocodingProvider,
-} from "../geocoding/geocoding-provider.interface";
+} from "../geocoding";
 import { PrismaService } from "../prisma/prisma.service";
 import { isCityCovered } from "./coverage";
 

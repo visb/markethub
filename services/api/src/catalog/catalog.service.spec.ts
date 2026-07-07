@@ -1,5 +1,5 @@
-import { CatalogService, NEARBY_STORES_CAP, type ViewportBounds } from "./catalog.service";
-import type { StoreFollowsService } from "../store-follows/store-follows.service";
+import { CatalogService, NEARBY_STORES_CAP, type ViewportBounds, CatalogService as CS, isOpenAt, saoPauloDayAndMinute } from "./catalog.service";
+import type { StoreFollowsService } from "../store-follows";
 
 // Story 34: o CatalogService passou a depender do StoreFollowsService (following nas
 // sections). Stub padrão: não segue ninguém; testes de follow sobrescrevem isFollowing.
@@ -433,7 +433,6 @@ describe("CatalogService.categoryFeed", () => {
 });
 
 // ─── Story 29: resumo da loja (modal explore) ───
-import { CatalogService as CS, isOpenAt, saoPauloDayAndMinute } from "./catalog.service";
 
 describe("isOpenAt (story 29)", () => {
   const hours = [

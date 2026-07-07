@@ -1,9 +1,8 @@
 import { Body, Controller, Post } from "@nestjs/common";
 import type { DeliveryMethod, FulfillmentType } from "@prisma/client";
 import { IsIn, IsOptional, IsString } from "class-validator";
-import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import { Roles } from "../auth/decorators/roles.decorator";
-import type { AuthUser } from "../auth/auth.types";
+import { CurrentUser, Roles } from "../auth";
+import type { AuthUser } from "../auth";
 import { OrdersService } from "./orders.service";
 
 class CheckoutDto {

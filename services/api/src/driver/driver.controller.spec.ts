@@ -1,7 +1,7 @@
 import { DriverController } from "./driver.controller";
 import type { DriverService } from "./driver.service";
 import type { DriverVehicleService } from "./driver-vehicle.service";
-import type { AuthUser } from "../auth/auth.types";
+import type { AuthUser } from "../auth";
 
 /**
  * App do entregador (entrega própria). Controller fino: delega ao `DriverService`

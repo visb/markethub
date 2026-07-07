@@ -1,9 +1,7 @@
 import { Injectable } from "@nestjs/common";
-import { ErpService } from "../../erp/erp.service";
+import { ErpService } from "../../erp";
 import { IntegrationService } from "../../integration/integration.service";
-import { OrderEvents } from "../../picking/order.events";
-import { OrderTrackingService } from "../../picking/order-tracking.service";
-import { PickingService } from "../../picking/picking.service";
+import { OrderEvents, OrderTrackingService, PickingService } from "../../picking";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { OrderPaidPayload } from "../event-types";
 

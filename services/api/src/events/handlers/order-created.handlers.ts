@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { IntegrationService } from "../../integration/integration.service";
-import { PixChargeService } from "../../payment/pix-charge.service";
-import { OrderEvents } from "../../picking/order.events";
+import { PixChargeService } from "../../payment";
+import { OrderEvents } from "../../picking";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { OrderCreatedPayload } from "../event-types";
 

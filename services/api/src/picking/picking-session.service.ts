@@ -5,7 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
-import { computeItemTotal } from "../marketplace/pricing";
+import { computeItemTotal } from "../shared/pricing";
 import { RefundService } from "../payment/refund.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { OrderTrackingService } from "./order-tracking.service";

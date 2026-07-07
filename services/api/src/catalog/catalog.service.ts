@@ -1,9 +1,9 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import { etaMinutes, haversineKm } from "../common/geo";
-import { CartService } from "../marketplace/cart.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { StoreFollowsService } from "../store-follows/store-follows.service";
+import { DOOR_SURCHARGE_CENTS } from "../shared/pricing";
+import { StoreFollowsService } from "../store-follows";
 
 export interface Paginated<T> {
   items: T[];
@@ -357,7 +357,7 @@ export class CatalogService {
       rating,
       etaMinutes: store.avgPrepMinutes,
       deliveryFeeCents: store.merchant.deliveryFeeCents,
-      doorFeeCents: store.merchant.deliveryFeeCents + CartService.DOOR_SURCHARGE_CENTS,
+      doorFeeCents: store.merchant.deliveryFeeCents + DOOR_SURCHARGE_CENTS,
       allowsPickup: store.allowsPickup,
       openNow: isOpenAt(store.hours, dayOfWeek, minuteOfDay),
     };

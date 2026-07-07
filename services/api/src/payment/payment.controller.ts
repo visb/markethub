@@ -1,8 +1,6 @@
 import { Body, Controller, Get, Headers, Param, Post } from "@nestjs/common";
-import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import { Public } from "../auth/decorators/public.decorator";
-import { Roles } from "../auth/decorators/roles.decorator";
-import type { AuthUser } from "../auth/auth.types";
+import { CurrentUser, Public, Roles } from "../auth";
+import type { AuthUser } from "../auth";
 import { PaymentService } from "./payment.service";
 
 @Roles("customer")

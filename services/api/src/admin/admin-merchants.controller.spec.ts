@@ -3,8 +3,8 @@ import {
   AdminStoreDetailController,
 } from "./admin-merchants.controller";
 import type { AdminMerchantsService } from "./admin-merchants.service";
-import type { StorageService } from "../storage/storage.service";
-import type { AuthUser } from "../auth/auth.types";
+import type { StorageService } from "../storage";
+import type { AuthUser } from "../auth";
 
 /**
  * Controllers admin finos: navegação/CRUD de mercados e lojas (+ horário de

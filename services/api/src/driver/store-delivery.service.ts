@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import type { DeliveryStatus } from "@prisma/client";
-import { PushService } from "../notifications/push.service";
+import { PushService } from "../notifications";
 import { HandoffService } from "../picking/handoff.service";
 import { OrderTrackingService } from "../picking/order-tracking.service";
 import { PrismaService } from "../prisma/prisma.service";

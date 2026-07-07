@@ -1,5 +1,8 @@
 /** Cálculo puro de preços do carrinho/pedido (centavos). Testável sem DB. */
 
+/** Sobretaxa de entrega na porta (+R$4) — usada no checkout e na vitrine. */
+export const DOOR_SURCHARGE_CENTS = 400;
+
 export type SaleTypeValue = "unit" | "weight";
 
 export interface CalcItem {

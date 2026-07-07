@@ -7,8 +7,8 @@ import {
   MaxLength,
   MinLength,
 } from "class-validator";
-import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import type { AuthUser } from "../auth/auth.types";
+import { CurrentUser } from "../auth";
+import type { AuthUser } from "../auth";
 import { MerchantVehiclesService } from "./merchant-vehicles.service";
 
 const VEHICLE_TYPES = ["motorcycle", "car", "van"] as const;

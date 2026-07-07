@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Post, Query } from "@nestjs/common";
 import { IsOptional, IsString } from "class-validator";
-import { Roles } from "../auth/decorators/roles.decorator";
+import { Roles } from "../auth";
 import { CatalogQualityService } from "./catalog-quality.service";
 
 class RequeueDto {

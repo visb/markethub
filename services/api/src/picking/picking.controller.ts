@@ -9,9 +9,8 @@ import {
   Query,
 } from "@nestjs/common";
 import { IsIn, IsInt, IsOptional, IsString, Min, MinLength } from "class-validator";
-import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import { Roles } from "../auth/decorators/roles.decorator";
-import type { AuthUser } from "../auth/auth.types";
+import { CurrentUser, Roles } from "../auth";
+import type { AuthUser } from "../auth";
 import { HandoffService } from "./handoff.service";
 import { PickingSessionService } from "./picking-session.service";
 import { PickingService } from "./picking.service";

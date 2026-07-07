@@ -1,7 +1,12 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { etaMinutes, haversineKm } from "../common/geo";
 import { PrismaService } from "../prisma/prisma.service";
-import { computeCart, type CalcCoupon, type CalcGroup } from "./pricing";
+import {
+  computeCart,
+  DOOR_SURCHARGE_CENTS,
+  type CalcCoupon,
+  type CalcGroup,
+} from "../shared/pricing";
 
 export interface AddItemInput {
   offerId: string;
@@ -9,8 +14,6 @@ export interface AddItemInput {
   weightGrams?: number | null;
   note?: string | null;
 }
-
-const DOOR_SURCHARGE_CENTS = 400; // entregar na porta (+R$4) — usado no checkout
 
 @Injectable()
 export class CartService {

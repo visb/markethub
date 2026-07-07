@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Post, Query } from "@nestjs/common";
 import { IsBoolean, IsIn, IsOptional, IsString } from "class-validator";
-import { Roles } from "../auth/decorators/roles.decorator";
+import { Roles } from "../auth";
 import { ConnectorRegistry } from "./connector-registry";
 import { ErpService } from "./erp.service";
 import { ErpQueueService } from "./erp.queue";

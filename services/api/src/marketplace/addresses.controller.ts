@@ -1,9 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
 import { IsBoolean, IsNumber, IsOptional, IsString, MinLength } from "class-validator";
-import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import { Public } from "../auth/decorators/public.decorator";
-import { Roles } from "../auth/decorators/roles.decorator";
-import type { AuthUser } from "../auth/auth.types";
+import { CurrentUser, Public, Roles } from "../auth";
+import type { AuthUser } from "../auth";
 import { AddressesService } from "./addresses.service";
 import { COVERED_CITIES } from "./coverage";
 

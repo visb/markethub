@@ -1,7 +1,7 @@
 import { AddressesController, CoverageController } from "./addresses.controller";
 import type { AddressesService } from "./addresses.service";
 import { COVERED_CITIES } from "./coverage";
-import type { AuthUser } from "../auth/auth.types";
+import type { AuthUser } from "../auth";
 
 /** Story 43: controllers finos de endereços + cobertura — delegação pura. */
 function make() {

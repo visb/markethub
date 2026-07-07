@@ -1,6 +1,6 @@
 import { Controller, Get, Query } from "@nestjs/common";
-import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import type { AuthUser } from "../auth/auth.types";
+import { CurrentUser } from "../auth";
+import type { AuthUser } from "../auth";
 import { MerchantService } from "./merchant.service";
 
 /**
