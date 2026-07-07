@@ -8,7 +8,7 @@ Cuidados da rodada: migrations novas (OutboxEvent, ProcessedEvent na 45) — nun
 |----|--------|-----|--------|
 | 45 | Eventos de domínio — outbox + relay + migração `order.paid` | — | done |
 | 46 | Eventos de domínio p2 — `order.created` → PIX · `picking.done` → entrega | 45 | done |
-| 47 | Modular monolith — travar fronteiras de contexto (lint + allow-list) | 45,46 | todo |
+| 47 | Modular monolith — travar fronteiras de contexto (lint + allow-list) | 45,46 | done |
 | 48 | Eventos de domínio p3 — `order.canceled` + estorno durável com retry | 45 (46 pref.) | todo |
 | 49 | Push notifications assíncronas — fila BullMQ atrás do `PushService` | — | todo |
 
@@ -21,3 +21,6 @@ Nota: lint do @markethub/api vermelho JÁ NA MAIN (import não usado em merchant
 
 [OK] 46 — testes: api 967/967 (90 suítes) + e2e 111/111 + diff-coverage 100%; coverage 83.49% linhas — commit: fb5a7a0 — merge: 715a1d6 — 2026-07-07
 Nota: corrigiu bug latente da 45 (jobId com `:` rejeitado pelo BullMQ → relay morto em runtime; separador virou `__`) e e2e picking/delivery que já estavam vermelhos na main.
+
+[OK] 47 — testes: api 967/967 + e2e 111/111; coverage 83.57% linhas; lint com regra de fronteira verde — commit: 5faecdd — merge: 2e6c067 — 2026-07-07
+Nota: allow-list herdada = 7 arestas, todas do ciclo payment↔fulfillment (follow-up: fachada order-status + reembolso por evento). Detalhe em docs/context-boundaries.md.
