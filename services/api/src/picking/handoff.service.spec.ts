@@ -1,10 +1,11 @@
 import { HandoffService } from "./handoff.service";
 
 /**
- * Story 01 (regressão): markReady continua levando OrderGroup → ready_for_pickup
- * + recompute/emit, agora pelo método compartilhado tracking.recomputeAndEmit
- * (sem duplicar a agregação no HandoffService). Garante que a extração não
- * quebrou o handoff.
+ * Story 46: markReady leva PickTask/OrderGroup → ready_for_pickup e emite
+ * `picking.done` no outbox NA MESMA TX. Criação da Delivery e notificações
+ * (tracking/webhook/socket/push) saíram do fluxo inline — viraram handlers do
+ * evento (picking-done.handlers). Aqui garantimos a transição, a emissão
+ * atômica e a ausência dos side-effects inline.
  */
 
 const DETAIL_TASK = {
@@ -22,10 +23,11 @@ const DETAIL_TASK = {
   orderGroup: { fulfillment: "pickup", pickupCode: "1234", order: { scheduledFrom: null } },
 };
 
-function makeService(taskStatus: string) {
-  const groupUpdate = jest.fn().mockResolvedValue({});
-  const taskUpdate = jest.fn().mockResolvedValue({});
-  const $transaction = jest.fn().mockResolvedValue([{}, {}]);
+function makeService(taskStatus: string, fulfillment: "pickup" | "delivery" = "pickup") {
+  const groupUpdate = jest.fn().mockReturnValue({ op: "groupUpdate" });
+  const taskUpdate = jest.fn().mockReturnValue({ op: "taskUpdate" });
+  const deliveryUpsert = jest.fn().mockReturnValue({ op: "deliveryUpsert" });
+  const $transaction = jest.fn().mockResolvedValue([{}, {}, {}]);
   const recomputeAndEmit = jest.fn().mockResolvedValue(undefined);
   const prisma = {
     pickTask: {
@@ -35,7 +37,7 @@ function makeService(taskStatus: string) {
         storeId: "s1",
         pickerId: "u1",
         status: taskStatus,
-        orderGroup: { pickupCode: "1234", fulfillment: "pickup", storeId: "s1" },
+        orderGroup: { pickupCode: "1234", fulfillment, storeId: "s1" },
       }),
       findUniqueOrThrow: jest.fn().mockResolvedValue(DETAIL_TASK),
       update: taskUpdate,
@@ -46,48 +48,88 @@ function makeService(taskStatus: string) {
         .fn()
         .mockResolvedValue({ orderId: "o1", merchantId: "m1", storeId: "s1", order: { userId: "owner1" } }),
     },
-    delivery: { upsert: jest.fn() },
+    delivery: { upsert: deliveryUpsert },
     $transaction,
   } as never;
-  const events = { readyForPickup: jest.fn() } as never;
-  const tracking = { recomputeAndEmit } as never;
-  const push = { sendToUser: jest.fn().mockResolvedValue(undefined) } as never;
+  const recompute = { recomputeAndEmit } as never;
+  const sendToUser = jest.fn().mockResolvedValue(undefined);
+  const push = { sendToUser } as never;
   const emit = jest.fn().mockResolvedValue(undefined);
   const integration = { emit } as never;
   const statusChanged = jest.fn();
   const orderEvents = { statusChanged, created: jest.fn() } as never;
-  const svc = new HandoffService(prisma, events, tracking, push, integration, orderEvents);
-  return { svc, $transaction, recomputeAndEmit, events, emit, statusChanged };
+  const publish = jest.fn().mockReturnValue({ op: "outboxPublish" });
+  const outbox = { publish } as never;
+  const svc = new HandoffService(prisma, recompute, push, integration, orderEvents, outbox);
+  return {
+    svc,
+    prisma,
+    $transaction,
+    recomputeAndEmit,
+    deliveryUpsert,
+    emit,
+    statusChanged,
+    sendToUser,
+    publish,
+  };
 }
 
-describe("HandoffService.markReady — regressão story 01", () => {
-  it("packed → ready_for_pickup + recompute/emit compartilhado, sem duplicar agregação", async () => {
-    const { svc, $transaction, recomputeAndEmit, events } = makeService("packed");
+describe("HandoffService.markReady — story 46 (picking.done no outbox)", () => {
+  it("packed → ready_for_pickup e emite picking.done NA MESMA TX", async () => {
+    const { svc, $transaction, prisma, publish } = makeService("packed");
     const dto = await svc.markReady("u1", "t1");
-    // transação muda task + grupo (pickup não cria delivery)
+
     expect($transaction).toHaveBeenCalledTimes(1);
-    // delega a agregação ao ponto compartilhado (não recomputa localmente)
-    expect(recomputeAndEmit).toHaveBeenCalledWith("g1");
-    expect((events as { readyForPickup: jest.Mock }).readyForPickup).toHaveBeenCalled();
+    // a TX contém task.update + group.update + a row do outbox (atômico)
+    const ops = $transaction.mock.calls[0]![0] as { op: string }[];
+    expect(ops).toEqual(
+      expect.arrayContaining([{ op: "taskUpdate" }, { op: "groupUpdate" }, { op: "outboxPublish" }]),
+    );
+    expect(publish).toHaveBeenCalledTimes(1);
+    expect(publish).toHaveBeenCalledWith(prisma, {
+      type: "picking.done",
+      payload: { orderGroupId: "g1" },
+      aggregateId: "g1",
+    });
     expect(dto.status).toBe("ready_for_pickup");
   });
 
-  // Story 12: a transição do OrderGroup emite order.status_changed à store room.
-  it("markReady emite order.status_changed (story 12) à store room do grupo", async () => {
-    const { svc, statusChanged } = makeService("packed");
+  it("não cria mais a Delivery inline (virou handler iniciar-entrega)", async () => {
+    const { svc, deliveryUpsert, $transaction } = makeService("packed", "delivery");
     await svc.markReady("u1", "t1");
-    expect(statusChanged).toHaveBeenCalledWith({
-      orderId: "o1",
-      merchantId: "m1",
-      storeId: "s1",
-      status: "ready_for_pickup",
-    });
+    expect(deliveryUpsert).not.toHaveBeenCalled();
+    const ops = $transaction.mock.calls[0]![0] as { op: string }[];
+    expect(ops).not.toEqual(expect.arrayContaining([{ op: "deliveryUpsert" }]));
   });
 
-  it("idempotente: já ready_for_pickup não re-transiciona", async () => {
-    const { svc, $transaction, recomputeAndEmit } = makeService("ready_for_pickup");
+  it("não notifica mais inline (tracking/webhook/socket/push viraram handler notificar)", async () => {
+    const { svc, recomputeAndEmit, emit, statusChanged, sendToUser } = makeService("packed");
+    await svc.markReady("u1", "t1");
+    expect(recomputeAndEmit).not.toHaveBeenCalled();
+    expect(emit).not.toHaveBeenCalled();
+    expect(statusChanged).not.toHaveBeenCalled();
+    expect(sendToUser).not.toHaveBeenCalled();
+  });
+
+  it("idempotente: já ready_for_pickup não re-transiciona nem reemite o evento", async () => {
+    const { svc, $transaction, publish } = makeService("ready_for_pickup");
     await svc.markReady("u1", "t1");
     expect($transaction).not.toHaveBeenCalled();
-    expect(recomputeAndEmit).not.toHaveBeenCalled();
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it("status inválido (não packed) → PICK_TASK_NOT_PACKED sem emitir", async () => {
+    const { svc, publish } = makeService("picking");
+    await expect(svc.markReady("u1", "t1")).rejects.toMatchObject({
+      response: { code: "PICK_TASK_NOT_PACKED" },
+    });
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it("não-dono → NOT_TASK_OWNER", async () => {
+    const { svc } = makeService("packed");
+    await expect(svc.markReady("intruso", "t1")).rejects.toMatchObject({
+      response: { code: "NOT_TASK_OWNER" },
+    });
   });
 });

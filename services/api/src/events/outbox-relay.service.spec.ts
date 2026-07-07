@@ -81,7 +81,8 @@ describe("OutboxRelayService.relayPending", () => {
       expect(add).toHaveBeenCalledWith(
         "order.paid",
         { eventId: "evt1", type: "order.paid", payload: { orderId: "order1" } },
-        expect.objectContaining({ jobId: `evt1:${handler}` }),
+        // separador __ — jobId com ":" é rejeitado pelo BullMQ ("Custom Id cannot contain :")
+        expect.objectContaining({ jobId: `evt1__${handler}` }),
       );
     }
     expect(update).toHaveBeenCalledWith({

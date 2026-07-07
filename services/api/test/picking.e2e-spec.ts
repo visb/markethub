@@ -4,6 +4,7 @@ import { API_PREFIX, createTestApp } from "./helpers/app";
 import { authHeader, registerUser, type TestUser } from "./helpers/auth";
 import { getPrisma, resetDatabase } from "./helpers/db";
 import { seedOffer } from "./helpers/seed";
+import { waitFor } from "./helpers/wait";
 
 /**
  * C14: sessão de separação ponta a ponta. Pedido pago gera PickTask (queued);
@@ -50,7 +51,11 @@ describe("Picking (e2e)", () => {
       .send({ chargeId: payment.providerChargeId, status: "paid" })
       .expect(201);
 
-    const task = await prisma.pickTask.findFirstOrThrow({ where: { storeId: seeded.storeId } });
+    // gerar picking é handler do evento order.paid (story 45) — efeito assíncrono
+    const task = await waitFor(
+      () => prisma.pickTask.findFirst({ where: { storeId: seeded.storeId } }),
+      { label: "PickTask do order.paid" },
+    );
     const picker = await registerUser(app, { roles: ["picker"] });
     await prisma.storeStaff.create({
       data: { userId: (await prisma.user.findFirstOrThrow({ where: { email: picker.email } })).id, storeId: seeded.storeId, staffRole: "picker", active: true },

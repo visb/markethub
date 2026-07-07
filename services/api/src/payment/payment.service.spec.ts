@@ -3,13 +3,13 @@ import { PaymentService } from "./payment.service";
 
 /**
  * Foco C07: cobrança PIX e webhook do gateway. createPixForOrder (guarda de
- * estado, reuso de cobrança pendente válida, criação nova) e handleWebhook
+ * posse/estado + delegação ao PixChargeService — story 46) e handleWebhook
  * (idempotência do paid, fallback de gorjeta, estados expired/failed).
- * refund.pricing já coberto em refund.pricing.spec.ts.
+ * Criação/reuso da cobrança coberta em pix-charge.service.spec.ts;
+ * refund.pricing em refund.pricing.spec.ts.
  */
 
 const FUTURE = new Date(Date.now() + 3600_000);
-const PAST = new Date(Date.now() - 3600_000);
 
 function makeService(opts: {
   order?: Record<string, unknown> | null;
@@ -17,16 +17,9 @@ function makeService(opts: {
   tip?: Record<string, unknown> | null;
   parseWebhook?: unknown;
   providerName?: string;
+  ensured?: Record<string, unknown> | null;
 }) {
   const paymentUpdate = jest.fn().mockResolvedValue({});
-  const paymentUpsert = jest.fn().mockResolvedValue({
-    status: "pending",
-    amountCents: 5000,
-    pixQrCode: "qr",
-    pixQrCodeUrl: "url",
-    expiresAt: FUTURE,
-    paidAt: null,
-  });
   const tipUpdate = jest.fn().mockResolvedValue({});
   const markPaid = jest.fn().mockResolvedValue(undefined);
 
@@ -34,7 +27,6 @@ function makeService(opts: {
     order: { findUnique: jest.fn().mockResolvedValue("order" in opts ? opts.order : null) },
     payment: {
       findFirst: jest.fn().mockResolvedValue(opts.payment ?? null),
-      upsert: paymentUpsert,
       update: paymentUpdate,
     },
     tip: {
@@ -43,72 +35,55 @@ function makeService(opts: {
     },
   } as never;
 
-  const createPixCharge = jest.fn().mockResolvedValue({
-    chargeId: "ch1",
-    qrCode: "qr",
-    qrCodeUrl: "url",
-    expiresAt: FUTURE,
-    raw: {},
-  });
   const provider = {
     name: opts.providerName ?? "mock",
-    createPixCharge,
     parseWebhook: jest.fn().mockReturnValue("parseWebhook" in opts ? opts.parseWebhook : null),
   } as never;
   const orders = { markPaid } as never;
-  const config = { get: jest.fn().mockReturnValue(900) } as never;
+  const ensureForOrder = jest.fn().mockResolvedValue(
+    "ensured" in opts
+      ? opts.ensured
+      : {
+          status: "pending",
+          amountCents: 5000,
+          pixQrCode: "qr",
+          pixQrCodeUrl: "url",
+          expiresAt: FUTURE,
+          paidAt: null,
+        },
+  );
+  const pixCharge = { ensureForOrder } as never;
 
-  const svc = new PaymentService(prisma, provider, orders, config);
-  return { svc, createPixCharge, paymentUpdate, paymentUpsert, tipUpdate, markPaid };
+  const svc = new PaymentService(prisma, provider, orders, pixCharge);
+  return { svc, ensureForOrder, paymentUpdate, tipUpdate, markPaid };
 }
 
 describe("PaymentService.createPixForOrder", () => {
   it("ORDER_NOT_FOUND quando o pedido não é do usuário", async () => {
-    const { svc } = makeService({ order: { userId: "outro", status: "created" } });
+    const { svc, ensureForOrder } = makeService({ order: { userId: "outro", status: "created" } });
     await expect(svc.createPixForOrder("u1", "o1")).rejects.toBeInstanceOf(NotFoundException);
+    expect(ensureForOrder).not.toHaveBeenCalled();
   });
 
   it("ORDER_NOT_PAYABLE quando o pedido não está aberto", async () => {
-    const { svc } = makeService({ order: { userId: "u1", status: "paid" } });
+    const { svc, ensureForOrder } = makeService({ order: { userId: "u1", status: "paid" } });
     await expect(svc.createPixForOrder("u1", "o1")).rejects.toBeInstanceOf(BadRequestException);
+    expect(ensureForOrder).not.toHaveBeenCalled();
   });
 
-  it("reaproveita cobrança pendente válida sem chamar o provider", async () => {
-    const { svc, createPixCharge } = makeService({
-      order: {
-        userId: "u1",
-        status: "created",
-        totalCents: 5000,
-        user: { name: "N", email: "e" },
-        payment: {
-          status: "pending",
-          expiresAt: FUTURE,
-          amountCents: 5000,
-          pixQrCode: "qr",
-          pixQrCodeUrl: "url",
-          paidAt: null,
-        },
-      },
-    });
-    await svc.createPixForOrder("u1", "o1");
-    expect(createPixCharge).not.toHaveBeenCalled();
-  });
-
-  it("cria nova cobrança quando a anterior expirou", async () => {
-    const { svc, createPixCharge, paymentUpsert } = makeService({
-      order: {
-        id: "o1",
-        userId: "u1",
-        status: "created",
-        totalCents: 5000,
-        user: { name: "N", email: "e" },
-        payment: { status: "pending", expiresAt: PAST },
-      },
-    });
+  it("delega a criação/reuso da cobrança ao PixChargeService e devolve a view", async () => {
+    const { svc, ensureForOrder } = makeService({ order: { userId: "u1", status: "created" } });
     const view = await svc.createPixForOrder("u1", "o1");
-    expect(createPixCharge).toHaveBeenCalled();
-    expect(paymentUpsert).toHaveBeenCalled();
+    expect(ensureForOrder).toHaveBeenCalledWith("o1");
     expect(view.qrCode).toBe("qr");
+    expect(view.amountCents).toBe(5000);
+  });
+
+  it("corrida: pedido deixou de estar aberto durante a cobrança → ORDER_NOT_PAYABLE", async () => {
+    const { svc } = makeService({ order: { userId: "u1", status: "created" }, ensured: null });
+    await expect(svc.createPixForOrder("u1", "o1")).rejects.toMatchObject({
+      response: { code: "ORDER_NOT_PAYABLE" },
+    });
   });
 });
 
