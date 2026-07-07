@@ -6,7 +6,7 @@ Cuidados da rodada: migrations novas (OutboxEvent, ProcessedEvent na 45) — nun
 
 | #  | Título | Dep | Status |
 |----|--------|-----|--------|
-| 45 | Eventos de domínio — outbox + relay + migração `order.paid` | — | todo |
+| 45 | Eventos de domínio — outbox + relay + migração `order.paid` | — | done |
 | 46 | Eventos de domínio p2 — `order.created` → PIX · `picking.done` → entrega | 45 | todo |
 | 47 | Modular monolith — travar fronteiras de contexto (lint + allow-list) | 45,46 | todo |
 | 48 | Eventos de domínio p3 — `order.canceled` + estorno durável com retry | 45 (46 pref.) | todo |
@@ -15,3 +15,6 @@ Cuidados da rodada: migrations novas (OutboxEvent, ProcessedEvent na 45) — nun
 ## Log
 
 (entradas `[OK|PARCIAL|BLOQUEADO] NN — testes — commit — merge — data — bloqueio` após cada unidade)
+
+[OK] 45 — testes: api 937/937 (87 suítes, +21) + e2e payment 4/4; coverage 83.39% linhas — commit: 3e12989 — merge: a0a886b — 2026-07-07
+Nota: lint do @markethub/api vermelho JÁ NA MAIN (import não usado em merchant-product.service.spec.ts) — corrigido em commit próprio na main.
