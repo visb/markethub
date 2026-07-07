@@ -1,6 +1,6 @@
 import { CartController } from "./cart.controller";
 import type { CartService } from "./cart.service";
-import type { AuthUser } from "../auth/auth.types";
+import type { AuthUser } from "../auth";
 
 /** Story 43: controller fino do carrinho — delega tudo ao CartService. */
 function make() {

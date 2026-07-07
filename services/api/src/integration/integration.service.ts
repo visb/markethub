@@ -8,7 +8,7 @@ import {
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { PrismaService } from "../prisma/prisma.service";
-import { ConnectorRegistry } from "../erp/connector-registry";
+import { ConnectorRegistry } from "../erp";
 import {
   apiKeyPrefix,
   generateApiKey,

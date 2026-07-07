@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
-import { slugify } from "../erp/catalog-normalize";
+import { slugify } from "../shared/catalog-normalize";
 import { PrismaService } from "../prisma/prisma.service";
 
 export interface MktCategoryInput {

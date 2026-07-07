@@ -6,8 +6,7 @@ import {
   IsString,
   MinLength,
 } from "class-validator";
-import { Public } from "../auth/decorators/public.decorator";
-import { Roles } from "../auth/decorators/roles.decorator";
+import { Public, Roles } from "../auth";
 import { MarketplaceCategoryService } from "./marketplace-category.service";
 
 class CreateMktCategoryDto {

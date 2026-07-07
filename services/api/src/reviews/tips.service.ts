@@ -1,7 +1,7 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { Env } from "../config/env";
-import { PAYMENT_PROVIDER, type PaymentProvider } from "../payment/payment-provider.interface";
+import { PAYMENT_PROVIDER, type PaymentProvider } from "../payment";
 import { PrismaService } from "../prisma/prisma.service";
 
 /**

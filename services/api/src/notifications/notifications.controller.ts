@@ -1,8 +1,8 @@
 import { Body, Controller, Delete, Post } from "@nestjs/common";
 import type { DevicePlatform } from "@prisma/client";
 import { IsIn, IsString, MinLength } from "class-validator";
-import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import type { AuthUser } from "../auth/auth.types";
+import { CurrentUser } from "../auth";
+import type { AuthUser } from "../auth";
 import { PushService } from "./push.service";
 
 class RegisterTokenDto {

@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import type { SyncType } from "@prisma/client";
 import { EnrichmentQueueService } from "../enrichment/enrichment.queue";
 import { PrismaService } from "../prisma/prisma.service";
-import { cleanGtin, inferSaleType, slugify } from "./catalog-normalize";
+import { cleanGtin, inferSaleType, slugify } from "../shared/catalog-normalize";
 import { ConnectorRegistry } from "./connector-registry";
 import type { ErpConnector } from "./connector.interface";
 import type { ConnectorContext, RawProduct, SyncCounters } from "./erp.types";

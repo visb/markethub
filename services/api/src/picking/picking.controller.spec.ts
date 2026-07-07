@@ -4,7 +4,7 @@ import type { PickingService } from "./picking.service";
 import type { PickingSessionService } from "./picking-session.service";
 import type { SubstitutionService } from "./substitution.service";
 import type { HandoffService } from "./handoff.service";
-import type { AuthUser } from "../auth/auth.types";
+import type { AuthUser } from "../auth";
 
 /**
  * Story 43: controller fino de picking — delega aos 4 services (fila/sessão/

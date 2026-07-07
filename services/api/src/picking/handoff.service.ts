@@ -5,9 +5,9 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { shortCode } from "../common/codes";
-import { OutboxPublisher } from "../events/outbox.publisher";
-import { IntegrationService } from "../integration/integration.service";
-import { PushService } from "../notifications/push.service";
+import { OutboxPublisher } from "../events";
+import { IntegrationService } from "../integration";
+import { PushService } from "../notifications";
 import { PrismaService } from "../prisma/prisma.service";
 import { OrderEvents } from "./order.events";
 import { OrderTrackingService } from "./order-tracking.service";

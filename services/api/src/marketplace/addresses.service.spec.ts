@@ -1,5 +1,5 @@
 import { BadRequestException, NotFoundException } from "@nestjs/common";
-import type { GeocodingProvider } from "../geocoding/geocoding-provider.interface";
+import type { GeocodingProvider } from "../geocoding";
 import { AddressesService } from "./addresses.service";
 
 /**

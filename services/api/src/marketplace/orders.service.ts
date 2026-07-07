@@ -2,8 +2,8 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import { Prisma } from "@prisma/client";
 import type { DeliveryMethod, FulfillmentType } from "@prisma/client";
 import { shortCode } from "../common/codes";
-import { OutboxPublisher } from "../events/outbox.publisher";
-import { IntegrationService } from "../integration/integration.service";
+import { OutboxPublisher } from "../events";
+import { IntegrationService } from "../integration";
 import { RefundService } from "../payment/refund.service";
 import { OrderEvents } from "../picking/order.events";
 import { OrderTrackingService } from "../picking/order-tracking.service";

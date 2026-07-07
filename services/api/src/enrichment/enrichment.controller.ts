@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Post } from "@nestjs/common";
 import { IsBoolean, IsOptional, IsString } from "class-validator";
-import { Roles } from "../auth/decorators/roles.decorator";
+import { Roles } from "../auth";
 import { EnrichmentService } from "./enrichment.service";
 import { EnrichmentQueueService } from "./enrichment.queue";
 

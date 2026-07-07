@@ -1,7 +1,7 @@
 import { MerchantController } from "./merchant.controller";
 import type { MerchantService } from "./merchant.service";
 import type { MerchantProductService } from "./merchant-product.service";
-import type { AuthUser } from "../auth/auth.types";
+import type { AuthUser } from "../auth";
 
 /**
  * Story 43: controller fino do app merchant — delega a MerchantService (lojas/

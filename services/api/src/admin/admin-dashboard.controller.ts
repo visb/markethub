@@ -1,7 +1,7 @@
 import { Controller, Get, Param, Query } from "@nestjs/common";
 import type { OrderStatus } from "@prisma/client";
-import { Roles } from "../auth/decorators/roles.decorator";
-import { ReviewsAggregateService } from "../reviews/reviews-aggregate.service";
+import { Roles } from "../auth";
+import { ReviewsAggregateService } from "../reviews";
 import { AdminDashboardService } from "./admin-dashboard.service";
 
 const toDate = (s?: string) => (s ? new Date(s) : undefined);

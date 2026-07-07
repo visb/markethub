@@ -1,6 +1,6 @@
 import { AdminDashboardController } from "./admin-dashboard.controller";
 import type { AdminDashboardService } from "./admin-dashboard.service";
-import type { ReviewsAggregateService } from "../reviews/reviews-aggregate.service";
+import type { ReviewsAggregateService } from "../reviews";
 
 /**
  * Backfill de cobertura (story 28). Controller fino: valida o roteamento e a

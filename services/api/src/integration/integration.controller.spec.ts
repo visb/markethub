@@ -1,6 +1,6 @@
 import { IntegrationController } from "./integration.controller";
 import type { IntegrationService } from "./integration.service";
-import type { AuthUser } from "../auth/auth.types";
+import type { AuthUser } from "../auth";
 
 /**
  * Story 43: controller fino de integração (story 09) — extrai { id, roles } do

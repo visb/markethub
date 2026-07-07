@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { slugify } from "../../erp/catalog-normalize";
+import { slugify } from "../../shared/catalog-normalize";
 import type { CategoryMapper } from "../category-mapper.interface";
 
 interface Rule {

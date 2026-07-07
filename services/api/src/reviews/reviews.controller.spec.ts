@@ -1,7 +1,7 @@
 import { ReviewsController } from "./reviews.controller";
 import type { ReviewsService } from "./reviews.service";
 import type { TipsService } from "./tips.service";
-import type { AuthUser } from "../auth/auth.types";
+import type { AuthUser } from "../auth";
 
 /**
  * Backfill de cobertura (story 28). Controller fino: roteamento de avaliações

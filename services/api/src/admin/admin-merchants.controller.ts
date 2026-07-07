@@ -13,10 +13,9 @@ import {
   MinLength,
   ValidateNested,
 } from "class-validator";
-import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import { Roles } from "../auth/decorators/roles.decorator";
-import type { AuthUser } from "../auth/auth.types";
-import { StorageService } from "../storage/storage.service";
+import { CurrentUser, Roles } from "../auth";
+import type { AuthUser } from "../auth";
+import { StorageService } from "../storage";
 import { AdminMerchantsService } from "./admin-merchants.service";
 
 class CreateMerchantDto {

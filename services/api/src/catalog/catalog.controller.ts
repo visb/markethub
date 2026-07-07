@@ -1,8 +1,6 @@
 import { BadRequestException, Controller, Get, Param, Query, UseGuards } from "@nestjs/common";
-import { Public } from "../auth/decorators/public.decorator";
-import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import { OptionalJwtAuthGuard } from "../auth/guards/optional-jwt-auth.guard";
-import type { AuthUser } from "../auth/auth.types";
+import { Public, CurrentUser, OptionalJwtAuthGuard } from "../auth";
+import type { AuthUser } from "../auth";
 import { CatalogService, type GeoFilter } from "./catalog.service";
 import { StoresNearbyQueryDto } from "./dto/stores-nearby.dto";
 

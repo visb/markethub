@@ -1,6 +1,6 @@
 import { MerchantStaffController } from "./merchant-staff.controller";
 import type { MerchantStaffService } from "./merchant-staff.service";
-import type { AuthUser } from "../auth/auth.types";
+import type { AuthUser } from "../auth";
 
 /**
  * Story 10: controller fino de colaboradores (StoreStaff). Apenas delegação ao

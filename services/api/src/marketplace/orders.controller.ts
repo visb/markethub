@@ -1,7 +1,6 @@
 import { Controller, Get, Param, Post, Query } from "@nestjs/common";
-import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import { Roles } from "../auth/decorators/roles.decorator";
-import type { AuthUser } from "../auth/auth.types";
+import { CurrentUser, Roles } from "../auth";
+import type { AuthUser } from "../auth";
 import { OrdersService } from "./orders.service";
 
 @Roles("customer")

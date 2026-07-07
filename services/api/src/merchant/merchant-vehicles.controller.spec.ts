@@ -1,6 +1,6 @@
 import { MerchantVehiclesController } from "./merchant-vehicles.controller";
 import type { MerchantVehiclesService } from "./merchant-vehicles.service";
-import type { AuthUser } from "../auth/auth.types";
+import type { AuthUser } from "../auth";
 
 /**
  * Story 14: controller fino da frota de veículos. Apenas delegação para o

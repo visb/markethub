@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import type { EnrichmentStatus } from "@prisma/client";
 import { IsArray, IsIn, IsOptional, IsString } from "class-validator";
-import { Roles } from "../auth/decorators/roles.decorator";
+import { Roles } from "../auth";
 import { EnrichmentService } from "../enrichment/enrichment.service";
 import { AdminCatalogService } from "./admin-catalog.service";
 

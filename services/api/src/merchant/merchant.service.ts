@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
-import { GEOCODING_PROVIDER, type GeocodingProvider } from "../geocoding/geocoding-provider.interface";
+import { GEOCODING_PROVIDER, type GeocodingProvider } from "../geocoding";
 import { PrismaService } from "../prisma/prisma.service";
 
 export interface OfferFilters {

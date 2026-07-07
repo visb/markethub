@@ -5,7 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
-import { PushService } from "../notifications/push.service";
+import { PushService } from "../notifications";
 import { PrismaService } from "../prisma/prisma.service";
 import { OrderTrackingService } from "./order-tracking.service";
 import { PickingSessionService } from "./picking-session.service";

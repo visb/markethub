@@ -1,5 +1,5 @@
 /** Cálculo puro da falta cobrável por item para o reembolso (SF.3). Testável sem DB. */
-import { computeItemTotal } from "../marketplace/pricing";
+import { computeItemTotal } from "../shared/pricing";
 
 export type RefundReasonValue = "weight_shortfall" | "refused";
 

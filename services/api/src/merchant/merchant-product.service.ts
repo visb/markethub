@@ -5,9 +5,9 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import type { Prisma, SaleType } from "@prisma/client";
-import { cleanGtin } from "../erp/catalog-normalize";
+import { cleanGtin } from "../shared/catalog-normalize";
 import { PrismaService } from "../prisma/prisma.service";
-import { StorageService } from "../storage/storage.service";
+import { StorageService } from "../storage";
 import { MerchantService } from "./merchant.service";
 
 export interface CreateProductInput {

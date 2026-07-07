@@ -1,8 +1,8 @@
 import { Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
-import { inferSaleType, normalizeGtin, slugify } from "../erp/catalog-normalize";
+import { inferSaleType, normalizeGtin, slugify } from "../shared/catalog-normalize";
 import { PrismaService } from "../prisma/prisma.service";
-import { StorageService } from "../storage/storage.service";
+import { StorageService } from "../storage";
 import { CATEGORY_MAPPER, type CategoryMapper } from "./category-mapper.interface";
 import { completenessScore } from "./completeness";
 import type { EnrichmentResult } from "./enrichment.types";

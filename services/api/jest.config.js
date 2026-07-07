@@ -11,7 +11,8 @@ module.exports = {
   },
   // Gate de cobertura (story 19) — all-files cravado no config, não em flag CLI.
   // Glob relativo ao rootDir ("src"). Exclui specs, wiring de framework e código
-  // sem lógica testável (modules, DTOs, bootstrap, processors, schedulers).
+  // sem lógica testável (modules, DTOs, bootstrap, processors, schedulers e os
+  // barrels públicos de contexto da story 47 — index.ts só re-exporta).
   collectCoverageFrom: [
     "**/*.ts",
     "!**/*.spec.ts",
@@ -20,6 +21,7 @@ module.exports = {
     "!main.ts",
     "!**/*.processor.ts",
     "!**/*.scheduler.ts",
+    "!**/index.ts",
   ],
   coverageReporters: ["text-summary", "lcov", "json-summary"],
   // Piso do ratchet — só sobe. Story 43 levou o agregado ao meta-alvo (medido
