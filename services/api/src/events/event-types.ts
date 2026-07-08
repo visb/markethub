@@ -19,11 +19,22 @@ export interface PickingDonePayload {
   orderGroupId: string;
 }
 
+/**
+ * Pedido cancelado pelo cliente (story 48). Além do orderId, carrega o
+ * deliverySlotId reservado (se houver) — o handler `liberar-slot` não precisa
+ * reler o pedido para saber qual vaga devolver.
+ */
+export interface OrderCanceledPayload {
+  orderId: string;
+  deliverySlotId: string | null;
+}
+
 /** Mapa tipo → payload. */
 export interface DomainEventMap {
   "order.created": OrderCreatedPayload;
   "order.paid": OrderPaidPayload;
   "picking.done": PickingDonePayload;
+  "order.canceled": OrderCanceledPayload;
 }
 
 export type DomainEventType = keyof DomainEventMap;

@@ -60,21 +60,17 @@ const ALLOWED_DEPENDENCIES = {
  * grande, vedadas para código NOVO. Cada entrada tem motivo + follow-up; drenar
  * em story futura. Não adicionar entrada sem justificativa explícita no PR.
  *
- * Ciclo payment ↔ fulfillment (herdado): o fluxo de pagamento consulta/avança o
- * pedido de forma síncrona (payment → marketplace) e cancelamento/substituição
- * dispara reembolso síncrono (marketplace/picking → payment/refund). Quebrar o
- * ciclo = extrair fachada de "order status" + reembolso por evento — follow-up
- * dedicado (ver stories/ROADMAP.md, trilha event-driven pós-45/46).
+ * Resto do ciclo payment ↔ fulfillment (herdado): o fluxo de pagamento
+ * consulta/avança o pedido de forma síncrona (payment → marketplace). O lado 2
+ * (fulfillment → payment/refund) foi DRENADO na story 48 — o estorno de
+ * cancelamento e de shortfall virou handler dos eventos `order.canceled` /
+ * `picking.done`. Quebrar o que sobrou = extrair fachada de "order status" —
+ * follow-up dedicado (ver stories/ROADMAP.md, trilha event-driven).
  */
 const INHERITED_ALLOW = [
   // payment → fulfillment (lado 1 do ciclo)
   "payment/payment.module -> marketplace/marketplace.module",
   "payment/payment.service -> marketplace/orders.service",
-  // fulfillment → payment/refund (lado 2 do ciclo)
-  "marketplace/marketplace.module -> payment/refund.module",
-  "marketplace/orders.service -> payment/refund.service",
-  "picking/picking.module -> payment/refund.module",
-  "picking/picking-session.service -> payment/refund.service",
 ];
 
 export default [

@@ -2,7 +2,6 @@ import { Module } from "@nestjs/common";
 import { JwtModule } from "@nestjs/jwt";
 import { OutboxModule } from "../events/outbox.module";
 import { IntegrationModule } from "../integration/integration.module";
-import { RefundModule } from "../payment/refund.module";
 import { HandoffService } from "./handoff.service";
 import { OrderEvents } from "./order.events";
 import { OrderTrackingService } from "./order-tracking.service";
@@ -16,7 +15,7 @@ import { SubstitutionScheduler } from "./substitution.scheduler";
 import { SubstitutionService } from "./substitution.service";
 
 @Module({
-  imports: [JwtModule.register({}), IntegrationModule, OutboxModule, RefundModule],
+  imports: [JwtModule.register({}), IntegrationModule, OutboxModule],
   controllers: [PickingController, SubstitutionController],
   providers: [
     PickingService,

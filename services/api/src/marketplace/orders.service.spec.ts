@@ -116,9 +116,6 @@ function makeDeps(opts: {
     reserveInTx: jest.fn().mockResolvedValue(opts.slotWindow ?? { start: new Date(), end: new Date() }),
     release: jest.fn().mockResolvedValue({}),
   };
-  const refund = { issueCancelRefund: jest.fn().mockResolvedValue({}) };
-  const integration = { emit: jest.fn().mockResolvedValue({}) };
-  const orderEvents = { created: jest.fn(), statusChanged: jest.fn() };
   const outbox = { publish: jest.fn().mockResolvedValue({ id: "evt1" }) };
 
   const svc = new OrdersService(
@@ -126,12 +123,9 @@ function makeDeps(opts: {
     cart as never,
     tracking as never,
     scheduling as never,
-    refund as never,
-    integration as never,
-    orderEvents as never,
     outbox as never,
   );
-  return { svc, prisma, tx, cart, tracking, scheduling, refund, integration, orderEvents, outbox };
+  return { svc, prisma, tx, cart, tracking, scheduling, outbox };
 }
 
 const deliveryInput: CreateOrderInput = { fulfillment: "delivery", addressId: "addr1", deliveryMethod: "gate" };
@@ -203,14 +197,6 @@ describe("OrdersService.checkout", () => {
       aggregateId: "order1",
     });
     expect(res).toBe(order); // detail() devolve o pedido
-  });
-
-  it("não notifica mais inline (webhook/socket viraram handlers do order.created)", async () => {
-    const order = { id: "order1", userId: "u1", status: "created", groups: [] };
-    const { svc, integration, orderEvents } = makeDeps({ address: validAddress, order });
-    await svc.checkout("u1", deliveryInput);
-    expect(integration.emit).not.toHaveBeenCalled();
-    expect(orderEvents.created).not.toHaveBeenCalled();
   });
 
   it("falha na TX não emite evento pós-commit nem limpa o carrinho", async () => {
@@ -344,15 +330,13 @@ describe("OrdersService.markPaid (transição created→preparing + evento order
   });
 
   it("não orquestra mais side-effects inline (viraram handlers do evento)", async () => {
-    const { svc, prisma, tracking, integration, orderEvents } = makeDeps();
+    const { svc, prisma, tracking } = makeDeps();
     const p = prisma as never as { order: { findUnique: jest.Mock } };
     p.order.findUnique.mockResolvedValue({ id: "order1", status: "created" });
 
     await svc.markPaid("order1");
 
     expect(tracking.emit).not.toHaveBeenCalled();
-    expect(integration.emit).not.toHaveBeenCalled();
-    expect(orderEvents.statusChanged).not.toHaveBeenCalled();
   });
 
   it("pedido inexistente: no-op (não transiciona nem emite)", async () => {
@@ -379,7 +363,7 @@ describe("OrdersService.markPaid (transição created→preparing + evento order
   });
 });
 
-describe("OrdersService.cancel (BUSINESS_RULES: cancelamento)", () => {
+describe("OrdersService.cancel (BUSINESS_RULES: cancelamento + evento order.canceled — story 48)", () => {
   function setupCancel(opts: { status: string; tasks?: { id: string; status: string }[]; deliverySlotId?: string }) {
     const order = {
       id: "order1",
@@ -394,37 +378,58 @@ describe("OrdersService.cancel (BUSINESS_RULES: cancelamento)", () => {
     return deps;
   }
 
-  it.each(["created", "paid", "preparing"])("cancela quando status=%s e tasks ainda em fila", async (status) => {
-    const { svc, tx, refund, tracking } = setupCancel({ status, tasks: [{ id: "t1", status: "queued" }] });
-    const res = await svc.cancel("u1", "order1");
-    expect(tx.pickTask.deleteMany).toHaveBeenCalledWith({ where: { id: { in: ["t1"] } } });
-    expect(tx.orderGroup.updateMany).toHaveBeenCalledWith({ where: { orderId: "order1" }, data: { status: "canceled" } });
-    expect(refund.issueCancelRefund).toHaveBeenCalledWith("order1");
-    expect(tracking.emit).toHaveBeenCalledWith("order1");
-    expect(res).toMatchObject({ status: "canceled" });
+  it.each(["created", "paid", "preparing"])(
+    "status=%s e tasks ainda em fila: cancela e emite order.canceled NA MESMA TX",
+    async (status) => {
+      const { svc, tx, outbox } = setupCancel({ status, tasks: [{ id: "t1", status: "queued" }] });
+      const res = await svc.cancel("u1", "order1");
+      expect(tx.pickTask.deleteMany).toHaveBeenCalledWith({ where: { id: { in: ["t1"] } } });
+      expect(tx.orderGroup.updateMany).toHaveBeenCalledWith({ where: { orderId: "order1" }, data: { status: "canceled" } });
+      // o publish recebe o CLIENT TRANSACIONAL — atômico com o cancelamento
+      expect(outbox.publish).toHaveBeenCalledTimes(1);
+      expect(outbox.publish).toHaveBeenCalledWith(tx, {
+        type: "order.canceled",
+        payload: { orderId: "order1", deliverySlotId: null },
+        aggregateId: "order1",
+      });
+      // resposta imediata preservada: devolve o pedido cancelado
+      expect(res).toMatchObject({ status: "canceled" });
+    },
+  );
+
+  it("pedido com slot: o payload carrega o deliverySlotId (handler liberar-slot usa)", async () => {
+    const { svc, outbox } = setupCancel({ status: "created", deliverySlotId: "slot1" });
+    await svc.cancel("u1", "order1");
+    expect(outbox.publish).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ payload: { orderId: "order1", deliverySlotId: "slot1" } }),
+    );
   });
 
-  it("status já avançado (picking) → CANNOT_CANCEL", async () => {
-    const { svc } = setupCancel({ status: "picking" });
+  it("não orquestra mais side-effects inline (slot/estorno/notificação viraram handlers do evento)", async () => {
+    const { svc, scheduling, tracking } = setupCancel({ status: "paid", deliverySlotId: "slot1" });
+    await svc.cancel("u1", "order1");
+    expect(scheduling.release).not.toHaveBeenCalled();
+    expect(tracking.emit).not.toHaveBeenCalled();
+  });
+
+  it("status já avançado (picking) → CANNOT_CANCEL sem evento", async () => {
+    const { svc, outbox } = setupCancel({ status: "picking" });
     await expect(svc.cancel("u1", "order1")).rejects.toMatchObject({ response: { code: "CANNOT_CANCEL" } });
+    expect(outbox.publish).not.toHaveBeenCalled();
   });
 
-  it("separação já iniciada (PickTask além de assigned) → CANNOT_CANCEL", async () => {
-    const { svc, tx } = setupCancel({ status: "paid", tasks: [{ id: "t1", status: "picking" }] });
+  it("separação já iniciada (PickTask além de assigned) → CANNOT_CANCEL sem evento", async () => {
+    const { svc, tx, outbox } = setupCancel({ status: "paid", tasks: [{ id: "t1", status: "picking" }] });
     await expect(svc.cancel("u1", "order1")).rejects.toMatchObject({ response: { code: "CANNOT_CANCEL" } });
     expect(tx.order.update).not.toHaveBeenCalled();
+    expect(outbox.publish).not.toHaveBeenCalled();
   });
 
   it("task em assigned ainda permite cancelar", async () => {
     const { svc } = setupCancel({ status: "paid", tasks: [{ id: "t1", status: "assigned" }] });
     const res = await svc.cancel("u1", "order1");
     expect(res).toMatchObject({ status: "canceled" });
-  });
-
-  it("libera o slot reservado ao cancelar", async () => {
-    const { svc, scheduling } = setupCancel({ status: "created", deliverySlotId: "slot1" });
-    await svc.cancel("u1", "order1");
-    expect(scheduling.release).toHaveBeenCalledWith("slot1");
   });
 
   it("sem tasks: não chama deleteMany de PickTask", async () => {

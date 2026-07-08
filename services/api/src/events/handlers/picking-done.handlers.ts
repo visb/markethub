@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { IntegrationService } from "../../integration/integration.service";
 import { PushService } from "../../notifications/push.service";
+import { RefundService } from "../../payment";
 import { OrderEvents, OrderTrackingService, PickingEvents } from "../../picking";
 import { PrismaService } from "../../prisma/prisma.service";
 import type { PickingDonePayload } from "../event-types";
@@ -24,6 +25,7 @@ export class PickingDoneHandlers {
     private readonly orderEvents: OrderEvents,
     private readonly pickingEvents: PickingEvents,
     private readonly push: PushService,
+    private readonly refund: RefundService,
   ) {}
 
   /**
@@ -95,5 +97,34 @@ export class PickingDoneHandlers {
           : "Seu pedido foi separado e aguarda coleta.",
       data: { orderId: group.orderId },
     });
+  }
+
+  /**
+   * Estorno de shortfall (SF.3, story 48) — antes chamado síncrono no
+   * completePicking do picking-session (provider no caminho, falha sem retry).
+   * O gatilho "todas as separações concluídas" e a idempotência (refund
+   * existente → no-op; unique orderId) já vivem no maybeIssueRefundForOrder.
+   * Falha do provider propaga → BullMQ retenta esta fila.
+   */
+  async verificarShortfallRefund(payload: PickingDonePayload): Promise<void> {
+    const group = await this.prisma.orderGroup.findUnique({
+      where: { id: payload.orderGroupId },
+      select: { orderId: true },
+    });
+    if (!group) return;
+    await this.refund.maybeIssueRefundForOrder(group.orderId);
+  }
+
+  /**
+   * Esgotamento definitivo dos retries do estorno de shortfall: marca o Refund
+   * `failed` (auditável). Chamado pelo listener de job failed do processor.
+   */
+  async shortfallEsgotado(payload: PickingDonePayload): Promise<void> {
+    const group = await this.prisma.orderGroup.findUnique({
+      where: { id: payload.orderGroupId },
+      select: { orderId: true },
+    });
+    if (!group) return;
+    await this.refund.markFailed(group.orderId);
   }
 }

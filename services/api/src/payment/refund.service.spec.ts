@@ -1,28 +1,45 @@
+import { Prisma } from "@prisma/client";
 import { RefundService } from "./refund.service";
 
 /**
  * Story 20: cobertura do RefundService (SF.3) — orquestração do estorno único por
  * pedido. Cobre estorno integral de cancelamento e estorno consolidado de faltas
- * (peso menor / item recusado), idempotência, falha do provedor e valor já reembolsado.
- * O cálculo puro (itemShortfall) já está coberto em refund.pricing.spec.ts.
+ * (peso menor / item recusado), idempotência e valor já reembolsado. O cálculo
+ * puro (itemShortfall) já está coberto em refund.pricing.spec.ts.
+ *
+ * Story 48 (estorno durável): falha do provider PROPAGA (o chamador é handler de
+ * evento em fila BullMQ — o erro é o que faz o retry), refund `pending` deixado
+ * por tentativa anterior é RETOMADO sem recriar, corrida do unique (P2002) segue
+ * short-circuit silencioso e `failed` só é gravado no esgotamento (markFailed).
  */
 
 type OrderShape = Record<string, unknown> | null;
 
+function p2002() {
+  return new Prisma.PrismaClientKnownRequestError("unique violation", {
+    code: "P2002",
+    clientVersion: "test",
+  });
+}
+
 function makeService(opts: {
   order?: OrderShape;
-  createThrows?: boolean;
+  createError?: Error;
   refundResult?: { refundId: string; raw?: unknown };
   refundThrows?: boolean;
 }) {
-  const refundCreate = opts.createThrows
-    ? jest.fn().mockRejectedValue(new Error("unique violation"))
-    : jest.fn().mockResolvedValue({ id: "ref1" });
+  const refundCreate = opts.createError
+    ? jest.fn().mockRejectedValue(opts.createError)
+    : // ecoa os dados criados (o service processa no gateway com a row criada)
+      jest.fn().mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+        Promise.resolve({ id: "ref1", ...data }),
+      );
   const refundUpdate = jest.fn().mockResolvedValue({});
+  const refundUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
 
   const prisma = {
     order: { findUnique: jest.fn().mockResolvedValue("order" in opts ? opts.order : null) },
-    refund: { create: refundCreate, update: refundUpdate },
+    refund: { create: refundCreate, update: refundUpdate, updateMany: refundUpdateMany },
   } as never;
 
   const refund = opts.refundThrows
@@ -31,7 +48,7 @@ function makeService(opts: {
   const provider = { name: "mock", refund } as never;
 
   const svc = new RefundService(prisma, provider);
-  return { svc, refundCreate, refundUpdate, providerRefund: refund };
+  return { svc, refundCreate, refundUpdate, refundUpdateMany, providerRefund: refund };
 }
 
 const paidPayment = (over: Record<string, unknown> = {}) => ({
@@ -86,13 +103,44 @@ describe("RefundService.issueCancelRefund", () => {
     expect(refundCreate).not.toHaveBeenCalled();
   });
 
-  it("idempotente: já existe reembolso → não recria (REFUND_ALREADY_DONE)", async () => {
+  it("idempotente: reembolso já processado → não recria nem reprocessa", async () => {
     const { svc, refundCreate, providerRefund } = makeService({
-      order: { id: "o1", payment: paidPayment(), refund: { id: "ref0" } },
+      order: { id: "o1", payment: paidPayment(), refund: { id: "ref0", status: "processed" } },
     });
     await svc.issueCancelRefund("o1");
     expect(refundCreate).not.toHaveBeenCalled();
     expect(providerRefund).not.toHaveBeenCalled();
+  });
+
+  it("reembolso já esgotado (failed) → no-op (auditável; não reprocessa sozinho)", async () => {
+    const { svc, refundCreate, providerRefund } = makeService({
+      order: { id: "o1", payment: paidPayment(), refund: { id: "ref0", status: "failed" } },
+    });
+    await svc.issueCancelRefund("o1");
+    expect(refundCreate).not.toHaveBeenCalled();
+    expect(providerRefund).not.toHaveBeenCalled();
+  });
+
+  it("retomada (retry do BullMQ): refund pending de tentativa anterior → reprocessa no gateway SEM recriar", async () => {
+    const { svc, refundCreate, refundUpdate, providerRefund } = makeService({
+      order: {
+        id: "o1",
+        payment: paidPayment(),
+        refund: { id: "ref0", status: "pending", amountCents: 4200, reason: "customer_cancel" },
+      },
+    });
+    await svc.issueCancelRefund("o1");
+    expect(refundCreate).not.toHaveBeenCalled();
+    // usa os dados da PRÓPRIA row pendente (não recalcula do payment)
+    expect(providerRefund).toHaveBeenCalledWith({
+      chargeId: "ch_paid",
+      amountCents: 4200,
+      reason: "customer_cancel",
+    });
+    expect(refundUpdate).toHaveBeenCalledWith({
+      where: { id: "ref0" },
+      data: expect.objectContaining({ status: "processed", providerRefundId: "prov_ref1" }),
+    });
   });
 
   it("não estorna pedido sem pagamento ou não pago", async () => {
@@ -107,22 +155,47 @@ describe("RefundService.issueCancelRefund", () => {
     expect(pending.refundCreate).not.toHaveBeenCalled();
   });
 
-  it("corrida na criação (unique orderId) → ignora sem chamar o provider", async () => {
+  it("corrida na criação (unique P2002) → short-circuit sem erro e sem chamar o provider", async () => {
     const { svc, providerRefund } = makeService({
       order: { id: "o1", payment: paidPayment(), refund: null },
-      createThrows: true,
+      createError: p2002(),
     });
-    await svc.issueCancelRefund("o1");
+    await expect(svc.issueCancelRefund("o1")).resolves.toBeUndefined();
     expect(providerRefund).not.toHaveBeenCalled();
   });
 
-  it("falha do provedor → marca o reembolso como failed", async () => {
+  it("erro de banco que NÃO é P2002 na criação propaga (não mascara como corrida)", async () => {
+    const { svc } = makeService({
+      order: { id: "o1", payment: paidPayment(), refund: null },
+      createError: new Error("db fora"),
+    });
+    await expect(svc.issueCancelRefund("o1")).rejects.toThrow("db fora");
+  });
+
+  it("falha do provedor PROPAGA (job retenta) e NÃO crava failed — refund segue pending", async () => {
     const { svc, refundUpdate } = makeService({
       order: { id: "o1", payment: paidPayment(), refund: null },
       refundThrows: true,
     });
-    await svc.issueCancelRefund("o1");
-    expect(refundUpdate).toHaveBeenCalledWith({ where: { id: "ref1" }, data: { status: "failed" } });
+    await expect(svc.issueCancelRefund("o1")).rejects.toThrow("gateway down");
+    expect(refundUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe("RefundService.markFailed (esgotamento dos retries — story 48)", () => {
+  it("marca failed apenas refund ainda pending do pedido", async () => {
+    const { svc, refundUpdateMany } = makeService({});
+    await svc.markFailed("o1");
+    expect(refundUpdateMany).toHaveBeenCalledWith({
+      where: { orderId: "o1", status: "pending" },
+      data: { status: "failed" },
+    });
+  });
+
+  it("sem refund pending (processed venceu a corrida ou nada criado) → no-op silencioso", async () => {
+    const { svc, refundUpdateMany } = makeService({});
+    refundUpdateMany.mockResolvedValue({ count: 0 });
+    await expect(svc.markFailed("o1")).resolves.toBeUndefined();
   });
 });
 
@@ -272,17 +345,40 @@ describe("RefundService.maybeIssueRefundForOrder", () => {
     expect(refundCreate).not.toHaveBeenCalled();
   });
 
-  it("idempotente: já existe reembolso → não recria", async () => {
-    const { svc, refundCreate } = makeService({
+  it("idempotente: já existe reembolso processado → não recria", async () => {
+    const { svc, refundCreate, providerRefund } = makeService({
       order: {
         id: "o1",
         payment: paidPayment(),
-        refund: { id: "ref0" },
+        refund: { id: "ref0", status: "processed" },
         groups: [group("packed", [weightShortItem()])],
       },
     });
     await svc.maybeIssueRefundForOrder("o1");
     expect(refundCreate).not.toHaveBeenCalled();
+    expect(providerRefund).not.toHaveBeenCalled();
+  });
+
+  it("retomada (retry do BullMQ): refund pending anterior → reprocessa no gateway SEM recriar", async () => {
+    const { svc, refundCreate, refundUpdate, providerRefund } = makeService({
+      order: {
+        id: "o1",
+        payment: paidPayment(),
+        refund: { id: "ref0", status: "pending", amountCents: 200, reason: "weight_shortfall" },
+        groups: [group("packed", [weightShortItem()])],
+      },
+    });
+    await svc.maybeIssueRefundForOrder("o1");
+    expect(refundCreate).not.toHaveBeenCalled();
+    expect(providerRefund).toHaveBeenCalledWith({
+      chargeId: "ch_paid",
+      amountCents: 200,
+      reason: "weight_shortfall",
+    });
+    expect(refundUpdate).toHaveBeenCalledWith({
+      where: { id: "ref0" },
+      data: expect.objectContaining({ status: "processed" }),
+    });
   });
 
   it("pedido não pago → não estorna", async () => {
@@ -298,7 +394,7 @@ describe("RefundService.maybeIssueRefundForOrder", () => {
     expect(refundCreate).not.toHaveBeenCalled();
   });
 
-  it("corrida na criação (unique) → ignora sem chamar o provider", async () => {
+  it("corrida na criação (unique P2002) → short-circuit sem erro e sem chamar o provider", async () => {
     const { svc, providerRefund } = makeService({
       order: {
         id: "o1",
@@ -306,13 +402,13 @@ describe("RefundService.maybeIssueRefundForOrder", () => {
         refund: null,
         groups: [group("packed", [weightShortItem()])],
       },
-      createThrows: true,
+      createError: p2002(),
     });
-    await svc.maybeIssueRefundForOrder("o1");
+    await expect(svc.maybeIssueRefundForOrder("o1")).resolves.toBeUndefined();
     expect(providerRefund).not.toHaveBeenCalled();
   });
 
-  it("falha do provedor → marca reembolso failed", async () => {
+  it("falha do provedor PROPAGA (job retenta) e NÃO crava failed", async () => {
     const { svc, refundUpdate } = makeService({
       order: {
         id: "o1",
@@ -322,7 +418,7 @@ describe("RefundService.maybeIssueRefundForOrder", () => {
       },
       refundThrows: true,
     });
-    await svc.maybeIssueRefundForOrder("o1");
-    expect(refundUpdate).toHaveBeenCalledWith({ where: { id: "ref1" }, data: { status: "failed" } });
+    await expect(svc.maybeIssueRefundForOrder("o1")).rejects.toThrow("gateway down");
+    expect(refundUpdate).not.toHaveBeenCalled();
   });
 });

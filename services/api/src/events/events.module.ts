@@ -4,8 +4,16 @@ import type { Queue } from "bullmq";
 import { ErpModule } from "../erp/erp.module";
 import { IntegrationModule } from "../integration/integration.module";
 import { PixChargeModule } from "../payment/pix-charge.module";
+import { RefundModule } from "../payment/refund.module";
 import { PickingModule } from "../picking/picking.module";
+import { SchedulingModule } from "../scheduling/scheduling.module";
 import { EventIdempotencyService } from "./event-idempotency.service";
+import { OrderCanceledHandlers } from "./handlers/order-canceled.handlers";
+import {
+  OrderCanceledEmitirEstornoProcessor,
+  OrderCanceledLiberarSlotProcessor,
+  OrderCanceledNotificarProcessor,
+} from "./handlers/order-canceled.processor";
 import { OrderCreatedHandlers } from "./handlers/order-created.handlers";
 import {
   OrderCreatedGerarCobrancaPixProcessor,
@@ -21,6 +29,7 @@ import { PickingDoneHandlers } from "./handlers/picking-done.handlers";
 import {
   PickingDoneIniciarEntregaProcessor,
   PickingDoneNotificarProcessor,
+  PickingDoneVerificarShortfallRefundProcessor,
 } from "./handlers/picking-done.processor";
 import { OutboxModule } from "./outbox.module";
 import { OUTBOX_RELAY_QUEUE, OutboxRelayProcessor } from "./outbox-relay.processor";
@@ -32,7 +41,8 @@ import { HANDLER_QUEUE_NAMES, HANDLER_QUEUES } from "./subscriptions";
  * Eventos de domínio (story 45): transactional outbox + relay por poll + fan-out
  * por subscriber. Re-exporta o OutboxModule (publisher) p/ os agregados emitirem
  * eventos na própria TX; o resto (relay, filas por handler, idempotência) é
- * interno. Story 46 adiciona os handlers de `order.created` e `picking.done`.
+ * interno. Story 46 adiciona os handlers de `order.created` e `picking.done`;
+ * story 48 os de `order.canceled` + o shortfall refund no `picking.done`.
  */
 @Module({
   imports: [
@@ -45,6 +55,8 @@ import { HANDLER_QUEUE_NAMES, HANDLER_QUEUES } from "./subscriptions";
     IntegrationModule,
     PickingModule,
     PixChargeModule,
+    RefundModule,
+    SchedulingModule,
   ],
   providers: [
     OutboxRelayService,
@@ -61,6 +73,11 @@ import { HANDLER_QUEUE_NAMES, HANDLER_QUEUES } from "./subscriptions";
     PickingDoneHandlers,
     PickingDoneIniciarEntregaProcessor,
     PickingDoneNotificarProcessor,
+    PickingDoneVerificarShortfallRefundProcessor,
+    OrderCanceledHandlers,
+    OrderCanceledLiberarSlotProcessor,
+    OrderCanceledEmitirEstornoProcessor,
+    OrderCanceledNotificarProcessor,
     {
       provide: HANDLER_QUEUES,
       useFactory: (...queues: Queue[]) =>

@@ -2,11 +2,9 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
-  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import { computeItemTotal } from "../shared/pricing";
-import { RefundService } from "../payment/refund.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { OrderTrackingService } from "./order-tracking.service";
 import { PickingEvents } from "./picking.events";
@@ -29,12 +27,9 @@ export interface UpdatePickItemInput {
  */
 @Injectable()
 export class PickingSessionService {
-  private readonly logger = new Logger(PickingSessionService.name);
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly events: PickingEvents,
-    private readonly refunds: RefundService,
     private readonly tracking: OrderTrackingService,
   ) {}
 
@@ -168,19 +163,9 @@ export class PickingSessionService {
       data: { status: "packed", packedAt: new Date() },
     });
 
-    // Reembolso único por pedido (SF.3): dispara quando todas as separações do
-    // pedido concluem. Idempotente; não falha a conclusão se o estorno falhar.
-    const group = await this.prisma.orderGroup.findUnique({
-      where: { id: task.orderGroupId },
-      select: { orderId: true },
-    });
-    if (group) {
-      try {
-        await this.refunds.maybeIssueRefundForOrder(group.orderId);
-      } catch (e) {
-        this.logger.error(`Estorno do pedido ${group.orderId} falhou: ${String(e)}`);
-      }
-    }
+    // Reembolso de shortfall (SF.3): saiu do caminho síncrono (story 48) — o
+    // handler `verificar-shortfall-refund` do evento `picking.done` (emitido no
+    // markReady) chama maybeIssueRefundForOrder com retry durável do provider.
     // snapshot final da separação ao dono (status segue "picking" até markReady).
     // Best-effort. Story 01.
     await this.tracking.emitForGroup(task.orderGroupId);
