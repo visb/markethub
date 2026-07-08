@@ -14,12 +14,13 @@ function makeService(prismaOverrides: Record<string, unknown>, tracking?: Record
     itemUpdated: jest.fn(),
     taskStatusChanged: jest.fn(),
   } as never;
-  const refunds = { maybeIssueRefundForOrder: jest.fn().mockResolvedValue(undefined) } as never;
   const track = (tracking ?? {
     recomputeAndEmit: jest.fn().mockResolvedValue(undefined),
     emitForGroup: jest.fn().mockResolvedValue(undefined),
   }) as never;
-  return new PickingSessionService(prisma, events, refunds, track);
+  // story 48: RefundService saiu do construtor — o estorno de shortfall virou
+  // handler do evento `picking.done` (verificar-shortfall-refund).
+  return new PickingSessionService(prisma, events, track);
 }
 
 describe("PickingSessionService.recalcTotals", () => {
@@ -311,7 +312,6 @@ describe("PickingSessionService.completePicking — emit final (story 01)", () =
         pickItem: { count: jest.fn().mockResolvedValue(0) },
         orderGroup: {
           findUniqueOrThrow: jest.fn().mockResolvedValue({ orderId: "o1", items: [] }),
-          findUnique: jest.fn().mockResolvedValue({ orderId: "o1" }),
           update: jest.fn().mockResolvedValue({}),
         },
         order: {

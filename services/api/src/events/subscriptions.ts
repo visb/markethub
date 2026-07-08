@@ -14,12 +14,25 @@ export const ORDER_PAID_GERAR_PICKING = "order-paid.gerar-picking";
 export const ORDER_PAID_NOTIFICAR = "order-paid.notificar";
 export const PICKING_DONE_INICIAR_ENTREGA = "picking-done.iniciar-entrega";
 export const PICKING_DONE_NOTIFICAR = "picking-done.notificar";
+export const PICKING_DONE_VERIFICAR_SHORTFALL_REFUND = "picking-done.verificar-shortfall-refund";
+export const ORDER_CANCELED_LIBERAR_SLOT = "order-canceled.liberar-slot";
+export const ORDER_CANCELED_EMITIR_ESTORNO = "order-canceled.emitir-estorno";
+export const ORDER_CANCELED_NOTIFICAR = "order-canceled.notificar";
 
 /** eventType → handlers inscritos. */
 export const SUBSCRIPTIONS: Record<DomainEventType, readonly string[]> = {
   "order.created": [ORDER_CREATED_GERAR_COBRANCA_PIX, ORDER_CREATED_NOTIFICAR],
   "order.paid": [ORDER_PAID_PUSH_ERP, ORDER_PAID_GERAR_PICKING, ORDER_PAID_NOTIFICAR],
-  "picking.done": [PICKING_DONE_INICIAR_ENTREGA, PICKING_DONE_NOTIFICAR],
+  "picking.done": [
+    PICKING_DONE_INICIAR_ENTREGA,
+    PICKING_DONE_NOTIFICAR,
+    PICKING_DONE_VERIFICAR_SHORTFALL_REFUND,
+  ],
+  "order.canceled": [
+    ORDER_CANCELED_LIBERAR_SLOT,
+    ORDER_CANCELED_EMITIR_ESTORNO,
+    ORDER_CANCELED_NOTIFICAR,
+  ],
 };
 
 /** Todas as filas de handler (p/ registerQueue + injeção do mapa no relay). */

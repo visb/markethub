@@ -36,6 +36,10 @@ function makeHandlers(opts: {
   const orderEvents = { statusChanged: jest.fn() };
   const pickingEvents = { readyForPickup: jest.fn() };
   const push = { sendToUser: jest.fn().mockResolvedValue(undefined) };
+  const refund = {
+    maybeIssueRefundForOrder: jest.fn().mockResolvedValue(undefined),
+    markFailed: jest.fn().mockResolvedValue(undefined),
+  };
   const svc = new PickingDoneHandlers(
     prisma,
     tracking as never,
@@ -43,8 +47,19 @@ function makeHandlers(opts: {
     orderEvents as never,
     pickingEvents as never,
     push as never,
+    refund as never,
   );
-  return { svc, groupFindUnique, deliveryUpsert, tracking, integration, orderEvents, pickingEvents, push };
+  return {
+    svc,
+    groupFindUnique,
+    deliveryUpsert,
+    tracking,
+    integration,
+    orderEvents,
+    pickingEvents,
+    push,
+    refund,
+  };
 }
 
 const payload = { orderGroupId: "g1" };
@@ -161,5 +176,46 @@ describe("PickingDoneHandlers.notificar", () => {
     integration.emit.mockRejectedValue(new Error("webhook fora"));
     await expect(svc.notificar(payload)).rejects.toThrow("webhook fora");
     expect(deliveryUpsert).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Story 48: estorno de shortfall saiu do completePicking síncrono (provider no
+ * caminho, sem retry) e virou handler do `picking.done`. O gatilho "todas as
+ * separações concluídas" e a idempotência (refund existente → no-op; unique
+ * orderId) já vivem no maybeIssueRefundForOrder — cobertos no spec do refund.
+ */
+describe("PickingDoneHandlers.verificarShortfallRefund", () => {
+  it("resolve o orderId do grupo e delega ao maybeIssueRefundForOrder", async () => {
+    const { svc, refund } = makeHandlers();
+    await svc.verificarShortfallRefund(payload);
+    expect(refund.maybeIssueRefundForOrder).toHaveBeenCalledWith("o1");
+  });
+
+  it("grupo inexistente (cascade delete): no-op sem explodir", async () => {
+    const { svc, refund } = makeHandlers({ group: null });
+    await svc.verificarShortfallRefund(payload);
+    expect(refund.maybeIssueRefundForOrder).not.toHaveBeenCalled();
+  });
+
+  it("falha do provider PROPAGA (BullMQ retenta só esta fila; failed apenas no esgotamento)", async () => {
+    const { svc, refund } = makeHandlers();
+    refund.maybeIssueRefundForOrder.mockRejectedValue(new Error("gateway down"));
+    await expect(svc.verificarShortfallRefund(payload)).rejects.toThrow("gateway down");
+    expect(refund.markFailed).not.toHaveBeenCalled();
+  });
+});
+
+describe("PickingDoneHandlers.shortfallEsgotado (retries esgotados)", () => {
+  it("marca o refund do pedido como failed (auditável)", async () => {
+    const { svc, refund } = makeHandlers();
+    await svc.shortfallEsgotado(payload);
+    expect(refund.markFailed).toHaveBeenCalledWith("o1");
+  });
+
+  it("grupo inexistente: no-op", async () => {
+    const { svc, refund } = makeHandlers({ group: null });
+    await svc.shortfallEsgotado(payload);
+    expect(refund.markFailed).not.toHaveBeenCalled();
   });
 });

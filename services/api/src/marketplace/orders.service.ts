@@ -3,9 +3,6 @@ import { Prisma } from "@prisma/client";
 import type { DeliveryMethod, FulfillmentType } from "@prisma/client";
 import { shortCode } from "../common/codes";
 import { OutboxPublisher } from "../events";
-import { IntegrationService } from "../integration";
-import { RefundService } from "../payment/refund.service";
-import { OrderEvents } from "../picking/order.events";
 import { OrderTrackingService } from "../picking/order-tracking.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { SchedulingService } from "../scheduling/scheduling.service";
@@ -29,9 +26,6 @@ export class OrdersService {
     private readonly cart: CartService,
     private readonly tracking: OrderTrackingService,
     private readonly scheduling: SchedulingService,
-    private readonly refund: RefundService,
-    private readonly integration: IntegrationService,
-    private readonly orderEvents: OrderEvents,
     private readonly outbox: OutboxPublisher,
   ) {}
 
@@ -237,8 +231,15 @@ export class OrdersService {
   /**
    * Cancela o pedido. Permitido antes da separação começar:
    * - created (não pago): só cancela;
-   * - paid/preparing com todas as separações ainda não iniciadas: cancela,
-   *   remove as tarefas da fila e emite estorno integral.
+   * - paid/preparing com todas as separações ainda não iniciadas: cancela e
+   *   remove as tarefas da fila.
+   *
+   * A TX cancela order + groups + pickTasks e emite `order.canceled` no outbox
+   * NA MESMA TX (story 48) — commit sem evento é impossível. Liberação do slot,
+   * estorno integral (antes: PROVIDER no request do cliente; crash pós-TX =
+   * dinheiro perdido) e notificações viraram handlers do evento — duráveis, com
+   * retry isolado. A resposta HTTP segue imediata (pedido cancelado); o estado
+   * do estorno é exposto via detail() (`refund { status }`).
    */
   async cancel(userId: string, id: string) {
     const order = await this.detail(userId, id);
@@ -260,36 +261,19 @@ export class OrdersService {
       });
     }
 
-    const canceled = await this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx) => {
       if (tasks.length > 0) {
         await tx.pickTask.deleteMany({ where: { id: { in: tasks.map((t) => t.id) } } });
       }
       await tx.orderGroup.updateMany({ where: { orderId: id }, data: { status: "canceled" } });
-      return tx.order.update({ where: { id }, data: { status: "canceled" } });
+      const canceled = await tx.order.update({ where: { id }, data: { status: "canceled" } });
+      await this.outbox.publish(tx, {
+        type: "order.canceled",
+        payload: { orderId: id, deliverySlotId: order.deliverySlotId ?? null },
+        aggregateId: id,
+      });
+      return canceled;
     });
-
-    // libera a vaga do slot reservado (S5.3)
-    if (order.deliverySlotId) await this.scheduling.release(order.deliverySlotId);
-    // estorno integral se já pago
-    await this.refund.issueCancelRefund(id);
-    // rastreio em tempo real
-    await this.tracking.emit(id);
-    // webhook order.status_changed → canceled (story 09) + socket (story 12)
-    for (const g of order.groups) {
-      void this.integration.emit(g.merchantId, "order.status_changed", {
-        orderId: id,
-        merchantId: g.merchantId,
-        storeId: g.storeId,
-        status: "canceled",
-      });
-      this.orderEvents.statusChanged({
-        orderId: id,
-        merchantId: g.merchantId,
-        storeId: g.storeId,
-        status: "canceled",
-      });
-    }
-    return canceled;
   }
 
   private async assertAddress(userId: string, addressId?: string | null) {
