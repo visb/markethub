@@ -9,7 +9,7 @@ Cuidados da rodada: migrations novas (OutboxEvent, ProcessedEvent na 45) — nun
 | 45 | Eventos de domínio — outbox + relay + migração `order.paid` | — | done |
 | 46 | Eventos de domínio p2 — `order.created` → PIX · `picking.done` → entrega | 45 | done |
 | 47 | Modular monolith — travar fronteiras de contexto (lint + allow-list) | 45,46 | done |
-| 48 | Eventos de domínio p3 — `order.canceled` + estorno durável com retry | 45 (46 pref.) | todo |
+| 48 | Eventos de domínio p3 — `order.canceled` + estorno durável com retry | 45 (46 pref.) | done |
 | 49 | Push notifications assíncronas — fila BullMQ atrás do `PushService` | — | todo |
 
 ## Log
@@ -24,3 +24,6 @@ Nota: corrigiu bug latente da 45 (jobId com `:` rejeitado pelo BullMQ → relay 
 
 [OK] 47 — testes: api 967/967 + e2e 111/111; coverage 83.57% linhas; lint com regra de fronteira verde — commit: 5faecdd — merge: 2e6c067 — 2026-07-07
 Nota: allow-list herdada = 7 arestas, todas do ciclo payment↔fulfillment (follow-up: fachada order-status + reembolso por evento). Detalhe em docs/context-boundaries.md.
+
+[OK] 48 — testes: api 997/997 (92 suítes) + e2e 111/111 + diff-coverage 100%; coverage 83.68% linhas — commit: 76d141a — merge: f7fd951 — 2026-07-08
+Nota: drenou 4 arestas da allow-list de fronteira (todo o lado fulfillment→payment); restam 2 (payment→marketplace). Retry de estorno: attempts=5, backoff exponencial 5s, markFailed só na última tentativa.
