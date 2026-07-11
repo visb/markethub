@@ -24,11 +24,6 @@ customer (polish).
 
 ## App picker
 
-### 14. Scanner de código de barras na separação
-Picking real é bipar produto. `expo-barcode-scanner`/`expo-camera` na tela de tarefa:
-- Bipar GTIN confirma item (evita erro de separação); divergência → fluxo de substituição.
-- Fallback manual permanece.
-
 ### 15. Aprovação de substituição pelo cliente
 Substituição hoje é decisão unilateral do picker (autocomplete, story 03). Completar o loop:
 - Push/realtime pro cliente propondo substituto → aprovar/recusar com timeout (auto-aprova ou
