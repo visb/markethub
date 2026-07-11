@@ -1,11 +1,14 @@
 /**
- * Cliente Socket.IO compartilhado (realtime). Conecta ao namespace `/picking`
- * com o JWT no handshake (`auth.token`) — mesmo contrato do PickingGateway.
- * Usado pelo rastreio de pedido em tempo real (S5.1 / story 02).
+ * Cliente Socket.IO compartilhado (realtime). Conecta a um namespace (default
+ * `/picking`) com o JWT no handshake (`auth.token`) — mesmo contrato dos
+ * gateways. Usado pelo rastreio de pedido em tempo real (S5.1 / story 02) e pelo
+ * rastreio de entrega ao vivo no namespace `/delivery` (story 51).
  */
 import { io, type Socket } from "socket.io-client";
 import {
   PICKING_NAMESPACE,
+  DELIVERY_NAMESPACE,
+  DRIVER_LOCATION_EVENT,
   ORDER_UPDATED_EVENT,
   PICK_TASK_UPDATED_EVENT,
   ORDER_CREATED_EVENT,
@@ -28,16 +31,19 @@ export interface RealtimeClient {
 export interface RealtimeOptions {
   url: string;
   getToken: () => string | null | Promise<string | null>;
+  /** Namespace Socket.IO. Default `/picking` (compat com consumidores atuais). */
+  namespace?: string;
 }
 
 export function createRealtimeClient(opts: RealtimeOptions): RealtimeClient {
   let socket: Socket | null = null;
+  const namespace = opts.namespace ?? PICKING_NAMESPACE;
   // Handlers registrados antes do connect são reaplicados ao socket criado.
   const handlers = new Map<string, Set<(payload: unknown) => void>>();
 
   function getSocket(): Socket {
     if (socket) return socket;
-    socket = io(`${opts.url}${PICKING_NAMESPACE}`, {
+    socket = io(`${opts.url}${namespace}`, {
       // Token resolvido a cada (re)conexão — suporta getToken sync ou async.
       auth: (cb: (data: { token: string | null }) => void) => {
         void Promise.resolve(opts.getToken()).then((token) => cb({ token }));
@@ -89,4 +95,6 @@ export {
   PICK_TASK_UPDATED_EVENT,
   ORDER_CREATED_EVENT,
   ORDER_STATUS_CHANGED_EVENT,
+  DELIVERY_NAMESPACE,
+  DRIVER_LOCATION_EVENT,
 };

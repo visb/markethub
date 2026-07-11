@@ -71,6 +71,11 @@ Decisões travadas (planning 2026-07-11):
 - `pnpm typecheck` + `pnpm build`.
 - Manual (registrar na story ao concluir): rastreio segue emitindo com app em background/tela
   bloqueada num device físico Android.
+  - **PENDENTE-MANUAL:** background/tela bloqueada em device físico Android não é validável em
+    CI/emulador (permissão "o tempo todo" + foreground service). A camada de device
+    (`expo-location` + `expo-task-manager`) está atrás de interface e coberta por testes com mock;
+    a emissão real em background exige um Android físico. Config declarada em `app.json`
+    (ACCESS_BACKGROUND_LOCATION, FOREGROUND_SERVICE_LOCATION, UIBackgroundModes: location).
 
 ## Fora de escopo
 

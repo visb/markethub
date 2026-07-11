@@ -466,6 +466,17 @@ export class ApiClient {
     return this.request(`/driver/deliveries/${id}/deliver`, { method: "POST", body: { deliveryCode }, auth: true });
   }
 
+  /**
+   * Rastreio ao vivo (story 51): publica a posição do entregador para a entrega
+   * em trânsito. Ingest throttled — o backend faz o fan-out via Socket.IO.
+   */
+  driverPublishLocation(
+    id: string,
+    body: { lat: number; lng: number; heading?: number | null; recordedAt: string },
+  ): Promise<{ accepted: boolean }> {
+    return this.request(`/driver/deliveries/${id}/location`, { method: "POST", body, auth: true });
+  }
+
   // ─── Entregador: seleção de veículo (story 15) ───────
   /** Veículos `active` da rede da(s) loja(s) do entregador, p/ selecionar. */
   driverVehicles(): Promise<DriverVehicleDTO[]> {

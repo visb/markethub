@@ -6,8 +6,34 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Button, Text, colors, radius, spacing } from "@markethub/ui";
 import { brl, type OrderTracking, type SubstitutionView } from "@/api/marketplace";
 import { useOrderTracking } from "@/api/hooks/useOrderTracking";
+import { useDeliveryLocation } from "@/api/hooks/useDeliveryLocation";
+import { DeliveryMap } from "@/components/DeliveryMap";
+import { DEFAULT_DELTA, hasCoords, type LatLng, type MapRegion } from "@/lib/mapRegion";
 import { Header } from "@/components/Header";
 import { MerchantLogo } from "@/components/MerchantLogo";
+
+/** Origem do mapa: coordenadas da 1ª loja de entrega do pedido (own-store). */
+function storeCoords(data: OrderTracking): LatLng | null {
+  const g = data.groups.find(
+    (grp) => grp.fulfillment === "delivery" && grp.storeLat != null && grp.storeLng != null,
+  );
+  return g ? { latitude: g.storeLat as number, longitude: g.storeLng as number } : null;
+}
+
+/** Destino do mapa: coordenadas do endereço de entrega (snapshot). */
+function destinationCoords(data: OrderTracking): LatLng | null {
+  const a = data.address;
+  if (a && hasCoords({ latitude: a.lat, longitude: a.lng })) {
+    return { latitude: a.lat as number, longitude: a.lng as number };
+  }
+  return null;
+}
+
+/** Enquadra o mapa: entregador > destino > loja, com zoom de bairro. */
+function mapRegionFor(driver: LatLng | null, dest: LatLng | null, store: LatLng | null): MapRegion | null {
+  const center = driver ?? dest ?? store;
+  return center ? { ...center, ...DEFAULT_DELTA } : null;
+}
 
 // Macro-etapas da visão do cliente (ref: Confirmed.jpg / Picking.jpg):
 // Pedido confirmado → Comprando (separação) → A caminho (ou Pronto p/ retirar).
@@ -34,6 +60,10 @@ export default function TrackScreen() {
   const { tracking: data, substitutions: subs, loading, busy, decideSubstitution, cancelOrder } =
     useOrderTracking(id);
   const [showItems, setShowItems] = useState(false);
+
+  // Mapa ao vivo só na etapa de entrega em andamento com entrega own-store.
+  const deliveryInProgress = data?.status === "on_the_way" && !!data.hasDelivery;
+  const { driver } = useDeliveryLocation(id, deliveryInProgress);
 
   async function decideSub(sub: SubstitutionView, approve: boolean) {
     await decideSubstitution(sub.id, approve);
@@ -91,6 +121,20 @@ export default function TrackScreen() {
             <Text style={styles.eta}>{etaLabel(data.etaWindow)}</Text>
           </View>
         )}
+
+        {/* Mapa ao vivo (story 51): loja, destino e entregador em tempo real */}
+        {deliveryInProgress &&
+          (() => {
+            const store = storeCoords(data);
+            const dest = destinationCoords(data);
+            const region = mapRegionFor(driver, dest, store);
+            if (!region) return null;
+            return (
+              <View style={styles.mapCard} testID="delivery-map">
+                <DeliveryMap initialRegion={region} store={store} destination={dest} driver={driver} />
+              </View>
+            );
+          })()}
 
         {data.address && (
           <View style={styles.card}>
@@ -271,6 +315,13 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   codeCard: { borderColor: colors.primary, alignItems: "center" },
+  mapCard: {
+    height: 220,
+    borderRadius: radius.md,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   code: { fontSize: 30, fontWeight: "800", letterSpacing: 6, color: colors.primary },
   stepRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.sm },
   dot: {

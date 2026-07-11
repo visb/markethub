@@ -224,6 +224,8 @@ describe("useOrderTracking", () => {
             orderGroupId: "g1",
             storeId: "s1",
             storeName: "Loja",
+            storeLat: null,
+            storeLng: null,
             merchantId: "m1",
             merchantName: "M",
             merchantLogoUrl: null,

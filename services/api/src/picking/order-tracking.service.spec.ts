@@ -93,6 +93,78 @@ describe("OrderTrackingService.recomputeAndEmit — agregação compartilhada", 
   });
 });
 
+describe("OrderTrackingService.build — coordenadas do rastreio ao vivo (story 51)", () => {
+  it("expõe storeLat/storeLng do grupo e lat/lng do endereço de entrega", async () => {
+    const prisma = {
+      order: {
+        findUniqueOrThrow: jest.fn().mockResolvedValue({
+          id: "o1",
+          status: "on_the_way",
+          deliveryCode: "1234",
+          updatedAt: new Date("2026-01-01"),
+          createdAt: new Date("2026-01-01"),
+          scheduledFrom: null,
+          scheduledTo: null,
+          totalCents: 5000,
+          addressSnapshot: {
+            street: "Rua X",
+            number: "10",
+            city: "SP",
+            latitude: -23.55,
+            longitude: -46.63,
+          },
+          groups: [
+            {
+              id: "g1",
+              storeId: "s1",
+              merchantId: "m1",
+              status: "on_the_way",
+              fulfillment: "delivery",
+              subtotalCents: 5000,
+              store: { name: "Loja", latitude: -23.5, longitude: -46.6, avgPrepMinutes: 20 },
+              merchant: { name: "Rede", logoUrl: null },
+              delivery: { status: "picked_up", driver: { name: "João" } },
+              pickTask: null,
+            },
+          ],
+        }),
+      },
+    } as never;
+    const svc = new OrderTrackingService(prisma, { emitToOrder: jest.fn() } as never);
+    const tracking = await svc.build("o1");
+    expect(tracking.groups[0]).toMatchObject({ storeLat: -23.5, storeLng: -46.6 });
+    expect(tracking.address).toMatchObject({
+      street: "Rua X",
+      number: "10",
+      city: "SP",
+      lat: -23.55,
+      lng: -46.63,
+    });
+  });
+
+  it("endereço sem coordenadas: lat/lng nulos", async () => {
+    const prisma = {
+      order: {
+        findUniqueOrThrow: jest.fn().mockResolvedValue({
+          id: "o1",
+          status: "preparing",
+          deliveryCode: null,
+          updatedAt: new Date("2026-01-01"),
+          createdAt: new Date("2026-01-01"),
+          scheduledFrom: null,
+          scheduledTo: null,
+          totalCents: 0,
+          addressSnapshot: { street: "Rua Y", number: "1" },
+          groups: [],
+        }),
+      },
+    } as never;
+    const svc = new OrderTrackingService(prisma, { emitToOrder: jest.fn() } as never);
+    const tracking = await svc.build("o1");
+    expect(tracking.address).toMatchObject({ lat: null, lng: null });
+  });
+});
+
 describe("OrderTrackingService.emitForGroup — best-effort", () => {
   it("não relança quando o build falha", async () => {
     const prisma = {

@@ -534,6 +534,21 @@ describe("ApiClient — endpoints (rota + método + body)", () => {
     await client.driverConfirmDelivery("d1", "DC");
     expect(url(7)).toBe(`${B}/driver/deliveries/d1/deliver`);
     expect(JSON.parse(init(7).body!)).toEqual({ deliveryCode: "DC" });
+    // Rastreio ao vivo (story 51): publica a posição (ingest throttled).
+    await client.driverPublishLocation("d1", {
+      lat: -23.5,
+      lng: -46.6,
+      heading: 90,
+      recordedAt: "2026-07-11T12:00:00.000Z",
+    });
+    expect(url(8)).toBe(`${B}/driver/deliveries/d1/location`);
+    expect(init(8).method).toBe("POST");
+    expect(JSON.parse(init(8).body!)).toEqual({
+      lat: -23.5,
+      lng: -46.6,
+      heading: 90,
+      recordedAt: "2026-07-11T12:00:00.000Z",
+    });
   });
 
   it("store: despacho de entregas e handover", async () => {
@@ -697,5 +712,23 @@ describe("createRealtimeClient", () => {
     rt.connect();
     fakeSocket.connected = true;
     expect(rt.connected).toBe(true);
+  });
+
+  // ── Namespace parametrizado (story 51) ──
+
+  it("sem namespace: mantém o default /picking (compat com consumidores atuais)", () => {
+    const rt = createRealtimeClient({ url: "http://api.test", getToken: () => null });
+    rt.connect();
+    expect(ioMock.mock.calls[0]![0]).toBe("http://api.test/picking");
+  });
+
+  it("namespace /delivery: conecta ao canal do rastreio de entrega ao vivo", () => {
+    const rt = createRealtimeClient({
+      url: "http://api.test",
+      getToken: () => null,
+      namespace: "/delivery",
+    });
+    rt.connect();
+    expect(ioMock.mock.calls[0]![0]).toBe("http://api.test/delivery");
   });
 });
