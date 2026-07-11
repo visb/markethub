@@ -105,6 +105,22 @@ export function isStoreOpen(
   return isOpenAt(hours, dayOfWeek, minuteOfDay);
 }
 
+/**
+ * Política de disponibilidade da loja p/ checkout e badges (story 52). Loja SEM
+ * horário configurado (`hours.length === 0`) é tratada como sempre disponível —
+ * preserva o comportamento pré-52 (não bloqueia checkout nem exibe "Fechado").
+ * Com horário configurado, aplica o cálculo completo (`isStoreOpen`: horário
+ * semanal + fechamento excepcional do dia).
+ */
+export function isStoreAvailable(
+  hours: StoreHoursSlot[],
+  closures: (Date | string)[],
+  now: Date = new Date(),
+): boolean {
+  if (hours.length === 0) return true;
+  return isStoreOpen(hours, closures, now);
+}
+
 /** Faixa de hoje (opensAt/closesAt) ou null se hoje é fechado (folga/closure). */
 export function todayHours(
   hours: StoreHoursSlot[],

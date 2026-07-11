@@ -1,6 +1,7 @@
 import {
   closureDateISO,
   isOpenAt,
+  isStoreAvailable,
   isStoreOpen,
   nextOpening,
   saoPauloNow,
@@ -61,6 +62,22 @@ describe("isStoreOpen (horário + fechamento excepcional)", () => {
   });
   it("aceita Date @db.Date como fechamento", () => {
     expect(isStoreOpen(HOURS, [new Date("2026-06-28T00:00:00Z")], SUN_0900)).toBe(false);
+  });
+});
+
+describe("isStoreAvailable (política de disponibilidade)", () => {
+  it("loja SEM horário configurado → sempre disponível (pré-52)", () => {
+    expect(isStoreAvailable([], [], SUN_2000)).toBe(true);
+    expect(isStoreAvailable([], ["2026-06-28"], SUN_0900)).toBe(true);
+  });
+  it("loja COM horário e dentro da janela → disponível", () => {
+    expect(isStoreAvailable(HOURS, [], SUN_0900)).toBe(true);
+  });
+  it("loja COM horário e fora da janela → indisponível", () => {
+    expect(isStoreAvailable(HOURS, [], SUN_2000)).toBe(false);
+  });
+  it("loja COM horário e fechamento excepcional hoje → indisponível", () => {
+    expect(isStoreAvailable(HOURS, ["2026-06-28"], SUN_0900)).toBe(false);
   });
 });
 

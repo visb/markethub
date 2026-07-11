@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { etaMinutes, haversineKm } from "../common/geo";
 import { PrismaService } from "../prisma/prisma.service";
 import { DOOR_SURCHARGE_CENTS } from "../shared/pricing";
-import { isStoreOpen, nextOpening, todayHours } from "../shared/store-hours";
+import { isStoreAvailable, nextOpening, todayHours } from "../shared/store-hours";
 import { StoreFollowsService } from "../store-follows";
 
 // Re-export dos helpers de horário (kernel `shared/store-hours`) mantendo o ponto
@@ -303,7 +303,7 @@ export class CatalogService {
         etaMinutes: etaMinutes(store.avgPrepMinutes, distanceKm ?? 0),
         following,
         // Estado de funcionamento p/ o badge da página da loja (story 52).
-        openNow: isStoreOpen(store.hours, closures, now),
+        openNow: isStoreAvailable(store.hours, closures, now),
         todayHours: todayHours(store.hours, closures, now),
         nextOpen: next ? { dayOfWeek: next.dayOfWeek, opensAt: next.opensAt } : null,
       },
@@ -373,7 +373,7 @@ export class CatalogService {
       doorFeeCents: store.merchant.deliveryFeeCents + DOOR_SURCHARGE_CENTS,
       allowsPickup: store.allowsPickup,
       // Fechamento excepcional do dia (story 52) sobrepõe o horário semanal.
-      openNow: isStoreOpen(store.hours, store.closures.map((c) => c.date), now),
+      openNow: isStoreAvailable(store.hours, store.closures.map((c) => c.date), now),
     };
   }
 
@@ -587,7 +587,7 @@ function toFeedView(row: FeedRow, geo?: GeoFilter, now: Date = new Date()) {
     deliveryEta: `${eta} min`,
     etaMinutes: eta,
     distanceKm,
-    openNow: isStoreOpen(row.store.hours, row.store.closures.map((c) => c.date), now),
+    openNow: isStoreAvailable(row.store.hours, row.store.closures.map((c) => c.date), now),
     ...row.product,
   };
 }

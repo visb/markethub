@@ -6,7 +6,7 @@ import { OutboxPublisher } from "../events";
 import { OrderTrackingService } from "../picking/order-tracking.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { SchedulingService } from "../scheduling/scheduling.service";
-import { isStoreOpen } from "../shared/store-hours";
+import { isStoreAvailable } from "../shared/store-hours";
 import { CartService } from "./cart.service";
 
 export interface CreateOrderInput {
@@ -286,8 +286,10 @@ export class OrdersService {
 
   /**
    * Bloqueia checkout imediato quando alguma loja do carrinho está fechada agora
-   * (story 52). Considera horário semanal + fechamento excepcional do dia. Em
-   * multi-loja, lista as fechadas na mensagem. Lança `STORE_CLOSED`.
+   * (story 52). Considera horário semanal + fechamento excepcional do dia. Loja
+   * SEM horário configurado é tratada como disponível (comportamento pré-52 —
+   * `isStoreAvailable`). Em multi-loja, lista as fechadas na mensagem. Lança
+   * `STORE_CLOSED`.
    */
   private async assertStoresOpen(storeIds: string[], now: Date = new Date()) {
     if (storeIds.length === 0) return;
@@ -301,7 +303,7 @@ export class OrdersService {
       },
     });
     const closed = stores.filter(
-      (s) => !isStoreOpen(s.hours, s.closures.map((c) => c.date), now),
+      (s) => !isStoreAvailable(s.hours, s.closures.map((c) => c.date), now),
     );
     if (closed.length > 0) {
       const names = closed.map((s) => s.name).join(", ");

@@ -272,22 +272,42 @@ describe("OrdersService.checkout", () => {
     expect(tx.order.create).toHaveBeenCalled();
   });
 
-  // ── Story 52: loja fechada bloqueia checkout imediato ──
+  // ── Story 52: horário de funcionamento no checkout ──
 
-  it("imediato com loja fechada → STORE_CLOSED (sem hora = fechado)", async () => {
+  it("loja SEM horário configurado → checkout imediato passa (comportamento pré-52)", async () => {
     const order = { id: "order1", userId: "u1", status: "created", groups: [] };
     const { svc, tx } = makeDeps({
       address: validAddress,
       order,
-      stores: [{ id: "store1", name: "Europa Centro", hours: [], closures: [] }],
+      stores: [{ id: "store1", name: "Sem horário", hours: [], closures: [] }],
     });
-    await expect(svc.checkout("u1", deliveryInput)).rejects.toMatchObject({
-      response: { code: "STORE_CLOSED", stores: [{ id: "store1", name: "Europa Centro" }] },
-    });
-    expect(tx.order.create).not.toHaveBeenCalled();
+    await svc.checkout("u1", deliveryInput);
+    expect(tx.order.create).toHaveBeenCalled();
   });
 
-  it("imediato: fechamento excepcional hoje → STORE_CLOSED", async () => {
+  it("loja configurada e fechada agora (fora da janela) → STORE_CLOSED", async () => {
+    const now = new Date("2026-06-28T12:00:00Z"); // domingo 09:00 São Paulo
+    const order = { id: "order1", userId: "u1", status: "created", groups: [] };
+    const { svc, tx } = makeDeps({
+      address: validAddress,
+      order,
+      // aberta só na segunda (dayOfWeek 1); domingo → fechada
+      stores: [
+        { id: "store1", name: "Europa Centro", hours: [{ dayOfWeek: 1, opensAt: 480, closesAt: 1320 }], closures: [] },
+      ],
+    });
+    jest.useFakeTimers().setSystemTime(now);
+    try {
+      await expect(svc.checkout("u1", deliveryInput)).rejects.toMatchObject({
+        response: { code: "STORE_CLOSED", stores: [{ id: "store1", name: "Europa Centro" }] },
+      });
+      expect(tx.order.create).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("loja configurada com fechamento excepcional hoje → STORE_CLOSED", async () => {
     const now = new Date("2026-06-28T12:00:00Z"); // domingo 09:00 São Paulo
     const order = { id: "order1", userId: "u1", status: "created", groups: [] };
     const { svc } = makeDeps({
@@ -297,16 +317,11 @@ describe("OrdersService.checkout", () => {
         {
           id: "store1",
           name: "Europa Centro",
-          hours: [{ dayOfWeek: 0, opensAt: 0, closesAt: 1440 }],
-          closures: [{ date: new Date("2026-06-28T00:00:00Z") }],
+          hours: ALWAYS_OPEN_HOURS, // aberta todo dia
+          closures: [{ date: new Date("2026-06-28T00:00:00Z") }], // mas fechada hoje
         },
       ],
     });
-    // injeta o relógio via spy do Date? o service usa new Date() interno; usamos
-    // o cenário "hoje real" fica não-determinístico. Em vez disso validamos a
-    // lógica pura de isStoreOpen no store-hours.spec; aqui garantimos o gate com
-    // hours vazio (teste acima). Este caso confirma que closure é considerado
-    // quando a data bate com o dia atual mockado via jest fake timers.
     jest.useFakeTimers().setSystemTime(now);
     try {
       await expect(svc.checkout("u1", deliveryInput)).rejects.toMatchObject({
@@ -317,7 +332,7 @@ describe("OrdersService.checkout", () => {
     }
   });
 
-  it("agendado com slot futuro válido passa mesmo com loja fechada agora", async () => {
+  it("agendado com slot futuro válido passa (não consulta abertura)", async () => {
     const order = { id: "order1", userId: "u1", status: "created", groups: [] };
     const window = { start: new Date("2026-06-29T10:00:00Z"), end: new Date("2026-06-29T11:00:00Z") };
     const { svc, tx, prisma } = makeDeps({
@@ -333,18 +348,26 @@ describe("OrdersService.checkout", () => {
   });
 
   it("multi-loja: lista apenas a(s) fechada(s) na mensagem", async () => {
+    const now = new Date("2026-06-28T12:00:00Z"); // domingo 09:00 São Paulo
     const order = { id: "order1", userId: "u1", status: "created", groups: [] };
     const { svc } = makeDeps({
       address: validAddress,
       order,
       stores: [
+        // aberta (aberta todo dia) e sem fechamento
         { id: "store1", name: "Aberta", hours: ALWAYS_OPEN_HOURS, closures: [] },
-        { id: "store2", name: "Fechada", hours: [], closures: [] },
+        // configurada mas com fechamento excepcional hoje → fechada
+        { id: "store2", name: "Fechada", hours: ALWAYS_OPEN_HOURS, closures: [{ date: new Date("2026-06-28T00:00:00Z") }] },
       ],
     });
-    await expect(svc.checkout("u1", deliveryInput)).rejects.toMatchObject({
-      response: { code: "STORE_CLOSED", stores: [{ id: "store2", name: "Fechada" }] },
-    });
+    jest.useFakeTimers().setSystemTime(now);
+    try {
+      await expect(svc.checkout("u1", deliveryInput)).rejects.toMatchObject({
+        response: { code: "STORE_CLOSED", stores: [{ id: "store2", name: "Fechada" }] },
+      });
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 
