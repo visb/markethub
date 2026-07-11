@@ -20,11 +20,6 @@ customer (polish).
 
 ## App driver
 
-### 12. Fluxo de problema na entrega
-Hoje só caminho feliz (código de coleta → código de entrega). Falta:
-- Cliente ausente / endereço errado / recusa → registrar ocorrência, notificar loja/cliente,
-  status de retorno à loja. Definir invariantes em `BUSINESS_RULES.md`.
-
 ### 13. Disponibilidade (turno on/off)
 Driver sinaliza disponível/indisponível; loja só atribui/oferece entrega a driver disponível
 (hoje lista todos os `StoreStaff` driver).
