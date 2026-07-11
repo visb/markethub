@@ -23,7 +23,7 @@ Cuidados da rodada:
 | 50 | push no device via Expo Push Service (customer/picker/driver) | — | done |
 | 51 | rastreio de entrega ao vivo (driver → customer) | — | done |
 | 52 | horário de funcionamento ponta-a-ponta | — | done |
-| 53 | cupons — gestão admin (globais) + merchant (rede) | — | todo |
+| 53 | cupons — gestão admin (globais) + merchant (rede) | — | done |
 | 54 | merchant — detalhe do pedido, cancelamento por grupo, alerta | — | todo |
 | 55 | merchant — gestão de slots de agendamento | — | todo |
 | 56 | reviews — resposta do lojista + vitrine pública | — | todo |
@@ -49,3 +49,4 @@ Cuidados da rodada:
 [OK] 50 — testes: api 1018/1018, customer 208/208, picker 86/86, driver 92/92 — commit: 4e61a30 — merge na main + arquivada — 2026-07-11 — PENDENTE-MANUAL: validação em device físico real (Expo Push + projectId) só em runtime com aparelho.
 [OK] 51 — testes: api 1046/1046, api-client 54/54, driver 117/117, customer 224/224 — commit: 23d13b7 — merge: 59ee65f — 2026-07-11 — PENDENTE-MANUAL: emissão de posição com app em background/tela bloqueada em device Android físico (device layer atrás de mock nos testes).
 [OK] 52 — testes: api 1091/1091, merchant 189/189, customer 233/233, api-client 54/54 — merge: f7bcb97 — arquivada em done/ — 2026-07-11 — migration story52_store_closures não aplicada em runtime (testes Jest unit/mock); PENDENTE-MANUAL: `prisma:migrate deploy` no ambiente real.
+[OK] 53 — testes: api 1147/1147, merchant 213/213, admin 139/139, api-client 54/54 — merge: f2d01cc — arquivada em done/ — 2026-07-11 — sem migration (model Coupon já existia); admin app ganhou React Query/rhf/zod só na tela nova (legado intacto).
