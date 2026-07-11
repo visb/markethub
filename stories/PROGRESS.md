@@ -21,7 +21,7 @@ Cuidados da rodada:
 | #  | Título | Dep | Status |
 |----|--------|-----|--------|
 | 50 | push no device via Expo Push Service (customer/picker/driver) | — | done |
-| 51 | rastreio de entrega ao vivo (driver → customer) | — | todo |
+| 51 | rastreio de entrega ao vivo (driver → customer) | — | done |
 | 52 | horário de funcionamento ponta-a-ponta | — | todo |
 | 53 | cupons — gestão admin (globais) + merchant (rede) | — | todo |
 | 54 | merchant — detalhe do pedido, cancelamento por grupo, alerta | — | todo |
@@ -47,3 +47,4 @@ Cuidados da rodada:
 ## Log
 
 [OK] 50 — testes: api 1018/1018, customer 208/208, picker 86/86, driver 92/92 — commit: 4e61a30 — merge na main + arquivada — 2026-07-11 — PENDENTE-MANUAL: validação em device físico real (Expo Push + projectId) só em runtime com aparelho.
+[OK] 51 — testes: api 1046/1046, api-client 54/54, driver 117/117, customer 224/224 — commit: 23d13b7 — merge: 59ee65f — 2026-07-11 — PENDENTE-MANUAL: emissão de posição com app em background/tela bloqueada em device Android físico (device layer atrás de mock nos testes).
