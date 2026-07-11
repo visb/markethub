@@ -20,10 +20,6 @@ customer (polish).
 
 ## App driver
 
-### 13. Disponibilidade (turno on/off)
-Driver sinaliza disponível/indisponível; loja só atribui/oferece entrega a driver disponível
-(hoje lista todos os `StoreStaff` driver).
-
 ---
 
 ## App picker
