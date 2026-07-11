@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/auth/auth-context";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -19,6 +20,12 @@ import { Products } from "@/pages/merchant/Products";
 import { MerchantsList } from "@/pages/merchants/MerchantsList";
 import { MerchantDetail } from "@/pages/merchants/MerchantDetail";
 import { StoreDetail } from "@/pages/merchants/StoreDetail";
+import { Coupons } from "@/pages/Coupons";
+
+/** React Query só p/ o server-state novo (cupons — story 53); legado segue como está. */
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
+});
 
 /** Tela inicial conforme papel: admin vê o dashboard; manager vai p/ ofertas. */
 function RoleHome() {
@@ -36,37 +43,40 @@ function AdminOnly() {
 
 export function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route element={<ProtectedRoute />}>
-            <Route element={<Layout />}>
-              <Route index element={<RoleHome />} />
-              {/* Área do manager (S3.11) */}
-              <Route path="merchant/offers" element={<Offers />} />
-              <Route path="merchant/stock" element={<Stock />} />
-              <Route path="merchant/products" element={<Products />} />
-              {/* Telas globais — só admin */}
-              <Route element={<AdminOnly />}>
-                <Route path="merchants" element={<MerchantsList />} />
-                <Route path="merchants/:merchantId" element={<MerchantDetail />} />
-                <Route path="stores/:storeId" element={<StoreDetail />} />
-                <Route path="catalog" element={<Catalog />} />
-                <Route path="catalog/:id" element={<ProductDetail />} />
-                <Route path="catalog-quality" element={<CatalogQuality />} />
-                <Route path="categories" element={<MarketplaceCategories />} />
-                <Route path="users" element={<Users />} />
-                <Route path="orders" element={<Orders />} />
-                <Route path="operations" element={<Operations />} />
-                <Route path="finance" element={<Finance />} />
-                <Route path="erp" element={<ErpRuns />} />
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route element={<ProtectedRoute />}>
+              <Route element={<Layout />}>
+                <Route index element={<RoleHome />} />
+                {/* Área do manager (S3.11) */}
+                <Route path="merchant/offers" element={<Offers />} />
+                <Route path="merchant/stock" element={<Stock />} />
+                <Route path="merchant/products" element={<Products />} />
+                {/* Telas globais — só admin */}
+                <Route element={<AdminOnly />}>
+                  <Route path="merchants" element={<MerchantsList />} />
+                  <Route path="merchants/:merchantId" element={<MerchantDetail />} />
+                  <Route path="stores/:storeId" element={<StoreDetail />} />
+                  <Route path="coupons" element={<Coupons />} />
+                  <Route path="catalog" element={<Catalog />} />
+                  <Route path="catalog/:id" element={<ProductDetail />} />
+                  <Route path="catalog-quality" element={<CatalogQuality />} />
+                  <Route path="categories" element={<MarketplaceCategories />} />
+                  <Route path="users" element={<Users />} />
+                  <Route path="orders" element={<Orders />} />
+                  <Route path="operations" element={<Operations />} />
+                  <Route path="finance" element={<Finance />} />
+                  <Route path="erp" element={<ErpRuns />} />
+                </Route>
               </Route>
             </Route>
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </AuthProvider>
-    </BrowserRouter>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </AuthProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }

@@ -43,6 +43,7 @@ vi.mock("@/pages/merchants/MerchantDetail", () => ({
 vi.mock("@/pages/merchants/StoreDetail", () => ({
   StoreDetail: () => <div>PAGE:StoreDetail</div>,
 }));
+vi.mock("@/pages/Coupons", () => ({ Coupons: () => <div>PAGE:Coupons</div> }));
 
 function renderAppAt(path: string) {
   window.history.pushState({}, "", path);
