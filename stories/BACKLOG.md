@@ -14,13 +14,6 @@ customer (polish).
 
 ## Cross-cutting (impacta múltiplos apps)
 
-### 3. Horário de funcionamento ponta-a-ponta
-`StoreHours` existe no schema mas só o admin edita (StoreDetail). Falta:
-- Merchant: editar horários da própria loja (com fechamento excepcional/feriado).
-- Customer: badge aberto/fechado + horário na vitrine/loja (hoje nada exibido); bloquear checkout
-  de loja fechada (ou só agendamento).
-- Backend: endpoint merchant p/ hours + regra de loja fechada no checkout, se não houver.
-
 ### 4. Cupons — UI de gestão
 Model `Coupon` + aplicação no carrinho existem; **nenhuma UI cria/gerencia cupom**.
 - Decidir dono: cupom de plataforma (admin) vs cupom de loja (merchant) — provavelmente ambos.
