@@ -24,11 +24,6 @@ customer (polish).
 
 ## App picker
 
-### 15. Aprovação de substituição pelo cliente
-Substituição hoje é decisão unilateral do picker (autocomplete, story 03). Completar o loop:
-- Push/realtime pro cliente propondo substituto → aprovar/recusar com timeout (auto-aprova ou
-  remove item + reembolso parcial). Regras em `BUSINESS_RULES.md`.
-
 ### 16. Métricas / histórico do picker
 Tarefas concluídas, itens/hora, taxa de substituição — motivação e gestão (espelho no merchant
 Reports por colaborador).
