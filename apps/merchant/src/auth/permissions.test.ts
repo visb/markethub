@@ -16,6 +16,13 @@ describe("can (matriz de permissão — story 07)", () => {
     }
   });
 
+  it("orders.manage (cancelar sub-pedido — story 54) vale p/ owner, admin e manager", () => {
+    expect(can("owner", "orders.manage")).toBe(true);
+    expect(can("admin", "orders.manage")).toBe(true);
+    expect(can("manager", "orders.manage")).toBe(true);
+    expect(can(null, "orders.manage")).toBe(false);
+  });
+
   it("manager: colaboradores + catálogo + ver lojas/pedidos/relatórios", () => {
     expect(can("manager", "stores.view")).toBe(true);
     expect(can("manager", "staff.manage")).toBe(true);

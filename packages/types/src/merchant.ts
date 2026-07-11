@@ -246,6 +246,91 @@ export const merchantOrderSchema = z.object({
 });
 export type MerchantOrderDTO = z.infer<typeof merchantOrderSchema>;
 
+// ── Detalhe do sub-pedido + ações (story 54) ──
+
+/** Situação de separação de um item (espelha PickItemStatus). */
+export const merchantPickStatusSchema = z.enum(["pending", "picked", "refused", "substituted"]);
+export type MerchantPickStatus = z.infer<typeof merchantPickStatusSchema>;
+
+/** Substituto proposto p/ um item (snapshot do preço no momento da proposta). */
+export const merchantSubstitutionSchema = z.object({
+  name: z.string(),
+  unitPriceCents: z.number(),
+  priceDiffCents: z.number(),
+  approvalStatus: z.enum(["pending", "approved", "rejected"]),
+});
+export type MerchantSubstitutionDTO = z.infer<typeof merchantSubstitutionSchema>;
+
+/**
+ * Item do sub-pedido linha a linha (story 54): snapshot do pedido + situação da
+ * separação (o que foi separado / recusado / substituído).
+ */
+export const merchantOrderItemSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  saleType: z.enum(["unit", "weight"]),
+  quantity: z.number(),
+  weightGrams: z.number().nullable(),
+  unitPriceCents: z.number(),
+  lineTotalCents: z.number(),
+  /** null enquanto não há PickTask/PickItem (pedido não entrou em separação). */
+  pickStatus: merchantPickStatusSchema.nullable(),
+  quantityPicked: z.number().nullable(),
+  weightGramsPicked: z.number().nullable(),
+  substitution: merchantSubstitutionSchema.nullable(),
+});
+export type MerchantOrderItemDTO = z.infer<typeof merchantOrderItemSchema>;
+
+/** Marcos (timestamps) do sub-pedido — timeline do detalhe. */
+export const merchantOrderTimelineSchema = z.object({
+  createdAt: z.string(),
+  paidAt: z.string().nullable(),
+  pickingStartedAt: z.string().nullable(),
+  packedAt: z.string().nullable(),
+  readyAt: z.string().nullable(),
+  pickedUpAt: z.string().nullable(),
+  deliveredAt: z.string().nullable(),
+});
+export type MerchantOrderTimelineDTO = z.infer<typeof merchantOrderTimelineSchema>;
+
+/**
+ * Detalhe completo de um sub-pedido (OrderGroup) para o drawer do merchant
+ * (story 54): itens linha a linha (+substituições), cumprimento, pagamento,
+ * cliente e timeline de marcos. `cancelable` reflete a invariante de
+ * cancelamento por grupo (desabilita o botão quando a separação já começou).
+ */
+export const merchantOrderDetailSchema = z.object({
+  id: z.string(),
+  orderId: z.string(),
+  storeId: z.string(),
+  storeName: z.string(),
+  status: orderGroupStatusSchema,
+  fulfillment: z.enum(["delivery", "pickup"]),
+  createdAt: z.string(),
+  subtotalCents: z.number(),
+  deliveryCents: z.number(),
+  prepCents: z.number(),
+  platformFeeCents: z.number(),
+  totalCents: z.number(),
+  pickupCode: z.string().nullable(),
+  scheduledFrom: z.string().nullable(),
+  scheduledTo: z.string().nullable(),
+  payment: z
+    .object({ status: z.string(), method: z.string() })
+    .nullable(),
+  customer: z.object({ name: z.string(), phone: z.string().nullable() }),
+  items: z.array(merchantOrderItemSchema),
+  timeline: merchantOrderTimelineSchema,
+  cancelable: z.boolean(),
+});
+export type MerchantOrderDetailDTO = z.infer<typeof merchantOrderDetailSchema>;
+
+/** Payload do cancelamento de sub-pedido (motivo opcional). */
+export const cancelOrderGroupInputSchema = z.object({
+  reason: z.string().max(500).optional(),
+});
+export type CancelOrderGroupInput = z.infer<typeof cancelOrderGroupInputSchema>;
+
 // ── Relatórios (story 13) ──
 
 /** Filtro comum dos relatórios: período (ISO) + loja (uma do escopo ou todas). */

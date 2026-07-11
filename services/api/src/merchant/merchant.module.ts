@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { GeocodingModule } from "../geocoding/geocoding.module";
+import { MarketplaceModule } from "../marketplace";
 import { StorageModule } from "../storage/storage.module";
 import { UsersModule } from "../users/users.module";
 import { MerchantContextController } from "./merchant-context.controller";
@@ -17,7 +18,7 @@ import { MerchantController } from "./merchant.controller";
 import { MerchantService } from "./merchant.service";
 
 @Module({
-  imports: [StorageModule, GeocodingModule, UsersModule],
+  imports: [StorageModule, GeocodingModule, UsersModule, MarketplaceModule],
   controllers: [
     MerchantContextController,
     MerchantStaffController,

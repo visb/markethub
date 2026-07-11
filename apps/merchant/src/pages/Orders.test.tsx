@@ -6,6 +6,9 @@ let ctx: { data?: MerchantContextDTO };
 let ordersResult: { orders: MerchantOrderDTO[]; loading: boolean; connected: boolean };
 let lastOptions: { storeId?: string; subscribeStoreIds: string[]; enabled?: boolean } | undefined;
 
+const toggleSound = vi.fn();
+let soundEnabled = false;
+
 vi.mock("@/api/hooks/useMerchantContext", () => ({
   useMerchantContext: () => ctx,
 }));
@@ -14,6 +17,17 @@ vi.mock("@/api/hooks/useMerchantOrders", () => ({
     lastOptions = opts;
     return ordersResult;
   },
+}));
+vi.mock("@/api/hooks/useNewOrderAlert", () => ({
+  useNewOrderAlert: () => ({ soundEnabled, toggleSound, pendingCount: 0 }),
+}));
+vi.mock("@/components/OrderDrawer", () => ({
+  OrderDrawer: ({ groupId, onClose }: { groupId: string; onClose: () => void }) => (
+    <div data-testid="drawer">
+      drawer:{groupId}
+      <button onClick={onClose}>fechar</button>
+    </div>
+  ),
 }));
 
 import { Orders, groupByStatus } from "./Orders";
@@ -54,6 +68,8 @@ describe("Orders page", () => {
     ctx = { data: { role: "owner", merchantId: "m1", stores } };
     ordersResult = { orders: [order()], loading: false, connected: true };
     lastOptions = undefined;
+    toggleSound.mockReset();
+    soundEnabled = false;
   });
 
   it("passa as lojas do contexto p/ subscribe e renderiza o card no board", () => {
@@ -87,5 +103,21 @@ describe("Orders page", () => {
     ordersResult = { orders: [order()], loading: false, connected: false };
     render(<Orders />);
     expect(screen.getByText("Reconectando…")).toBeInTheDocument();
+  });
+
+  it("clicar no card abre o drawer de detalhe do sub-pedido", () => {
+    render(<Orders />);
+    expect(screen.queryByTestId("drawer")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("#123456"));
+    expect(screen.getByTestId("drawer")).toHaveTextContent("drawer:g1");
+    // fecha
+    fireEvent.click(screen.getByText("fechar"));
+    expect(screen.queryByTestId("drawer")).not.toBeInTheDocument();
+  });
+
+  it("toggle 🔔 de som chama toggleSound", () => {
+    render(<Orders />);
+    fireEvent.click(screen.getByLabelText("Ligar som de novos pedidos"));
+    expect(toggleSound).toHaveBeenCalled();
   });
 });

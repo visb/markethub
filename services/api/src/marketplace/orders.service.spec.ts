@@ -550,3 +550,164 @@ describe("OrdersService.cancel (BUSINESS_RULES: cancelamento + evento order.canc
     expect(tx.pickTask.deleteMany).not.toHaveBeenCalled();
   });
 });
+
+describe("OrdersService.cancelGroup (story 54 — cancelamento por sub-pedido)", () => {
+  function makeGroups(over: Partial<{ id: string; status: string }>[] = []) {
+    // grupo cancelado 'g1' (o alvo) + demais grupos, com totais p/ rateio
+    const base = [
+      { id: "g1", status: "paid", subtotalCents: 5000, deliveryCents: 800, prepCents: 100, platformFeeCents: 100 },
+      { id: "g2", status: "paid", subtotalCents: 3000, deliveryCents: 800, prepCents: 100, platformFeeCents: 100 },
+    ];
+    return base.map((g, i) => ({ ...g, ...(over[i] ?? {}) }));
+  }
+
+  function setup(opts: {
+    groupStatus?: string;
+    pickTask?: { id: string; status: string } | null;
+    storeId?: string;
+    discountCents?: number;
+    deliverySlotId?: string | null;
+    siblings?: { id: string; status: string; subtotalCents: number; deliveryCents: number; prepCents: number; platformFeeCents: number }[];
+  } = {}) {
+    const group = {
+      id: "g1",
+      storeId: opts.storeId ?? "store1",
+      status: opts.groupStatus ?? "paid",
+      orderId: "order1",
+      order: { id: "order1", discountCents: opts.discountCents ?? 0, deliverySlotId: opts.deliverySlotId ?? null },
+      pickTask: opts.pickTask ?? null,
+    };
+    const siblings = opts.siblings ?? makeGroups();
+
+    const tx = {
+      pickTask: { deleteMany: jest.fn().mockResolvedValue({}) },
+      orderGroup: { update: jest.fn().mockResolvedValue({}) },
+      order: { update: jest.fn().mockResolvedValue({}) },
+      deliverySlot: { updateMany: jest.fn().mockResolvedValue({}) },
+    };
+    const prisma = {
+      orderGroup: {
+        findUnique: jest.fn().mockResolvedValue(group),
+        findMany: jest.fn().mockResolvedValue(siblings),
+      },
+      $transaction: jest.fn(async (cb: (t: typeof tx) => unknown) => cb(tx)),
+    } as never;
+    const outbox = { publish: jest.fn().mockResolvedValue({ id: "evt1" }) };
+    const svc = new OrdersService(prisma, {} as never, {} as never, {} as never, outbox as never);
+    return { svc, prisma, tx, outbox };
+  }
+
+  it("cancela o grupo, remove a PickTask e emite order.group_canceled NA MESMA TX", async () => {
+    const { svc, tx, outbox } = setup({ pickTask: { id: "t1", status: "queued" } });
+    const res = await svc.cancelGroup("g1", { storeIds: ["store1"] });
+    expect(tx.pickTask.deleteMany).toHaveBeenCalledWith({ where: { orderGroupId: "g1" } });
+    expect(tx.orderGroup.update).toHaveBeenCalledWith({ where: { id: "g1" }, data: { status: "canceled" } });
+    expect(outbox.publish).toHaveBeenCalledTimes(1);
+    expect(outbox.publish).toHaveBeenCalledWith(tx, {
+      type: "order.group_canceled",
+      payload: { orderId: "order1", groupId: "g1", amountCents: 6000, reason: "group_canceled" },
+      aggregateId: "order1",
+    });
+    expect(res).toMatchObject({ id: "g1", status: "canceled", orderCanceled: false });
+  });
+
+  it("amountCents rateia o cupom (Order-level) proporcional ao total do grupo", async () => {
+    // grupo g1 total 6000; g2 total 4000; desconto 1000 → g1 estorna 5400
+    const { svc, outbox } = setup({
+      discountCents: 1000,
+      siblings: [
+        { id: "g1", status: "paid", subtotalCents: 6000, deliveryCents: 0, prepCents: 0, platformFeeCents: 0 },
+        { id: "g2", status: "paid", subtotalCents: 4000, deliveryCents: 0, prepCents: 0, platformFeeCents: 0 },
+      ],
+    });
+    await svc.cancelGroup("g1", { storeIds: ["store1"] });
+    expect(outbox.publish).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ payload: expect.objectContaining({ amountCents: 5400 }) }),
+    );
+  });
+
+  it("demais grupos seguem: NÃO cancela o Order nem libera slot quando há outro grupo ativo", async () => {
+    const { svc, tx } = setup({ deliverySlotId: "slot1" });
+    const res = await svc.cancelGroup("g1", { storeIds: ["store1"] });
+    expect(tx.order.update).not.toHaveBeenCalled();
+    expect(tx.deliverySlot.updateMany).not.toHaveBeenCalled();
+    expect(res).toMatchObject({ orderCanceled: false });
+  });
+
+  it("último grupo ativo cancelado → Order vira canceled e libera o slot (sem order.canceled)", async () => {
+    const { svc, tx, outbox } = setup({
+      deliverySlotId: "slot1",
+      siblings: [
+        { id: "g1", status: "paid", subtotalCents: 5000, deliveryCents: 0, prepCents: 0, platformFeeCents: 0 },
+        { id: "g2", status: "canceled", subtotalCents: 3000, deliveryCents: 0, prepCents: 0, platformFeeCents: 0 },
+      ],
+    });
+    const res = await svc.cancelGroup("g1", { storeIds: ["store1"] });
+    expect(tx.order.update).toHaveBeenCalledWith({ where: { id: "order1" }, data: { status: "canceled" } });
+    expect(tx.deliverySlot.updateMany).toHaveBeenCalledWith({
+      where: { id: "slot1", reserved: { gt: 0 } },
+      data: { reserved: { decrement: 1 } },
+    });
+    // só o evento do grupo — não emite order.canceled (evitaria estorno duplicado)
+    expect(outbox.publish).toHaveBeenCalledTimes(1);
+    expect(outbox.publish).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ type: "order.group_canceled" }),
+    );
+    expect(res).toMatchObject({ orderCanceled: true });
+  });
+
+  it("último grupo sem slot: cancela o Order sem tocar o slot", async () => {
+    const { svc, tx } = setup({
+      deliverySlotId: null,
+      siblings: [
+        { id: "g1", status: "paid", subtotalCents: 5000, deliveryCents: 0, prepCents: 0, platformFeeCents: 0 },
+        { id: "g2", status: "canceled", subtotalCents: 3000, deliveryCents: 0, prepCents: 0, platformFeeCents: 0 },
+      ],
+    });
+    await svc.cancelGroup("g1", { storeIds: ["store1"] });
+    expect(tx.order.update).toHaveBeenCalled();
+    expect(tx.deliverySlot.updateMany).not.toHaveBeenCalled();
+  });
+
+  it.each(["picking", "ready_for_pickup", "on_the_way", "delivered", "canceled"])(
+    "status=%s → CANNOT_CANCEL_GROUP sem evento",
+    async (status) => {
+      const { svc, outbox } = setup({ groupStatus: status });
+      await expect(svc.cancelGroup("g1", { storeIds: ["store1"] })).rejects.toMatchObject({
+        response: { code: "CANNOT_CANCEL_GROUP" },
+      });
+      expect(outbox.publish).not.toHaveBeenCalled();
+    },
+  );
+
+  it("PickTask além de assigned (picking) → CANNOT_CANCEL_GROUP", async () => {
+    const { svc } = setup({ pickTask: { id: "t1", status: "picking" } });
+    await expect(svc.cancelGroup("g1", { storeIds: ["store1"] })).rejects.toMatchObject({
+      response: { code: "CANNOT_CANCEL_GROUP" },
+    });
+  });
+
+  it("PickTask em assigned ainda permite cancelar", async () => {
+    const { svc } = setup({ pickTask: { id: "t1", status: "assigned" } });
+    const res = await svc.cancelGroup("g1", { storeIds: ["store1"] });
+    expect(res).toMatchObject({ status: "canceled" });
+  });
+
+  it("grupo de loja fora do escopo do ator → 404 (não vaza existência)", async () => {
+    const { svc, outbox } = setup({ storeId: "outra-loja" });
+    await expect(svc.cancelGroup("g1", { storeIds: ["store1"] })).rejects.toMatchObject({
+      response: { code: "ORDER_GROUP_NOT_FOUND" },
+    });
+    expect(outbox.publish).not.toHaveBeenCalled();
+  });
+
+  it("grupo inexistente → 404", async () => {
+    const { svc, prisma } = setup();
+    (prisma as never as { orderGroup: { findUnique: jest.Mock } }).orderGroup.findUnique.mockResolvedValue(null);
+    await expect(svc.cancelGroup("g1", { storeIds: ["store1"] })).rejects.toMatchObject({
+      response: { code: "ORDER_GROUP_NOT_FOUND" },
+    });
+  });
+});

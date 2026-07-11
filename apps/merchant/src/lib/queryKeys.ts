@@ -42,6 +42,8 @@ export const queryKeys = {
   orders: {
     all: ["orders"] as const,
     list: (filters: { storeId?: string; status?: string } = {}) => ["orders", "list", filters] as const,
+    /** Detalhe de um sub-pedido (OrderGroup) — story 54. */
+    detail: (id: string) => ["orders", "detail", id] as const,
   },
   reports: {
     all: ["reports"] as const,

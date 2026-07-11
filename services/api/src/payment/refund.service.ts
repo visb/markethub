@@ -61,6 +61,84 @@ export class RefundService {
     this.logger.log(`Estorno integral de ${amountCents}c p/ pedido cancelado ${orderId}`);
   }
 
+  /**
+   * Estorno PARCIAL ao cancelar UM sub-pedido (OrderGroup) — story 54. Acumula
+   * um `RefundComponent` (reason `group_canceled`) no Refund 1:1 do pedido e
+   * dispara o estorno do valor rateado no gateway. Vários grupos cancelados
+   * somam no MESMO Refund (amountCents cresce; components mantêm o breakdown por
+   * grupo p/ contábil/repasse).
+   *
+   * Idempotência (BullMQ entrega at-least-once; a trava ProcessedEvent do handler
+   * garante 1 execução por evento): a presença de um RefundComponent
+   * `group_canceled` para este grupo marca "já estornado" → no-op. O componente é
+   * gravado junto com o resultado do provider, então uma reentrega após sucesso
+   * completo faz short-circuit. Cancelamento de grupo só acontece antes da
+   * separação (invariante) — não há componente de shortfall do mesmo grupo p/
+   * confundir. Falha do provider PROPAGA (job retenta); só o esgotamento marca
+   * `failed` (markFailed).
+   */
+  async issueGroupCancelRefund(
+    orderId: string,
+    groupId: string,
+    amountCents: number,
+    reason: string,
+  ): Promise<void> {
+    if (amountCents <= 0) return;
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { payment: true, refund: { include: { components: true } } },
+    });
+    if (!order) return;
+    if (!order.payment || order.payment.status !== "paid") return; // só estorna pedido pago
+
+    // já estornado este grupo? (component group_canceled do grupo) → no-op idempotente
+    const already = order.refund?.components.some(
+      (c) => c.orderGroupId === groupId && c.reason === "group_canceled",
+    );
+    if (already) return;
+
+    // estorno parcial no gateway ANTES de registrar o componente (o componente é
+    // a marca de "processado" p/ a reentrega fazer short-circuit).
+    const result = await this.provider.refund({
+      chargeId: order.payment.providerChargeId ?? "",
+      amountCents,
+      reason,
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      if (order.refund) {
+        await tx.refund.update({
+          where: { id: order.refund.id },
+          data: {
+            amountCents: { increment: amountCents },
+            status: "processed",
+            providerRefundId: result.refundId,
+            processedAt: new Date(),
+            components: {
+              create: { orderGroupId: groupId, amountCents, reason: "group_canceled" },
+            },
+          },
+        });
+      } else {
+        await tx.refund.create({
+          data: {
+            orderId,
+            amountCents,
+            status: "processed",
+            provider: order.payment!.provider,
+            reason,
+            providerRefundId: result.refundId,
+            processedAt: new Date(),
+            components: {
+              create: { orderGroupId: groupId, amountCents, reason: "group_canceled" },
+            },
+          },
+        });
+      }
+    });
+    this.logger.log(`Estorno parcial de ${amountCents}c (grupo ${groupId} cancelado) p/ pedido ${orderId}`);
+  }
+
   async maybeIssueRefundForOrder(orderId: string): Promise<void> {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },

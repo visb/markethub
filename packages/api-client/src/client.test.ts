@@ -188,6 +188,22 @@ describe("ApiClient — frota merchant + veículo do entregador", () => {
     expect(url(fetchMock, 1)).toBe("http://api.test/api/v1/driver/vehicle/current");
   });
 
+  it("merchantOrderGroup: GET no detalhe do sub-pedido (story 54)", async () => {
+    const { client, fetchMock } = withFetch();
+    await client.merchantOrderGroup("g1");
+    expect(url(fetchMock)).toBe("http://api.test/api/v1/merchant/orders/groups/g1");
+  });
+
+  it("merchantCancelOrderGroup: POST com/sem motivo (story 54)", async () => {
+    const { client, fetchMock } = withFetch();
+    await client.merchantCancelOrderGroup("g1", "sem estoque");
+    expect(url(fetchMock)).toBe("http://api.test/api/v1/merchant/orders/groups/g1/cancel");
+    expect(init(fetchMock).method).toBe("POST");
+    expect(JSON.parse(init(fetchMock).body)).toEqual({ reason: "sem estoque" });
+    await client.merchantCancelOrderGroup("g1");
+    expect(JSON.parse(init(fetchMock, 1).body)).toEqual({});
+  });
+
   it("driverSelectVehicle: PUT /driver/vehicle com o vehicleId", async () => {
     const { client, fetchMock } = withFetch();
     await client.driverSelectVehicle("v1");

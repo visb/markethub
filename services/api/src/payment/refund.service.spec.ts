@@ -422,3 +422,111 @@ describe("RefundService.maybeIssueRefundForOrder", () => {
     expect(refundUpdate).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * Story 54: estorno PARCIAL ao cancelar um sub-pedido (OrderGroup). Acumula um
+ * RefundComponent group_canceled no Refund 1:1 do pedido e estorna o valor
+ * rateado no gateway. Idempotente pela presença do componente do grupo.
+ */
+describe("RefundService.issueGroupCancelRefund", () => {
+  function makeSvc(opts: { order?: Record<string, unknown> | null; refundThrows?: boolean } = {}) {
+    const txRefundCreate = jest.fn().mockResolvedValue({ id: "ref1" });
+    const txRefundUpdate = jest.fn().mockResolvedValue({});
+    const tx = { refund: { create: txRefundCreate, update: txRefundUpdate } };
+    const prisma = {
+      order: { findUnique: jest.fn().mockResolvedValue("order" in opts ? opts.order : null) },
+      $transaction: jest.fn(async (cb: (t: typeof tx) => unknown) => cb(tx)),
+    } as never;
+    const providerRefund = opts.refundThrows
+      ? jest.fn().mockRejectedValue(new Error("gateway down"))
+      : jest.fn().mockResolvedValue({ refundId: "prov_ref9" });
+    const provider = { name: "mock", refund: providerRefund } as never;
+    const svc = new RefundService(prisma, provider);
+    return { svc, txRefundCreate, txRefundUpdate, providerRefund };
+  }
+
+  const paid = { status: "paid", amountCents: 10000, provider: "mock", providerChargeId: "ch1" };
+
+  it("sem Refund ainda: estorna no gateway e cria o Refund com o component do grupo", async () => {
+    const { svc, txRefundCreate, providerRefund } = makeSvc({
+      order: { id: "o1", payment: paid, refund: null },
+    });
+    await svc.issueGroupCancelRefund("o1", "g1", 5400, "group_canceled");
+    expect(providerRefund).toHaveBeenCalledWith({ chargeId: "ch1", amountCents: 5400, reason: "group_canceled" });
+    expect(txRefundCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          orderId: "o1",
+          amountCents: 5400,
+          status: "processed",
+          components: { create: { orderGroupId: "g1", amountCents: 5400, reason: "group_canceled" } },
+        }),
+      }),
+    );
+  });
+
+  it("Refund já existe (outro grupo cancelado): acumula amountCents + novo component", async () => {
+    const { svc, txRefundUpdate } = makeSvc({
+      order: {
+        id: "o1",
+        payment: paid,
+        refund: { id: "ref1", components: [{ orderGroupId: "g0", reason: "group_canceled" }] },
+      },
+    });
+    await svc.issueGroupCancelRefund("o1", "g1", 3600, "group_canceled");
+    expect(txRefundUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "ref1" },
+        data: expect.objectContaining({
+          amountCents: { increment: 3600 },
+          status: "processed",
+          components: { create: { orderGroupId: "g1", amountCents: 3600, reason: "group_canceled" } },
+        }),
+      }),
+    );
+  });
+
+  it("idempotente: component group_canceled do grupo já existe → no-op (sem tocar o gateway)", async () => {
+    const { svc, providerRefund, txRefundUpdate } = makeSvc({
+      order: {
+        id: "o1",
+        payment: paid,
+        refund: { id: "ref1", components: [{ orderGroupId: "g1", reason: "group_canceled" }] },
+      },
+    });
+    await svc.issueGroupCancelRefund("o1", "g1", 3600, "group_canceled");
+    expect(providerRefund).not.toHaveBeenCalled();
+    expect(txRefundUpdate).not.toHaveBeenCalled();
+  });
+
+  it("amountCents <= 0 → no-op", async () => {
+    const { svc, providerRefund } = makeSvc({ order: { id: "o1", payment: paid, refund: null } });
+    await svc.issueGroupCancelRefund("o1", "g1", 0, "group_canceled");
+    expect(providerRefund).not.toHaveBeenCalled();
+  });
+
+  it("pedido não pago → no-op", async () => {
+    const { svc, providerRefund } = makeSvc({
+      order: { id: "o1", payment: { status: "pending" }, refund: null },
+    });
+    await svc.issueGroupCancelRefund("o1", "g1", 5400, "group_canceled");
+    expect(providerRefund).not.toHaveBeenCalled();
+  });
+
+  it("pedido inexistente → no-op", async () => {
+    const { svc, providerRefund } = makeSvc({ order: null });
+    await svc.issueGroupCancelRefund("o1", "g1", 5400, "group_canceled");
+    expect(providerRefund).not.toHaveBeenCalled();
+  });
+
+  it("falha do provider PROPAGA (job retenta) sem gravar Refund", async () => {
+    const { svc, txRefundCreate } = makeSvc({
+      order: { id: "o1", payment: paid, refund: null },
+      refundThrows: true,
+    });
+    await expect(svc.issueGroupCancelRefund("o1", "g1", 5400, "group_canceled")).rejects.toThrow(
+      "gateway down",
+    );
+    expect(txRefundCreate).not.toHaveBeenCalled();
+  });
+});

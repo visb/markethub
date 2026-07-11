@@ -52,7 +52,17 @@ Convenção: enums em `services/api/prisma/schema.prisma`; regras em services do
 
 - Order só cancela se status ∈ {`created`, `paid`, `preparing`} **e** nenhuma PickTask passou de `queued`/`assigned`. Caso contrário `CANNOT_CANCEL`.
 - Cancelar libera o slot de entrega reservado.
-- *Pointer:* `src/marketplace/orders.service.ts:226+`.
+- *Pointer:* `src/marketplace/orders.service.ts` (`cancel`).
+
+### Cancelamento por sub-pedido (OrderGroup — story 54)
+
+- A loja/marketplace cancela **um** sub-pedido (grupo de uma loja); os demais grupos do pedido seguem. Invariante espelha a de Order: o grupo cancela se `status ∈ {created, paid, preparing}` **e** a PickTask do grupo (se houver) ainda não passou de `assigned`. Caso contrário `CANNOT_CANCEL_GROUP`.
+- Ator: capability **`orders.manage`** (owner, administrador e gerente no escopo da loja). Grupo de loja fora do escopo → 404 (não vaza existência).
+- Efeitos atômicos (mesma TX): grupo → `canceled`; PickTask do grupo removida da fila; evento `order.group_canceled` no outbox (payload `orderId`, `groupId`, `amountCents` já rateado, `reason`). Quando é o **último grupo ativo** (os demais já cancelados), o Order inteiro vira `canceled` e o slot de entrega (Order-level) é liberado — **sem** emitir `order.canceled` (o handler do grupo já cobre o estorno; emitir os dois duplicaria o reembolso).
+- Estorno **parcial** durável: handler do evento acumula um `RefundComponent` (`reason = group_canceled`) no `Refund` 1:1 do pedido e estorna o valor no gateway (retry isolado, idempotente via `ProcessedEvent` + presença do component do grupo — padrão story 48). Push ao cliente ("itens de X foram cancelados e estornados").
+- **Rateio do cupom** (Order-level): `amountCents = totalGrupo − (desconto × totalGrupo / totalPedido)`, onde `totalGrupo` = subtotal + entrega + preparo + taxa da plataforma do grupo e `totalPedido` = soma dos totais (pré-desconto) de todos os grupos. Arredondamento com **soma exata** (método do prefixo por id): Σ das fatias de desconto de todos os grupos = desconto (nada perdido no arredondamento).
+- Capability **`orders.view`** continua dando só leitura (board + detalhe do sub-pedido); só `orders.manage` cancela.
+- *Pointer:* `src/marketplace/orders.service.ts` (`cancelGroup`), `src/marketplace/group-refund.pricing.ts` (`groupCancelRefundCents`), `src/events/handlers/order-group-canceled.handlers.ts`, `src/payment/refund.service.ts` (`issueGroupCancelRefund`).
 
 ### Cupom
 
@@ -100,6 +110,7 @@ Convenção: enums em `services/api/prisma/schema.prisma`; regras em services do
 
 - **Um Refund por Order** (`Order.refund` 1:1), consolidando faltas de todos os grupos. `amountCents = max(0, pago − total ajustado)`. Breakdown por grupo em `RefundComponent`.
 - **RefundStatus**: `pending → processed | failed`.
+- **RefundReason**: `weight_shortfall` | `refused` | `group_canceled` (sub-pedido cancelado — total do grupo com cupom rateado; estorno **parcial** acumulado no mesmo Refund, ver "Cancelamento por sub-pedido").
 - Falta cobrável por item (`itemShortfall`, cálculo puro testável):
   - `refused`: valor **integral** da linha.
   - `picked` com separação **menor** que o pedido (peso ou unidade): diferença até `min(separado, pedido)`. **Over-delivery não gera falta** (não cobra a mais).
