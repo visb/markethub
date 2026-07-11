@@ -14,6 +14,7 @@ import { Header } from "@/components/Header";
 import { FollowButton } from "@/components/FollowButton";
 import { MerchantLogo } from "@/components/MerchantLogo";
 import { useStoreFollow } from "@/api/hooks/useStoreFollow";
+import { storeOpenLabel } from "@/lib/storeOpen";
 import { getRadiusKm } from "@/prefs";
 
 export default function StoreHome() {
@@ -124,6 +125,18 @@ export default function StoreHome() {
           <Text variant="caption" muted>
             ⏱ {store ? `${store.etaMinutes} min` : "30 min"} ou programada
           </Text>
+          {store && (
+            <View
+              style={[styles.openBadge, { borderColor: store.openNow ? colors.success : colors.textMuted }]}
+            >
+              <Text
+                variant="caption"
+                style={{ color: store.openNow ? colors.success : colors.textMuted, fontWeight: "700" }}
+              >
+                {storeOpenLabel(store)}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -181,6 +194,14 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   storeHead: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md },
   storeName: { color: colors.primary, fontSize: 18, fontWeight: "700" },
+  openBadge: {
+    alignSelf: "flex-start",
+    marginTop: 4,
+    borderWidth: 1,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+  },
   searchWrap: {
     flexDirection: "row",
     alignItems: "center",

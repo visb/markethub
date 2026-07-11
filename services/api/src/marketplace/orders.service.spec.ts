@@ -69,14 +69,27 @@ function makeView(over: Partial<typeof VIEW_GROUP> & { available?: boolean } = {
   };
 }
 
+// Loja sempre aberta: uma faixa 00:00–24:00 em cada dia da semana (story 52) —
+// mantém os testes de checkout determinísticos independentes do relógio.
+const ALWAYS_OPEN_HOURS = Array.from({ length: 7 }, (_, d) => ({
+  dayOfWeek: d,
+  opensAt: 0,
+  closesAt: 1440,
+}));
+
 function makeDeps(opts: {
   view?: ReturnType<typeof makeView>;
   address?: Record<string, unknown> | null;
   order?: Record<string, unknown> | null;
   tasks?: { id: string; status: string }[];
   slotWindow?: { start: Date; end: Date };
+  /** Lojas devolvidas por store.findMany na checagem STORE_CLOSED (story 52). */
+  stores?: { id: string; name: string; hours: unknown[]; closures: unknown[] }[];
 } = {}) {
   const view = opts.view ?? makeView();
+  const openStores =
+    opts.stores ??
+    view.groups.map((g) => ({ id: g.storeId, name: `Loja ${g.storeId}`, hours: ALWAYS_OPEN_HOURS, closures: [] }));
 
   const tx = {
     order: {
@@ -102,6 +115,7 @@ function makeDeps(opts: {
     },
     orderGroup: { updateMany: jest.fn().mockResolvedValue({}) },
     pickTask: { findMany: jest.fn().mockResolvedValue(opts.tasks ?? []) },
+    store: { findMany: jest.fn().mockResolvedValue(openStores) },
   } as never;
 
   const cart = {
@@ -256,6 +270,104 @@ describe("OrdersService.checkout", () => {
     const { svc, tx } = makeDeps({ order });
     await svc.checkout("u1", pickupInput);
     expect(tx.order.create).toHaveBeenCalled();
+  });
+
+  // ── Story 52: horário de funcionamento no checkout ──
+
+  it("loja SEM horário configurado → checkout imediato passa (comportamento pré-52)", async () => {
+    const order = { id: "order1", userId: "u1", status: "created", groups: [] };
+    const { svc, tx } = makeDeps({
+      address: validAddress,
+      order,
+      stores: [{ id: "store1", name: "Sem horário", hours: [], closures: [] }],
+    });
+    await svc.checkout("u1", deliveryInput);
+    expect(tx.order.create).toHaveBeenCalled();
+  });
+
+  it("loja configurada e fechada agora (fora da janela) → STORE_CLOSED", async () => {
+    const now = new Date("2026-06-28T12:00:00Z"); // domingo 09:00 São Paulo
+    const order = { id: "order1", userId: "u1", status: "created", groups: [] };
+    const { svc, tx } = makeDeps({
+      address: validAddress,
+      order,
+      // aberta só na segunda (dayOfWeek 1); domingo → fechada
+      stores: [
+        { id: "store1", name: "Europa Centro", hours: [{ dayOfWeek: 1, opensAt: 480, closesAt: 1320 }], closures: [] },
+      ],
+    });
+    jest.useFakeTimers().setSystemTime(now);
+    try {
+      await expect(svc.checkout("u1", deliveryInput)).rejects.toMatchObject({
+        response: { code: "STORE_CLOSED", stores: [{ id: "store1", name: "Europa Centro" }] },
+      });
+      expect(tx.order.create).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("loja configurada com fechamento excepcional hoje → STORE_CLOSED", async () => {
+    const now = new Date("2026-06-28T12:00:00Z"); // domingo 09:00 São Paulo
+    const order = { id: "order1", userId: "u1", status: "created", groups: [] };
+    const { svc } = makeDeps({
+      address: validAddress,
+      order,
+      stores: [
+        {
+          id: "store1",
+          name: "Europa Centro",
+          hours: ALWAYS_OPEN_HOURS, // aberta todo dia
+          closures: [{ date: new Date("2026-06-28T00:00:00Z") }], // mas fechada hoje
+        },
+      ],
+    });
+    jest.useFakeTimers().setSystemTime(now);
+    try {
+      await expect(svc.checkout("u1", deliveryInput)).rejects.toMatchObject({
+        response: { code: "STORE_CLOSED" },
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("agendado com slot futuro válido passa (não consulta abertura)", async () => {
+    const order = { id: "order1", userId: "u1", status: "created", groups: [] };
+    const window = { start: new Date("2026-06-29T10:00:00Z"), end: new Date("2026-06-29T11:00:00Z") };
+    const { svc, tx, prisma } = makeDeps({
+      address: validAddress,
+      order,
+      slotWindow: window,
+      stores: [{ id: "store1", name: "Europa Centro", hours: [], closures: [] }],
+    });
+    await svc.checkout("u1", { ...deliveryInput, deliverySlotId: "slot1" });
+    // não consulta o estado de abertura quando há slot agendado
+    expect((prisma as never as { store: { findMany: jest.Mock } }).store.findMany).not.toHaveBeenCalled();
+    expect(tx.order.create).toHaveBeenCalled();
+  });
+
+  it("multi-loja: lista apenas a(s) fechada(s) na mensagem", async () => {
+    const now = new Date("2026-06-28T12:00:00Z"); // domingo 09:00 São Paulo
+    const order = { id: "order1", userId: "u1", status: "created", groups: [] };
+    const { svc } = makeDeps({
+      address: validAddress,
+      order,
+      stores: [
+        // aberta (aberta todo dia) e sem fechamento
+        { id: "store1", name: "Aberta", hours: ALWAYS_OPEN_HOURS, closures: [] },
+        // configurada mas com fechamento excepcional hoje → fechada
+        { id: "store2", name: "Fechada", hours: ALWAYS_OPEN_HOURS, closures: [{ date: new Date("2026-06-28T00:00:00Z") }] },
+      ],
+    });
+    jest.useFakeTimers().setSystemTime(now);
+    try {
+      await expect(svc.checkout("u1", deliveryInput)).rejects.toMatchObject({
+        response: { code: "STORE_CLOSED", stores: [{ id: "store2", name: "Fechada" }] },
+      });
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 

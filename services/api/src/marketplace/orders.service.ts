@@ -6,6 +6,7 @@ import { OutboxPublisher } from "../events";
 import { OrderTrackingService } from "../picking/order-tracking.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { SchedulingService } from "../scheduling/scheduling.service";
+import { isStoreAvailable } from "../shared/store-hours";
 import { CartService } from "./cart.service";
 
 export interface CreateOrderInput {
@@ -64,6 +65,13 @@ export class OrdersService {
 
     const totalsByMerchant = new Map(view.totals.groups.map((g) => [g.merchantId, g]));
     const storeIds = view.groups.map((g) => g.storeId);
+
+    // Entrega/retirada imediata (sem slot agendado): a loja precisa estar aberta
+    // agora (story 52). Pedido agendado num slot futuro válido pula a checagem —
+    // o slot já garante uma janela de operação da loja.
+    if (!input.deliverySlotId) {
+      await this.assertStoresOpen(storeIds);
+    }
 
     const order = await this.prisma.$transaction(async (tx) => {
       // reserva o slot (S5.3) atomicamente; a janela do slot define scheduledFrom/To
@@ -274,6 +282,40 @@ export class OrdersService {
       });
       return canceled;
     });
+  }
+
+  /**
+   * Bloqueia checkout imediato quando alguma loja do carrinho está fechada agora
+   * (story 52). Considera horário semanal + fechamento excepcional do dia. Loja
+   * SEM horário configurado é tratada como disponível (comportamento pré-52 —
+   * `isStoreAvailable`). Em multi-loja, lista as fechadas na mensagem. Lança
+   * `STORE_CLOSED`.
+   */
+  private async assertStoresOpen(storeIds: string[], now: Date = new Date()) {
+    if (storeIds.length === 0) return;
+    const stores = await this.prisma.store.findMany({
+      where: { id: { in: storeIds } },
+      select: {
+        id: true,
+        name: true,
+        hours: { select: { dayOfWeek: true, opensAt: true, closesAt: true } },
+        closures: { select: { date: true } },
+      },
+    });
+    const closed = stores.filter(
+      (s) => !isStoreAvailable(s.hours, s.closures.map((c) => c.date), now),
+    );
+    if (closed.length > 0) {
+      const names = closed.map((s) => s.name).join(", ");
+      throw new BadRequestException({
+        code: "STORE_CLOSED",
+        message:
+          closed.length === 1
+            ? `A loja ${names} está fechada agora. Agende uma entrega para um horário disponível.`
+            : `As lojas ${names} estão fechadas agora. Agende uma entrega para um horário disponível.`,
+        stores: closed.map((s) => ({ id: s.id, name: s.name })),
+      });
+    }
   }
 
   private async assertAddress(userId: string, addressId?: string | null) {

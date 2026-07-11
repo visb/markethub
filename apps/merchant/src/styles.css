@@ -385,3 +385,51 @@ body {
   padding: 4px 12px 4px 0;
   border-bottom: 1px solid #f1f5f9;
 }
+
+/* Horário de funcionamento + fechamentos (story 52) */
+.store-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  max-width: 560px;
+}
+.hours-section h3,
+.closures-section h3 {
+  font-size: 16px;
+  margin: 0 0 8px;
+}
+.hours-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hours-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.hours-row .checkbox {
+  min-width: 120px;
+}
+.hours-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.input-time {
+  width: 80px;
+  text-align: center;
+}
+.closure-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.success {
+  color: var(--success, #16a34a);
+  font-size: 13px;
+}

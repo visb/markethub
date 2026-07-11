@@ -289,6 +289,145 @@ export class MerchantService {
     }
   }
 
+  // ── Horário de funcionamento + fechamentos (story 52) ──
+  // Mesma capability da edição de loja: owner-only (nível de rede). O backend
+  // reforça sempre (assertOwner + posse da rede da loja).
+
+  /**
+   * Resolve a loja garantindo que o usuário é dono da rede dela (owner-only,
+   * igual a editar a loja). Lança FORBIDDEN/NOT_FOUND conforme o caso.
+   */
+  private async assertOwnerOfStore(user: { id: string; roles: string[] }, storeId: string) {
+    await this.assertOwner(user);
+    const store = await this.prisma.store.findUnique({ where: { id: storeId } });
+    if (!store) {
+      throw new NotFoundException({ code: "STORE_NOT_FOUND", message: "Loja não encontrada" });
+    }
+    await this.assertOwnsStore(user.id, store.merchantId);
+    return store;
+  }
+
+  /** Horário semanal da loja (uma faixa por dia), ordenado por dia da semana. */
+  async storeHours(user: { id: string; roles: string[] }, storeId: string) {
+    await this.assertOwnerOfStore(user, storeId);
+    return this.prisma.storeHours.findMany({
+      where: { storeId },
+      orderBy: { dayOfWeek: "asc" },
+      select: { id: true, dayOfWeek: true, opensAt: true, closesAt: true },
+    });
+  }
+
+  /**
+   * Substitui o horário semanal inteiro (replace-all): valida cada faixa
+   * (dia 0–6, `opensAt < closesAt`, sem dia duplicado) e troca todas as linhas
+   * numa transação. Janelas que cruzam a meia-noite ficam fora de escopo.
+   */
+  async setStoreHours(
+    user: { id: string; roles: string[] },
+    storeId: string,
+    entries: { dayOfWeek: number; opensAt: number; closesAt: number }[],
+  ) {
+    await this.assertOwnerOfStore(user, storeId);
+    const seen = new Set<number>();
+    for (const e of entries) {
+      if (!Number.isInteger(e.dayOfWeek) || e.dayOfWeek < 0 || e.dayOfWeek > 6) {
+        throw new BadRequestException({
+          code: "INVALID_DAY",
+          message: `Dia da semana inválido: ${e.dayOfWeek}`,
+        });
+      }
+      if (
+        !Number.isInteger(e.opensAt) ||
+        !Number.isInteger(e.closesAt) ||
+        e.opensAt < 0 ||
+        e.closesAt > 1440 ||
+        e.closesAt <= e.opensAt
+      ) {
+        throw new BadRequestException({
+          code: "INVALID_HOURS",
+          message: "Horário inválido: fechamento deve ser após a abertura",
+        });
+      }
+      if (seen.has(e.dayOfWeek)) {
+        throw new BadRequestException({
+          code: "DUPLICATE_DAY",
+          message: `Dia da semana repetido: ${e.dayOfWeek}`,
+        });
+      }
+      seen.add(e.dayOfWeek);
+    }
+    await this.prisma.$transaction([
+      this.prisma.storeHours.deleteMany({ where: { storeId } }),
+      ...(entries.length > 0
+        ? [
+            this.prisma.storeHours.createMany({
+              data: entries.map((e) => ({
+                storeId,
+                dayOfWeek: e.dayOfWeek,
+                opensAt: e.opensAt,
+                closesAt: e.closesAt,
+              })),
+            }),
+          ]
+        : []),
+    ]);
+    return this.prisma.storeHours.findMany({
+      where: { storeId },
+      orderBy: { dayOfWeek: "asc" },
+      select: { id: true, dayOfWeek: true, opensAt: true, closesAt: true },
+    });
+  }
+
+  /** Fechamentos excepcionais da loja (futuros primeiro), ordenados por data. */
+  async storeClosures(user: { id: string; roles: string[] }, storeId: string) {
+    await this.assertOwnerOfStore(user, storeId);
+    const rows = await this.prisma.storeClosure.findMany({
+      where: { storeId },
+      orderBy: { date: "asc" },
+      select: { id: true, date: true, reason: true },
+    });
+    return rows.map((c) => ({ id: c.id, date: c.date.toISOString().slice(0, 10), reason: c.reason }));
+  }
+
+  /**
+   * Adiciona um fechamento excepcional (data YYYY-MM-DD + motivo opcional). Data
+   * inválida → INVALID_DATE; duplicata do mesmo dia → CLOSURE_EXISTS.
+   */
+  async addStoreClosure(
+    user: { id: string; roles: string[] },
+    storeId: string,
+    input: { date: string; reason?: string | null },
+  ) {
+    await this.assertOwnerOfStore(user, storeId);
+    const date = parseClosureDate(input.date);
+    const existing = await this.prisma.storeClosure.findUnique({
+      where: { storeId_date: { storeId, date } },
+    });
+    if (existing) {
+      throw new BadRequestException({ code: "CLOSURE_EXISTS", message: "Já existe fechamento nessa data" });
+    }
+    const created = await this.prisma.storeClosure.create({
+      data: { storeId, date, reason: input.reason?.trim() || null },
+      select: { id: true, date: true, reason: true },
+    });
+    return { id: created.id, date: created.date.toISOString().slice(0, 10), reason: created.reason };
+  }
+
+  /** Remove um fechamento excepcional da loja (valida posse da loja). */
+  async removeStoreClosure(
+    user: { id: string; roles: string[] },
+    storeId: string,
+    closureId: string,
+  ) {
+    await this.assertOwnerOfStore(user, storeId);
+    const closure = await this.prisma.storeClosure.findUnique({ where: { id: closureId } });
+    if (!closure || closure.storeId !== storeId) {
+      throw new NotFoundException({ code: "CLOSURE_NOT_FOUND", message: "Fechamento não encontrado" });
+    }
+    await this.prisma.storeClosure.delete({ where: { id: closureId } });
+    return { removed: true };
+  }
+
   // ── Pedidos (story 12) ──
 
   /**
@@ -553,4 +692,20 @@ export class MerchantService {
       throw new ForbiddenException({ code: "STORE_NOT_MANAGED", message: "Loja não gerida por você" });
     }
   }
+}
+
+/**
+ * Converte "YYYY-MM-DD" numa Date UTC à meia-noite (casa com o `@db.Date` do
+ * StoreClosure). Formato inválido → BadRequest INVALID_DATE.
+ */
+function parseClosureDate(raw: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw?.trim() ?? "");
+  if (!m) {
+    throw new BadRequestException({ code: "INVALID_DATE", message: "Data inválida (use YYYY-MM-DD)" });
+  }
+  const date = new Date(`${m[1]}-${m[2]}-${m[3]}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) {
+    throw new BadRequestException({ code: "INVALID_DATE", message: "Data inválida (use YYYY-MM-DD)" });
+  }
+  return date;
 }

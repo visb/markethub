@@ -20,6 +20,8 @@ interface ProductCardProps {
   header?: MerchantHeader;
   /** Quantidade atual no carrinho (unidades) ou gramas; null = não está. */
   cartLabel?: string | null;
+  /** Loja fechada agora (story 52) → selo discreto "Fechado" no card. */
+  closed?: boolean;
   onAdd: () => void;
   onDec?: () => void;
   onInc?: () => void;
@@ -31,6 +33,7 @@ export function ProductCard({
   product,
   header,
   cartLabel,
+  closed,
   onAdd,
   onDec,
   onInc,
@@ -60,6 +63,11 @@ export function ProductCard({
             <Text variant="caption" muted>
               {header.eta}
             </Text>
+            {closed ? (
+              <View style={styles.closedChip}>
+                <Text style={styles.closedChipText}>Fechado</Text>
+              </View>
+            ) : null}
           </View>
         </View>
       ) : null}
@@ -102,6 +110,14 @@ const styles = StyleSheet.create({
   merchant: { gap: 2 },
   merchantLine: { flexDirection: "row", alignItems: "center", gap: 4 },
   deliveryLine: { flexDirection: "row", alignItems: "center", gap: 2 },
+  closedChip: {
+    marginLeft: 6,
+    backgroundColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  closedChipText: { color: colors.textMuted, fontSize: 10, fontWeight: "700" },
   img: { width: "100%", height: 92, borderRadius: radius.sm, backgroundColor: colors.white },
   imgEmpty: { borderWidth: 1, borderColor: colors.border },
   badge: {

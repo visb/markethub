@@ -8,4 +8,5 @@ export * from "./refund";
 export * from "./delivery";
 export * from "./reviews";
 export * from "./stores";
+export * from "./store-hours";
 export * from "./merchant";

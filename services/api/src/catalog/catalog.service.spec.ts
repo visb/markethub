@@ -300,6 +300,8 @@ describe("CatalogService.storeSections", () => {
       longitude: 0,
       avgPrepMinutes: 15,
       merchant: { name: "Mercado", logoUrl: null, deliveryFeeCents: 500 },
+      hours: [],
+      closures: [],
       ...over,
     };
   }
@@ -366,6 +368,8 @@ describe("CatalogService.feed", () => {
         longitude: lng,
         avgPrepMinutes: 10,
         merchant: { name: "Mercado", logoUrl: null, deliveryFeeCents: 0 },
+        hours: [],
+        closures: [],
       },
       product: {
         id: `p-${storeId}`,
@@ -491,6 +495,7 @@ describe("CatalogService.storeSummary (story 29)", () => {
     merchantId: "m1",
     merchant: { name: "Supermercado Europa", logoUrl: null, deliveryFeeCents: 700 },
     hours: [{ dayOfWeek: 0, opensAt: 480, closesAt: 1200 }],
+    closures: [],
   };
   // domingo 09:00 São Paulo → dentro de 8h–20h
   const sundayMorning = new Date("2026-06-28T12:00:00Z");

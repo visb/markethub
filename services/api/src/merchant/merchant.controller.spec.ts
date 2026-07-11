@@ -20,6 +20,11 @@ function make() {
     listStocks: jest.fn().mockResolvedValue([{ id: "k1" }]),
     updateStock: jest.fn().mockResolvedValue({ id: "k1" }),
     unlockStock: jest.fn().mockResolvedValue({ id: "k1" }),
+    storeHours: jest.fn().mockResolvedValue([{ id: "h1" }]),
+    setStoreHours: jest.fn().mockResolvedValue([{ id: "h1" }]),
+    storeClosures: jest.fn().mockResolvedValue([{ id: "c1" }]),
+    addStoreClosure: jest.fn().mockResolvedValue({ id: "c1" }),
+    removeStoreClosure: jest.fn().mockResolvedValue({ removed: true }),
   };
   const products = {
     uploadUrl: jest.fn().mockResolvedValue({ url: "u", key: "k" }),
@@ -57,6 +62,45 @@ describe("MerchantController — lojas", () => {
     const { controller, merchant, user } = make();
     await controller.updateStore(user, "s1", { name: "X" });
     expect(merchant.updateStore).toHaveBeenCalledWith({ id: "u1", roles: ["merchant"] }, "s1", { name: "X" });
+  });
+});
+
+describe("MerchantController — horário + fechamentos (story 52)", () => {
+  const identity = { id: "u1", roles: ["merchant"] };
+
+  it("GET stores/:id/hours delega identidade + id", async () => {
+    const { controller, merchant, user } = make();
+    await controller.storeHours(user, "s1");
+    expect(merchant.storeHours).toHaveBeenCalledWith(identity, "s1");
+  });
+
+  it("PUT stores/:id/hours delega as faixas do dto", async () => {
+    const { controller, merchant, user } = make();
+    await controller.setStoreHours(user, "s1", { hours: [{ dayOfWeek: 1, opensAt: 480, closesAt: 1320 }] });
+    expect(merchant.setStoreHours).toHaveBeenCalledWith(identity, "s1", [
+      { dayOfWeek: 1, opensAt: 480, closesAt: 1320 },
+    ]);
+  });
+
+  it("GET stores/:id/closures delega identidade + id", async () => {
+    const { controller, merchant, user } = make();
+    await controller.storeClosures(user, "s1");
+    expect(merchant.storeClosures).toHaveBeenCalledWith(identity, "s1");
+  });
+
+  it("POST stores/:id/closures delega dto", async () => {
+    const { controller, merchant, user } = make();
+    await controller.addStoreClosure(user, "s1", { date: "2026-12-25", reason: "Natal" });
+    expect(merchant.addStoreClosure).toHaveBeenCalledWith(identity, "s1", {
+      date: "2026-12-25",
+      reason: "Natal",
+    });
+  });
+
+  it("DELETE stores/:id/closures/:closureId delega ids", async () => {
+    const { controller, merchant, user } = make();
+    await controller.removeStoreClosure(user, "s1", "c1");
+    expect(merchant.removeStoreClosure).toHaveBeenCalledWith(identity, "s1", "c1");
   });
 });
 

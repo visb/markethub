@@ -16,6 +16,10 @@ vi.mock("@/api/hooks/useStores", () => ({
   useCreateStore: () => ({ mutate: createMutate, isPending: false }),
   useUpdateStore: () => ({ mutate: updateMutate, isPending: false }),
 }));
+// Story 52: as seções de horário/fechamentos têm testes próprios; aqui só
+// verificamos o CRUD da loja, então as stubamos para não puxar hooks/React Query.
+vi.mock("@/components/StoreHoursSection", () => ({ StoreHoursSection: () => null }));
+vi.mock("@/components/StoreClosuresSection", () => ({ StoreClosuresSection: () => null }));
 
 import { Stores } from "./Stores";
 

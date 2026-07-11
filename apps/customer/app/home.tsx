@@ -139,6 +139,7 @@ export default function MarketplaceHome() {
                       distanceKm: item.distanceKm,
                       deliveryFeeCents: item.deliveryFeeCents,
                     }}
+                    closed={!item.openNow}
                     cartLabel={cart.labelFor(item.offerId, item.saleType)}
                     onAdd={() => cart.add(item.offerId, item.saleType)}
                     onInc={() => cart.inc(item.offerId, item.saleType)}
