@@ -28,11 +28,6 @@ customer (polish).
 
 ## App admin
 
-### 17. Dashboard real
-`Dashboard.tsx` tem 29 linhas ("Olá, {user}"). Home do admin com KPIs: pedidos hoje, GMV,
-lojas ativas, filas de picking/entrega atrasadas (reusa endpoints de Operations/Finance),
-alertas (ex.: fila ERP parada, outbox acumulando).
-
 ### 18. Timeline do pedido + ferramentas de suporte
 Admin Orders lista pedidos; suporte precisa de detalhe profundo: timeline completa (eventos de
 domínio do outbox: pago → picking → entrega → cancelado/estornado), busca por id/cliente/telefone,
