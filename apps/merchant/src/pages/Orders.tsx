@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import type { MerchantOrderDTO, OrderGroupStatus } from "@markethub/api-client";
 import { useMerchantContext } from "@/api/hooks/useMerchantContext";
 import { useMerchantOrders } from "@/api/hooks/useMerchantOrders";
+import { useNewOrderAlert } from "@/api/hooks/useNewOrderAlert";
+import { OrderDrawer } from "@/components/OrderDrawer";
 
 /** Colunas do board, na ordem do fluxo. Cancelados ficam por último. */
 const COLUMNS: { status: OrderGroupStatus; label: string }[] = [
@@ -39,11 +41,15 @@ export function Orders() {
   const storeIds = useMemo(() => stores.map((s) => s.id), [stores]);
   const [storeId, setStoreId] = useState<string>("");
 
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
   const { orders, loading, connected } = useMerchantOrders({
     storeId: storeId || undefined,
     subscribeStoreIds: storeIds,
     enabled: storeIds.length > 0,
   });
+
+  const { soundEnabled, toggleSound } = useNewOrderAlert(storeIds.length > 0);
 
   const grouped = useMemo(() => groupByStatus(orders), [orders]);
 
@@ -51,6 +57,16 @@ export function Orders() {
     <section>
       <div className="page-head">
         <h1>Pedidos</h1>
+        <button
+          type="button"
+          className="btn-icon"
+          aria-pressed={soundEnabled}
+          aria-label={soundEnabled ? "Desligar som de novos pedidos" : "Ligar som de novos pedidos"}
+          title={soundEnabled ? "Som de novos pedidos ligado" : "Som de novos pedidos desligado"}
+          onClick={toggleSound}
+        >
+          {soundEnabled ? "🔔" : "🔕"}
+        </button>
         <span className={connected ? "badge-live" : "badge-muted"}>
           {connected ? "Tempo real" : "Reconectando…"}
         </span>
@@ -88,14 +104,18 @@ export function Orders() {
                 <ul className="list">
                   {cards.map((o) => (
                     <li key={o.id} className="list-item order-card">
-                      <div>
+                      <button
+                        type="button"
+                        className="order-card-btn"
+                        onClick={() => setSelectedId(o.id)}
+                      >
                         <strong>#{o.orderId.slice(-6)}</strong>
                         <span className="badge-muted"> {o.fulfillment === "pickup" ? "Retirada" : "Entrega"}</span>
                         <div className="muted">{o.storeName}</div>
                         <div className="muted">
                           {o.itemCount} {o.itemCount === 1 ? "item" : "itens"} · {formatBRL(o.totalCents)}
                         </div>
-                      </div>
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -104,6 +124,8 @@ export function Orders() {
           })}
         </div>
       )}
+
+      {selectedId && <OrderDrawer groupId={selectedId} onClose={() => setSelectedId(null)} />}
     </section>
   );
 }

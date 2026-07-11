@@ -35,7 +35,7 @@ function makeService(opts: {
   const geocode = opts.geocode ?? jest.fn().mockResolvedValue({ latitude: -25.4, longitude: -49.2 });
   const geocoding = { geocode } as never;
   const storeFindMany = (prisma as unknown as { store: { findMany: jest.Mock } }).store.findMany;
-  return { svc: new MerchantService(prisma, geocoding), create, update, geocode, storeFindMany };
+  return { svc: new MerchantService(prisma, geocoding, {} as never), create, update, geocode, storeFindMany };
 }
 
 const owner = { id: "u1", roles: ["merchant"] };
@@ -267,7 +267,7 @@ function makeManager(opts: {
     orderGroup: { findMany: jest.fn().mockResolvedValue(opts.groups ?? []) },
   } as never;
   const geocoding = { geocode: jest.fn() } as never;
-  return { svc: new MerchantService(prisma, geocoding), offerUpdate, stockUpdate, prisma };
+  return { svc: new MerchantService(prisma, geocoding, {} as never), offerUpdate, stockUpdate, prisma };
 }
 
 const mgr = { id: "u2", roles: ["customer"] };
@@ -598,7 +598,7 @@ function makeHours(opts: {
   } as never;
   // roles do owner: inclui merchant p/ resolveLevel = owner
   const geocoding = { geocode: jest.fn() } as never;
-  return { svc: new MerchantService(prisma, geocoding), prisma, closureCreate, closureDelete };
+  return { svc: new MerchantService(prisma, geocoding, {} as never), prisma, closureCreate, closureDelete };
 }
 
 const hoursOwner = { id: "u1", roles: ["merchant"] };

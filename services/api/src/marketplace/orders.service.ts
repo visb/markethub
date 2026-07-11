@@ -8,6 +8,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { SchedulingService } from "../scheduling/scheduling.service";
 import { isStoreAvailable } from "../shared/store-hours";
 import { CartService } from "./cart.service";
+import { groupCancelRefundCents } from "./group-refund.pricing";
 
 export interface CreateOrderInput {
   /** Entrega: obrigatório. Retirada na loja: ignorado. */
@@ -281,6 +282,94 @@ export class OrdersService {
         aggregateId: id,
       });
       return canceled;
+    });
+  }
+
+  /**
+   * Cancela UM sub-pedido (OrderGroup) — story 54. O marketplace é dono do
+   * agregado; a loja/marketplace cancela só o grupo dela, os demais grupos do
+   * pedido seguem. Espelha a invariante de Order (cancelamento): grupo cancela se
+   * `status ∈ {created, paid, preparing}` E a PickTask do grupo (se houver) ainda
+   * não passou de `assigned`. Senão `CANNOT_CANCEL_GROUP`.
+   *
+   * Escopo: `actor.storeIds` são as lojas do ator (resolvidas no contexto
+   * merchant). Grupo de loja fora do escopo → 404 (não vaza existência).
+   *
+   * Na MESMA TX: grupo → `canceled`; PickTask do grupo removida da fila; quando é
+   * o ÚLTIMO grupo ativo, o Order inteiro vira `canceled` e o slot de entrega
+   * (Order-level) é liberado — sem emitir `order.canceled` (o handler do grupo já
+   * cobre o estorno; emitir os dois duplicaria o reembolso). Emite
+   * `order.group_canceled` no outbox com o valor JÁ rateado (total do grupo −
+   * cupom proporcional). O estorno PARCIAL durável + push ao cliente são handlers
+   * do evento (retry isolado, idempotente via ProcessedEvent — padrão story 48).
+   */
+  async cancelGroup(groupId: string, actor: { storeIds: string[] }) {
+    const group = await this.prisma.orderGroup.findUnique({
+      where: { id: groupId },
+      include: {
+        order: { select: { id: true, discountCents: true, deliverySlotId: true } },
+        pickTask: { select: { id: true, status: true } },
+      },
+    });
+    if (!group || !actor.storeIds.includes(group.storeId)) {
+      throw new NotFoundException({ code: "ORDER_GROUP_NOT_FOUND", message: "Sub-pedido não encontrado" });
+    }
+
+    const cancelable =
+      group.status === "created" || group.status === "paid" || group.status === "preparing";
+    const taskOk =
+      !group.pickTask || group.pickTask.status === "queued" || group.pickTask.status === "assigned";
+    if (!cancelable || !taskOk) {
+      throw new BadRequestException({
+        code: "CANNOT_CANCEL_GROUP",
+        message: "Só é possível cancelar o sub-pedido antes da separação começar",
+      });
+    }
+
+    // Todos os grupos do pedido: rateio do cupom (Order-level) + detecção do
+    // último grupo ativo (os demais já cancelados → Order vira canceled).
+    const siblings = await this.prisma.orderGroup.findMany({
+      where: { orderId: group.orderId },
+      select: {
+        id: true,
+        status: true,
+        subtotalCents: true,
+        deliveryCents: true,
+        prepCents: true,
+        platformFeeCents: true,
+      },
+    });
+    const groupTotal = (g: { subtotalCents: number; deliveryCents: number; prepCents: number; platformFeeCents: number }) =>
+      g.subtotalCents + g.deliveryCents + g.prepCents + g.platformFeeCents;
+    const amountCents = groupCancelRefundCents({
+      discountCents: group.order.discountCents,
+      groups: siblings.map((g) => ({ id: g.id, totalCents: groupTotal(g) })),
+      groupId,
+    });
+    const lastActive = siblings.every((g) => g.id === groupId || g.status === "canceled");
+
+    return this.prisma.$transaction(async (tx) => {
+      if (group.pickTask) {
+        await tx.pickTask.deleteMany({ where: { orderGroupId: groupId } });
+      }
+      await tx.orderGroup.update({ where: { id: groupId }, data: { status: "canceled" } });
+      if (lastActive) {
+        await tx.order.update({ where: { id: group.orderId }, data: { status: "canceled" } });
+        // Slot é Order-level: só libera quando o pedido inteiro é cancelado.
+        // Decremento guardado (não desce abaixo de zero) — igual scheduling.release.
+        if (group.order.deliverySlotId) {
+          await tx.deliverySlot.updateMany({
+            where: { id: group.order.deliverySlotId, reserved: { gt: 0 } },
+            data: { reserved: { decrement: 1 } },
+          });
+        }
+      }
+      await this.outbox.publish(tx, {
+        type: "order.group_canceled",
+        payload: { orderId: group.orderId, groupId, amountCents, reason: "group_canceled" },
+        aggregateId: group.orderId,
+      });
+      return { id: groupId, status: "canceled" as const, orderCanceled: lastActive, amountCents };
     });
   }
 

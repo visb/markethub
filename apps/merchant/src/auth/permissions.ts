@@ -21,6 +21,7 @@ export type Capability =
   | "catalog.manage"
   | "coupons.manage"
   | "orders.view"
+  | "orders.manage"
   | "reports.view";
 
 const OWNER_CAPS: ReadonlySet<Capability> = new Set<Capability>([
@@ -32,6 +33,7 @@ const OWNER_CAPS: ReadonlySet<Capability> = new Set<Capability>([
   "catalog.manage",
   "coupons.manage",
   "orders.view",
+  "orders.manage",
   "reports.view",
 ]);
 
@@ -45,6 +47,7 @@ const ADMIN_CAPS: ReadonlySet<Capability> = new Set<Capability>([
   "catalog.manage",
   "coupons.manage",
   "orders.view",
+  "orders.manage",
   "reports.view",
 ]);
 
@@ -54,6 +57,7 @@ const MANAGER_CAPS: ReadonlySet<Capability> = new Set<Capability>([
   "vehicles.manage",
   "catalog.manage",
   "orders.view",
+  "orders.manage",
   "reports.view",
 ]);
 

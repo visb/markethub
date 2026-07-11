@@ -18,6 +18,8 @@ export const PICKING_DONE_VERIFICAR_SHORTFALL_REFUND = "picking-done.verificar-s
 export const ORDER_CANCELED_LIBERAR_SLOT = "order-canceled.liberar-slot";
 export const ORDER_CANCELED_EMITIR_ESTORNO = "order-canceled.emitir-estorno";
 export const ORDER_CANCELED_NOTIFICAR = "order-canceled.notificar";
+export const ORDER_GROUP_CANCELED_EMITIR_ESTORNO = "order-group-canceled.emitir-estorno";
+export const ORDER_GROUP_CANCELED_NOTIFICAR = "order-group-canceled.notificar";
 
 /** eventType → handlers inscritos. */
 export const SUBSCRIPTIONS: Record<DomainEventType, readonly string[]> = {
@@ -32,6 +34,10 @@ export const SUBSCRIPTIONS: Record<DomainEventType, readonly string[]> = {
     ORDER_CANCELED_LIBERAR_SLOT,
     ORDER_CANCELED_EMITIR_ESTORNO,
     ORDER_CANCELED_NOTIFICAR,
+  ],
+  "order.group_canceled": [
+    ORDER_GROUP_CANCELED_EMITIR_ESTORNO,
+    ORDER_GROUP_CANCELED_NOTIFICAR,
   ],
 };
 

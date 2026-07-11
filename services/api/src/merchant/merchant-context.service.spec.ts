@@ -19,7 +19,7 @@ function makeService(
     },
   } as never;
   const geocoding = { geocode: jest.fn().mockResolvedValue(null) } as never;
-  return new MerchantService(prisma, geocoding);
+  return new MerchantService(prisma, geocoding, {} as never);
 }
 
 const loja = (id: string, merchantId = "m1") => ({

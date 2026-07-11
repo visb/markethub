@@ -32,6 +32,7 @@ import type {
   UpdateCouponInput,
   DriverVehicleDTO,
   MerchantOrderDTO,
+  MerchantOrderDetailDTO,
   MerchantReportQuery,
   SalesReportDTO,
   OperationsReportDTO,
@@ -463,6 +464,20 @@ export class ApiClient {
     if (params.status) q.set("status", params.status);
     const qs = q.toString();
     return this.request(`/merchant/orders${qs ? `?${qs}` : ""}`, { auth: true });
+  }
+
+  /** Detalhe de um sub-pedido (OrderGroup) — itens, pagamento, cliente, timeline (story 54). */
+  merchantOrderGroup(id: string): Promise<MerchantOrderDetailDTO> {
+    return this.request(`/merchant/orders/groups/${id}`, { auth: true });
+  }
+
+  /** Cancela um sub-pedido (OrderGroup) da loja do ator, com motivo opcional (story 54). */
+  merchantCancelOrderGroup(id: string, reason?: string): Promise<{ id: string; status: string }> {
+    return this.request(`/merchant/orders/groups/${id}/cancel`, {
+      method: "POST",
+      body: reason ? { reason } : {},
+      auth: true,
+    });
   }
 
   // ─── Merchant / relatórios (story 13) ───────────

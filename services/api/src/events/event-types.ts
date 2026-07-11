@@ -29,12 +29,27 @@ export interface OrderCanceledPayload {
   deliverySlotId: string | null;
 }
 
+/**
+ * Sub-pedido (OrderGroup) cancelado pela loja/marketplace (story 54). O payload
+ * carrega o valor já rateado do estorno (total do grupo − cupom proporcional,
+ * calculado na TX de cancelGroup, quando os totais/desconto do pedido estão à
+ * mão) — o handler acumula esse valor no Refund 1:1 do pedido e dispara o estorno
+ * PARCIAL no gateway. `reason` é o resumo legível gravado no Refund.
+ */
+export interface OrderGroupCanceledPayload {
+  orderId: string;
+  groupId: string;
+  amountCents: number;
+  reason: string;
+}
+
 /** Mapa tipo → payload. */
 export interface DomainEventMap {
   "order.created": OrderCreatedPayload;
   "order.paid": OrderPaidPayload;
   "picking.done": PickingDonePayload;
   "order.canceled": OrderCanceledPayload;
+  "order.group_canceled": OrderGroupCanceledPayload;
 }
 
 export type DomainEventType = keyof DomainEventMap;

@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import { GEOCODING_PROVIDER, type GeocodingProvider } from "../geocoding";
+import { OrdersService } from "../marketplace";
 import { PrismaService } from "../prisma/prisma.service";
 
 export interface OfferFilters {
@@ -54,6 +55,7 @@ export class MerchantService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(GEOCODING_PROVIDER) private readonly geocoding: GeocodingProvider,
+    private readonly orders: OrdersService,
   ) {}
 
   /**
@@ -501,6 +503,125 @@ export class MerchantService {
       pickupCode: g.pickupCode,
       createdAt: g.order.createdAt.toISOString(),
     }));
+  }
+
+  /**
+   * Detalhe de um sub-pedido (OrderGroup) p/ o drawer do merchant (story 54):
+   * itens linha a linha (+ separação/substituição), cumprimento, pagamento,
+   * cliente e timeline de marcos. Capability `orders.view`. Grupo de loja fora do
+   * escopo do ator → 404 (não vaza existência de pedido de outra loja).
+   */
+  async orderGroupDetail(user: { id: string; roles: string[] }, groupId: string) {
+    const scoped = await this.scopedStoreIds(user);
+    const group = await this.prisma.orderGroup.findUnique({
+      where: { id: groupId },
+      include: {
+        store: { select: { name: true } },
+        pickTask: { select: { status: true, startedAt: true, packedAt: true, readyAt: true } },
+        delivery: { select: { pickedUpAt: true, deliveredAt: true } },
+        order: {
+          select: {
+            createdAt: true,
+            scheduledFrom: true,
+            scheduledTo: true,
+            user: { select: { name: true } },
+            payment: { select: { status: true, method: true, paidAt: true } },
+          },
+        },
+        items: {
+          orderBy: { nameSnapshot: "asc" },
+          include: {
+            pickItem: {
+              select: {
+                status: true,
+                quantityPicked: true,
+                weightGramsPicked: true,
+                substitution: {
+                  select: {
+                    nameSnapshot: true,
+                    unitPriceCents: true,
+                    priceDiffCents: true,
+                    approvalStatus: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!group || !scoped.includes(group.storeId)) {
+      throw new NotFoundException({ code: "ORDER_GROUP_NOT_FOUND", message: "Sub-pedido não encontrado" });
+    }
+
+    const cancelable =
+      (group.status === "created" || group.status === "paid" || group.status === "preparing") &&
+      (!group.pickTask || group.pickTask.status === "queued" || group.pickTask.status === "assigned");
+
+    return {
+      id: group.id,
+      orderId: group.orderId,
+      storeId: group.storeId,
+      storeName: group.store.name,
+      status: group.status,
+      fulfillment: group.fulfillment,
+      createdAt: group.order.createdAt.toISOString(),
+      subtotalCents: group.subtotalCents,
+      deliveryCents: group.deliveryCents,
+      prepCents: group.prepCents,
+      platformFeeCents: group.platformFeeCents,
+      totalCents: group.subtotalCents + group.deliveryCents + group.prepCents + group.platformFeeCents,
+      pickupCode: group.pickupCode,
+      scheduledFrom: group.order.scheduledFrom?.toISOString() ?? null,
+      scheduledTo: group.order.scheduledTo?.toISOString() ?? null,
+      payment: group.order.payment
+        ? { status: group.order.payment.status, method: group.order.payment.method }
+        : null,
+      customer: { name: group.order.user.name, phone: null },
+      items: group.items.map((i) => ({
+        id: i.id,
+        name: i.nameSnapshot,
+        saleType: i.saleType,
+        quantity: i.quantity,
+        weightGrams: i.weightGrams,
+        unitPriceCents: i.unitPriceCents,
+        lineTotalCents: i.lineTotalCents,
+        pickStatus: i.pickItem?.status ?? null,
+        quantityPicked: i.pickItem?.quantityPicked ?? null,
+        weightGramsPicked: i.pickItem?.weightGramsPicked ?? null,
+        substitution: i.pickItem?.substitution
+          ? {
+              name: i.pickItem.substitution.nameSnapshot,
+              unitPriceCents: i.pickItem.substitution.unitPriceCents,
+              priceDiffCents: i.pickItem.substitution.priceDiffCents,
+              approvalStatus: i.pickItem.substitution.approvalStatus,
+            }
+          : null,
+      })),
+      timeline: {
+        createdAt: group.order.createdAt.toISOString(),
+        paidAt: group.order.payment?.paidAt?.toISOString() ?? null,
+        pickingStartedAt: group.pickTask?.startedAt?.toISOString() ?? null,
+        packedAt: group.pickTask?.packedAt?.toISOString() ?? null,
+        readyAt: group.pickTask?.readyAt?.toISOString() ?? null,
+        pickedUpAt: group.delivery?.pickedUpAt?.toISOString() ?? null,
+        deliveredAt: group.delivery?.deliveredAt?.toISOString() ?? null,
+      },
+      cancelable,
+    };
+  }
+
+  /**
+   * Cancela um sub-pedido (OrderGroup) da loja do ator (story 54). Capability
+   * `orders.manage` (owner/admin/manager no escopo). Resolve o escopo de loja e
+   * delega ao marketplace (dono do agregado) — grupo fora do escopo → 404 (lá).
+   */
+  async cancelOrderGroup(user: { id: string; roles: string[] }, groupId: string) {
+    const storeIds = await this.scopedStoreIds(user);
+    if (storeIds.length === 0) {
+      throw new ForbiddenException({ code: "NOT_A_MERCHANT_USER", message: "Usuário sem lojas no escopo" });
+    }
+    return this.orders.cancelGroup(groupId, { storeIds });
   }
 
   // ── Ofertas ──
