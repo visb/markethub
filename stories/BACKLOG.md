@@ -28,11 +28,6 @@ customer (polish).
 
 ## App admin
 
-### 18. Timeline do pedido + ferramentas de suporte
-Admin Orders lista pedidos; suporte precisa de detalhe profundo: timeline completa (eventos de
-domínio do outbox: pago → picking → entrega → cancelado/estornado), busca por id/cliente/telefone,
-ação de reembolso manual (total/parcial) com trilha de quem fez.
-
 ### 19. Moderação de avaliações
 Review abusiva/spam: listar, ocultar/remover com motivo. Hoje nenhuma superfície de moderação.
 
