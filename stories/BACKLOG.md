@@ -24,10 +24,6 @@ customer (polish).
 
 ## App picker
 
-### 16. Métricas / histórico do picker
-Tarefas concluídas, itens/hora, taxa de substituição — motivação e gestão (espelho no merchant
-Reports por colaborador).
-
 ---
 
 ## App admin
