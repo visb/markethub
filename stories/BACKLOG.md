@@ -20,10 +20,6 @@ customer (polish).
 
 ## App driver
 
-### 10. Mapa + navegação na entrega
-Sem `MapView` no driver. Na tela de entrega: mapa loja→cliente com rota, botão "abrir no
-Google/Apple Maps" (deep-link), posição atual (liga com item 2).
-
 ### 11. Ganhos e histórico do entregador
 `Tip` existe e admin Finance já mostra "gorjetas por entregador" — **driver não vê as próprias**.
 - Tela de ganhos: gorjetas por período, entregas concluídas, histórico com detalhe.
