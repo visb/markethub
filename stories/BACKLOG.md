@@ -16,12 +16,6 @@ customer (polish).
 
 ## App merchant
 
-### 5. Detalhe + ações no pedido
-`Orders.tsx` é kanban realtime **read-only**. Falta:
-- Drawer/página de detalhe: itens, substituições, pagamento, cliente, timeline de eventos.
-- Ações: cancelar pedido (dispara estorno via evento `order.canceled`, story 48), marcar problema.
-- Som/badge de novo pedido no painel (lojista deixa aba aberta o dia todo).
-
 ### 6. Gestão de slots de agendamento
 Backend pronto (`scheduling.controller`: GET/POST/DELETE `store/slots`, capacidade por slot) —
 **sem UI merchant**. Tela de slots por loja: criar janelas, capacidade, desativar.
