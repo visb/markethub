@@ -28,10 +28,6 @@ customer (polish).
 
 ## App admin
 
-### 20. Ciclo de vida do merchant
-Onboarding/ativação: aprovar merchant novo, suspender/reativar (loja suspensa some da vitrine).
-Conferir o que `MerchantsList/MerchantDetail` já cobre e completar status + efeitos na vitrine.
-
 ---
 
 ## App customer (complementos)
