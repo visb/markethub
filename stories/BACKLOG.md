@@ -16,10 +16,6 @@ customer (polish).
 
 ## App merchant
 
-### 6. Gestão de slots de agendamento
-Backend pronto (`scheduling.controller`: GET/POST/DELETE `store/slots`, capacidade por slot) —
-**sem UI merchant**. Tela de slots por loja: criar janelas, capacidade, desativar.
-
 ### 7. Responder avaliações
 Merchant vê médias em Reports; `Review` não tem resposta do lojista. Fluxo completo:
 - Backend: campo/model de resposta + endpoint merchant.
