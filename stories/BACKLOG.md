@@ -14,13 +14,6 @@ customer (polish).
 
 ## Cross-cutting (impacta múltiplos apps)
 
-### 2. Rastreio de entrega ao vivo (driver → customer)
-Só existe `picking.gateway`. Sem posição do entregador em tempo real.
-- Driver: `expo-location watchPosition` durante entrega → publica posição (socket/endpoint throttled).
-- Backend: gateway/endpoint de localização + broadcast pro cliente do pedido.
-- Customer `track/[id]`: mapa com marcador ao vivo + ETA dinâmico (hoje `etaWindow` estático e
-  `driverName` em texto).
-
 ### 3. Horário de funcionamento ponta-a-ponta
 `StoreHours` existe no schema mas só o admin edita (StoreDetail). Falta:
 - Merchant: editar horários da própria loja (com fechamento excepcional/feriado).
