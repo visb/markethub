@@ -12,13 +12,6 @@ customer (polish).
 
 ---
 
-## Cross-cutting (impacta múltiplos apps)
-
-### 4. Cupons — UI de gestão
-Model `Coupon` + aplicação no carrinho existem; **nenhuma UI cria/gerencia cupom**.
-- Decidir dono: cupom de plataforma (admin) vs cupom de loja (merchant) — provavelmente ambos.
-- CRUD com validade, limite de uso, valor mínimo; listagem de usos.
-
 ---
 
 ## App merchant
