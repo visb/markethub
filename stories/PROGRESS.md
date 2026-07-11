@@ -20,7 +20,7 @@ Cuidados da rodada:
 
 | #  | Título | Dep | Status |
 |----|--------|-----|--------|
-| 50 | push no device via Expo Push Service (customer/picker/driver) | — | todo |
+| 50 | push no device via Expo Push Service (customer/picker/driver) | — | done |
 | 51 | rastreio de entrega ao vivo (driver → customer) | — | todo |
 | 52 | horário de funcionamento ponta-a-ponta | — | todo |
 | 53 | cupons — gestão admin (globais) + merchant (rede) | — | todo |
@@ -45,3 +45,5 @@ Cuidados da rodada:
 | 72 | merchant — remover Placeholder.tsx morto | — | todo |
 
 ## Log
+
+[OK] 50 — testes: api 1018/1018, customer 208/208, picker 86/86, driver 92/92 — commit: 4e61a30 — merge na main + arquivada — 2026-07-11 — PENDENTE-MANUAL: validação em device físico real (Expo Push + projectId) só em runtime com aparelho.
