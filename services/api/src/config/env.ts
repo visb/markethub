@@ -35,8 +35,8 @@ export const envSchema = z.object({
   REVIEW_WINDOW_DAYS: z.coerce.number().int().positive().default(30),
   TIP_MAX_CENTS: z.coerce.number().int().positive().default(20000),
 
-  // Notificações push (S5.6). mock = log; fcm = Firebase Cloud Messaging.
-  PUSH_PROVIDER: z.enum(["mock", "fcm"]).default("mock"),
+  // Notificações push (S5.6). mock = log; expo = Expo Push Service; fcm = Firebase.
+  PUSH_PROVIDER: z.enum(["mock", "expo", "fcm"]).default("mock"),
   FCM_SERVER_KEY: z.string().optional(),
 
   // Geocodificação de endereço (S6.2). mock = determinístico em Curitiba (dev).

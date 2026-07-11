@@ -85,7 +85,7 @@ export class StoreDeliveryService {
     await this.push.sendToUser(driverId, {
       title: "Nova entrega",
       body: "Uma entrega foi atribuída a você.",
-      data: { deliveryId },
+      data: { deliveryId, route: `/delivery/${deliveryId}` },
     });
     return this.detail(deliveryId);
   }

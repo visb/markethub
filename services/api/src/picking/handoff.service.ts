@@ -231,7 +231,7 @@ export class HandoffService {
     if (group) {
       await this.push.sendToUser(group.order.userId, {
         ...message,
-        data: { orderId: group.orderId },
+        data: { orderId: group.orderId, route: `/track/${group.orderId}` },
       });
     }
   }

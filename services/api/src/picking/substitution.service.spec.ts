@@ -143,7 +143,7 @@ describe("SubstitutionService.propose", () => {
     expect((events as { substitutionProposed: jest.Mock }).substitutionProposed).toHaveBeenCalled();
     expect((push as { sendToUser: jest.Mock }).sendToUser).toHaveBeenCalledWith(
       "owner1",
-      expect.objectContaining({ data: { orderId: "o1" } }),
+      expect.objectContaining({ data: { orderId: "o1", route: "/track/o1" } }),
     );
     expect(sub).toEqual({ id: "sub1" });
   });
