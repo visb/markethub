@@ -95,7 +95,7 @@ export class PickingDoneHandlers {
         group.fulfillment === "pickup"
           ? "Seu pedido está pronto para retirada na loja."
           : "Seu pedido foi separado e aguarda coleta.",
-      data: { orderId: group.orderId },
+      data: { orderId: group.orderId, route: `/track/${group.orderId}` },
     });
   }
 

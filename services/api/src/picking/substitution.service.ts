@@ -107,7 +107,7 @@ export class SubstitutionService {
       await this.push.sendToUser(group.order.userId, {
         title: "Substituição pendente",
         body: `Um item foi substituído por ${offer.product.name}. Aprove ou recuse.`,
-        data: { orderId: group.orderId },
+        data: { orderId: group.orderId, route: `/track/${group.orderId}` },
       });
     }
     return sub;

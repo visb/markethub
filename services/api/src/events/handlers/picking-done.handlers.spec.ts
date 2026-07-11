@@ -133,7 +133,7 @@ describe("PickingDoneHandlers.notificar", () => {
     expect(push.sendToUser).toHaveBeenCalledWith("owner1", {
       title: "Pedido pronto",
       body: "Seu pedido foi separado e aguarda coleta.",
-      data: { orderId: "o1" },
+      data: { orderId: "o1", route: "/track/o1" },
     });
   });
 

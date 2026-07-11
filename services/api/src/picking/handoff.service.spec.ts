@@ -133,3 +133,15 @@ describe("HandoffService.markReady — story 46 (picking.done no outbox)", () =>
     });
   });
 });
+
+describe("HandoffService.confirmPickup — push ao dono (story 50: data.route)", () => {
+  it("coleta confirmada notifica o cliente com deep-link p/ o rastreio", async () => {
+    const { svc, sendToUser } = makeService("ready_for_pickup", "delivery");
+    await svc.confirmPickup("t1", "1234");
+    expect(sendToUser).toHaveBeenCalledWith("owner1", {
+      title: "A caminho",
+      body: "Seu pedido saiu para entrega.",
+      data: { orderId: "o1", route: "/track/o1" },
+    });
+  });
+});
