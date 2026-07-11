@@ -28,9 +28,6 @@ customer (polish).
 
 ## App admin
 
-### 19. Moderação de avaliações
-Review abusiva/spam: listar, ocultar/remover com motivo. Hoje nenhuma superfície de moderação.
-
 ### 20. Ciclo de vida do merchant
 Onboarding/ativação: aprovar merchant novo, suspender/reativar (loja suspensa some da vitrine).
 Conferir o que `MerchantsList/MerchantDetail` já cobre e completar status + efeitos na vitrine.
