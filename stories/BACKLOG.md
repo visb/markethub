@@ -16,10 +16,6 @@ customer (polish).
 
 ## App merchant
 
-### 8. Pausar loja / disponibilidade rápida
-- Toggle "pausar loja" (fecha temporariamente sem mexer em horário — rush, falta de picker).
-- Toggle rápido de disponibilidade de produto direto da lista do catálogo (esgotou na gôndola).
-
 ### 9. Config de entrega da loja
 Conferir o que `Store`/StoreForm já cobre (hoje: endereço, `avgPrepMinutes`) e completar: taxa de
 entrega, raio/área de cobertura, pedido mínimo, tempo estimado. Exposto no checkout do cliente.
