@@ -16,12 +16,6 @@ customer (polish).
 
 ## App merchant
 
-### 7. Responder avaliações
-Merchant vê médias em Reports; `Review` não tem resposta do lojista. Fluxo completo:
-- Backend: campo/model de resposta + endpoint merchant.
-- Merchant: listar reviews com filtro por nota + responder.
-- Customer: exibir resposta da loja na tela de reviews.
-
 ### 8. Pausar loja / disponibilidade rápida
 - Toggle "pausar loja" (fecha temporariamente sem mexer em horário — rush, falta de picker).
 - Toggle rápido de disponibilidade de produto direto da lista do catálogo (esgotou na gôndola).
