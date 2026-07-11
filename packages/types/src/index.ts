@@ -10,3 +10,4 @@ export * from "./reviews";
 export * from "./stores";
 export * from "./store-hours";
 export * from "./merchant";
+export * from "./coupons";

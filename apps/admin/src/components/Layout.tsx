@@ -10,6 +10,7 @@ interface NavItem {
 const ADMIN_NAV: NavItem[] = [
   { to: "/", label: "Visão geral", end: true },
   { to: "/merchants", label: "Mercados" },
+  { to: "/coupons", label: "Cupons" },
   { to: "/orders", label: "Pedidos" },
   { to: "/operations", label: "Operação" },
   { to: "/finance", label: "Financeiro" },

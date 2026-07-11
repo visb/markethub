@@ -24,9 +24,15 @@ describe("can (matriz de permissão — story 07)", () => {
     expect(can("manager", "reports.view")).toBe(true);
   });
 
-  it("manager NÃO gere integração nem cria lojas", () => {
+  it("manager NÃO gere integração, cupons nem cria lojas", () => {
     expect(can("manager", "integration.manage")).toBe(false);
     expect(can("manager", "stores.create")).toBe(false);
+    expect(can("manager", "coupons.manage")).toBe(false);
+  });
+
+  it("owner e admin gerenciam cupons da rede (story 53)", () => {
+    expect(can("owner", "coupons.manage")).toBe(true);
+    expect(can("admin", "coupons.manage")).toBe(true);
   });
 
   it("admin (story 16): integração + equipe + catálogo, mas NÃO cria lojas", () => {

@@ -64,4 +64,9 @@ export type {
   StoreClosureDTO,
   CreateStoreClosureInput,
   StoreOpenStateDTO,
+  CouponType,
+  CouponDTO,
+  CreateCouponInput,
+  AdminCreateCouponInput,
+  UpdateCouponInput,
 } from "@markethub/types";

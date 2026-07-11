@@ -3,6 +3,8 @@ import { GeocodingModule } from "../geocoding/geocoding.module";
 import { StorageModule } from "../storage/storage.module";
 import { UsersModule } from "../users/users.module";
 import { MerchantContextController } from "./merchant-context.controller";
+import { MerchantCouponsController } from "./merchant-coupons.controller";
+import { MerchantCouponsService } from "./merchant-coupons.service";
 import { MerchantOrdersController } from "./merchant-orders.controller";
 import { MerchantProductService } from "./merchant-product.service";
 import { MerchantReportsController } from "./merchant-reports.controller";
@@ -20,6 +22,7 @@ import { MerchantService } from "./merchant.service";
     MerchantContextController,
     MerchantStaffController,
     MerchantVehiclesController,
+    MerchantCouponsController,
     MerchantOrdersController,
     MerchantReportsController,
     MerchantController,
@@ -29,6 +32,7 @@ import { MerchantService } from "./merchant.service";
     MerchantProductService,
     MerchantStaffService,
     MerchantVehiclesService,
+    MerchantCouponsService,
     MerchantReportsService,
   ],
   exports: [MerchantService],

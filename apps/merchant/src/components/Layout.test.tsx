@@ -27,7 +27,7 @@ describe("Layout — nav gated por can() (story 07)", () => {
   it("owner vê todos os itens (incl. Integração)", () => {
     role = "owner";
     renderLayout();
-    for (const label of ["Lojas", "Integração", "Colaboradores", "Catálogo", "Pedidos", "Relatórios"]) {
+    for (const label of ["Lojas", "Integração", "Colaboradores", "Cupons", "Catálogo", "Pedidos", "Relatórios"]) {
       expect(screen.getByRole("link", { name: label })).toBeInTheDocument();
     }
     expect(screen.getByText(/Dono/)).toBeInTheDocument();
@@ -37,6 +37,7 @@ describe("Layout — nav gated por can() (story 07)", () => {
     role = "manager";
     renderLayout();
     expect(screen.queryByRole("link", { name: "Integração" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Cupons" })).not.toBeInTheDocument();
     for (const label of ["Lojas", "Colaboradores", "Catálogo", "Pedidos", "Relatórios"]) {
       expect(screen.getByRole("link", { name: label })).toBeInTheDocument();
     }

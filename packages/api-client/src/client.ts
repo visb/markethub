@@ -26,6 +26,10 @@ import type {
   VehicleDTO,
   CreateVehicleInput,
   UpdateVehicleInput,
+  CouponDTO,
+  CreateCouponInput,
+  AdminCreateCouponInput,
+  UpdateCouponInput,
   DriverVehicleDTO,
   MerchantOrderDTO,
   MerchantReportQuery,
@@ -368,6 +372,56 @@ export class ApiClient {
       method: "DELETE",
       auth: true,
     });
+  }
+
+  // ─── Merchant / cupons (da rede — story 53) ─────────────
+
+  /** Lista os cupons das redes no escopo do usuário (opcionalmente por rede). */
+  merchantCoupons(merchantId?: string): Promise<CouponDTO[]> {
+    return this.request(
+      `/merchant/coupons${merchantId ? `?merchantId=${encodeURIComponent(merchantId)}` : ""}`,
+      { auth: true },
+    );
+  }
+
+  /** Cria um cupom na rede do escopo (merchantId resolvido pelo backend se omitido). */
+  merchantCreateCoupon(input: CreateCouponInput): Promise<CouponDTO> {
+    return this.request("/merchant/coupons", { method: "POST", body: input, auth: true });
+  }
+
+  /** Atualiza parcialmente um cupom da rede (código é imutável). */
+  merchantUpdateCoupon(id: string, patch: UpdateCouponInput): Promise<CouponDTO> {
+    return this.request(`/merchant/coupons/${id}`, { method: "PATCH", body: patch, auth: true });
+  }
+
+  /** Remove o cupom (bloqueado se já usado — a UI desativa nesse caso). */
+  merchantRemoveCoupon(id: string): Promise<{ id: string; removed: boolean }> {
+    return this.request(`/merchant/coupons/${id}`, { method: "DELETE", auth: true });
+  }
+
+  // ─── Admin / cupons (globais + por rede — story 53) ─────────────
+
+  /** Lista cupons no admin. `filter`: undefined = todos; "global"; ou um merchantId. */
+  adminCoupons(filter?: string): Promise<CouponDTO[]> {
+    return this.request(
+      `/admin/coupons${filter ? `?merchantId=${encodeURIComponent(filter)}` : ""}`,
+      { auth: true },
+    );
+  }
+
+  /** Cria um cupom (global se merchantId null/ausente; ou atrelado a uma rede). */
+  adminCreateCoupon(input: AdminCreateCouponInput): Promise<CouponDTO> {
+    return this.request("/admin/coupons", { method: "POST", body: input, auth: true });
+  }
+
+  /** Atualiza parcialmente um cupom (código é imutável). */
+  adminUpdateCoupon(id: string, patch: UpdateCouponInput): Promise<CouponDTO> {
+    return this.request(`/admin/coupons/${id}`, { method: "PATCH", body: patch, auth: true });
+  }
+
+  /** Remove o cupom (bloqueado se já usado — a UI desativa nesse caso). */
+  adminRemoveCoupon(id: string): Promise<{ id: string; removed: boolean }> {
+    return this.request(`/admin/coupons/${id}`, { method: "DELETE", auth: true });
   }
 
   merchantOffers(params: { storeId?: string; search?: string; categoryId?: string; available?: boolean } = {}): Promise<MerchantOffer[]> {
