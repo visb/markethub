@@ -16,10 +16,6 @@ customer (polish).
 
 ## App merchant
 
-### 9. Config de entrega da loja
-Conferir o que `Store`/StoreForm já cobre (hoje: endereço, `avgPrepMinutes`) e completar: taxa de
-entrega, raio/área de cobertura, pedido mínimo, tempo estimado. Exposto no checkout do cliente.
-
 ---
 
 ## App driver
