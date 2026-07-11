@@ -30,12 +30,6 @@ customer (polish).
 
 ---
 
-## App customer (complementos)
-
-### 22. Gerenciamento de endereços (tela dedicada)
-Endereço tratado inline em checkout/delivery. Livro de endereços: listar, adicionar, editar,
-remover, padrão — reaproveitável no checkout.
-
 ---
 
 ## Qualidade / housekeeping
