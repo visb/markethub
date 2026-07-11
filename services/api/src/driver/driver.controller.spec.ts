@@ -1,6 +1,7 @@
 import { DriverController } from "./driver.controller";
 import type { DriverService } from "./driver.service";
 import type { DriverVehicleService } from "./driver-vehicle.service";
+import type { DriverLocationService } from "./driver-location.service";
 import type { AuthUser } from "../auth";
 
 /**
@@ -22,11 +23,15 @@ function makeController() {
     current: jest.fn().mockResolvedValue({ id: "v1" }),
     select: jest.fn().mockResolvedValue({ id: "v1" }),
   };
+  const location = {
+    ingest: jest.fn().mockResolvedValue({ accepted: true }),
+  };
   const controller = new DriverController(
     driver as unknown as DriverService,
     vehicles as unknown as DriverVehicleService,
+    location as unknown as DriverLocationService,
   );
-  return { controller, driver, vehicles };
+  return { controller, driver, vehicles, location };
 }
 
 const user: AuthUser = { id: "u1", email: "d@x.com", roles: ["driver"] };
@@ -86,5 +91,14 @@ describe("DriverController", () => {
     const { controller, vehicles } = makeController();
     controller.selectVehicle(user, { vehicleId: "v1" });
     expect(vehicles.select).toHaveBeenCalledWith("u1", "v1");
+  });
+
+  // ── Rastreio ao vivo (story 51) ──
+
+  it("publishLocation: delega ao DriverLocationService com user.id + id + dto", () => {
+    const { controller, location } = makeController();
+    const dto = { lat: -23.5, lng: -46.6, heading: 90, recordedAt: "2026-07-11T12:00:00.000Z" };
+    controller.publishLocation(user, "d1", dto);
+    expect(location.ingest).toHaveBeenCalledWith("u1", "d1", dto);
   });
 });

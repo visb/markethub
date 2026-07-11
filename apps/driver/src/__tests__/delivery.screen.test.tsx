@@ -34,6 +34,12 @@ jest.mock("@/api/hooks/useDriverDeliveries", () => ({
   useConfirmDelivery: () => ({ mutate: mockDeliverMutate, ...mockState.deliver }),
 }));
 
+// Rastreio ao vivo (story 51): isolado do teste da tela (device/auth próprios).
+let mockTrackingPermissionDenied = false;
+jest.mock("@/hooks/useDeliveryTracking", () => ({
+  useDeliveryTracking: () => ({ permissionDenied: mockTrackingPermissionDenied }),
+}));
+
 function mkDelivery(over: Partial<DeliveryDTO>): DeliveryDTO {
   return {
     id: "d1",
@@ -63,6 +69,7 @@ beforeEach(() => {
   mockState.detail = { data: null, isLoading: false, isError: false };
   mockState.pickup = { isPending: false, isError: false };
   mockState.deliver = { isPending: false, isError: false };
+  mockTrackingPermissionDenied = false;
 });
 
 describe("DeliveryScreen", () => {
@@ -119,5 +126,12 @@ describe("DeliveryScreen", () => {
     mockState.detail = { data: mkDelivery({ status: "assigned" }), isLoading: false, isError: true };
     const tree = render(<DeliveryScreen />);
     expect(JSON.stringify(tree.toJSON())).toContain("Falha ao carregar a entrega");
+  });
+
+  it("picked_up + permissão de rastreio negada: mostra o banner", () => {
+    mockTrackingPermissionDenied = true;
+    mockState.detail = { data: mkDelivery({ status: "picked_up" }), isLoading: false, isError: false };
+    const tree = render(<DeliveryScreen />);
+    expect(JSON.stringify(tree.toJSON())).toContain("Rastreio ao vivo indisponível");
   });
 });

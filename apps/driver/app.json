@@ -15,12 +15,20 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.markethub.driver",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Usamos sua localização para oferecer rotas próximas e rastrear a entrega."
+        "NSLocationWhenInUseUsageDescription": "Usamos sua localização para oferecer rotas próximas e rastrear a entrega.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Usamos sua localização em segundo plano para o cliente acompanhar a entrega ao vivo no mapa.",
+        "UIBackgroundModes": ["location"]
       }
     },
     "android": {
       "package": "com.markethub.driver",
-      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"]
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
+      ]
     },
     "web": { "bundler": "metro", "output": "single" },
     "plugins": [
@@ -28,7 +36,12 @@
       "expo-secure-store",
       [
         "expo-location",
-        { "locationWhenInUsePermission": "Usamos sua localização para oferecer rotas próximas e rastrear a entrega." }
+        {
+          "locationWhenInUsePermission": "Usamos sua localização para oferecer rotas próximas e rastrear a entrega.",
+          "locationAlwaysAndWhenInUsePermission": "Usamos sua localização em segundo plano para o cliente acompanhar a entrega ao vivo no mapa.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
       ]
     ]
   }

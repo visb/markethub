@@ -38,6 +38,9 @@ export interface OrderTrackingGroup {
   orderGroupId: string;
   storeId: string;
   storeName: string;
+  /** Coordenadas da loja (origem no mapa de rastreio ao vivo, story 51). */
+  storeLat: number | null;
+  storeLng: number | null;
   merchantId: string;
   merchantName: string;
   merchantLogoUrl: string | null;
@@ -60,7 +63,14 @@ export interface OrderTracking {
   /** Janela prevista de entrega/retirada (agendada ou estimada). */
   etaWindow: { from: string; to: string } | null;
   /** Endereço de entrega (snapshot do checkout). */
-  address: { street: string; number: string; city: string | null } | null;
+  address: {
+    street: string;
+    number: string;
+    city: string | null;
+    /** Coordenadas do destino (marcador de entrega no mapa, story 51). */
+    lat: number | null;
+    lng: number | null;
+  } | null;
   totalCents: number;
   groups: OrderTrackingGroup[];
   updatedAt: string;
@@ -173,6 +183,8 @@ export class OrderTrackingService {
       orderGroupId: g.id,
       storeId: g.storeId,
       storeName: g.store.name,
+      storeLat: g.store.latitude,
+      storeLng: g.store.longitude,
       merchantId: g.merchantId,
       merchantName: g.merchant.name,
       merchantLogoUrl: g.merchant.logoUrl,
@@ -231,7 +243,13 @@ export class OrderTrackingService {
       etaWindow,
       address:
         snap?.street != null
-          ? { street: snap.street, number: snap.number ?? "", city: snap.city ?? null }
+          ? {
+              street: snap.street,
+              number: snap.number ?? "",
+              city: snap.city ?? null,
+              lat: snap.latitude ?? null,
+              lng: snap.longitude ?? null,
+            }
           : null,
       totalCents: order.totalCents,
       groups,

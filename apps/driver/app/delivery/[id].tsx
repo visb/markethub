@@ -3,6 +3,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, TextInput, View } from "reac
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { Button, Text, colors, radius, spacing } from "@markethub/ui";
 import { useConfirmDelivery, useConfirmPickup, useDeliveryDetail } from "@/api/hooks/useDriverDeliveries";
+import { useDeliveryTracking } from "@/hooks/useDeliveryTracking";
 
 export default function DeliveryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -14,6 +15,8 @@ export default function DeliveryScreen() {
   const [deliveryCode, setDeliveryCode] = useState("");
 
   const delivery = detail.data;
+  // Rastreio ao vivo: inicia ao coletar (picked_up), para ao entregar/sair.
+  const { permissionDenied } = useDeliveryTracking(delivery);
   const busy = confirmPickup.isPending || confirmDelivery.isPending;
   const error =
     detail.isError
@@ -91,6 +94,16 @@ export default function DeliveryScreen() {
         </View>
       )}
 
+      {/* Rastreio ao vivo: permissão de background negada (fluxo segue funcionando) */}
+      {delivery.status === "picked_up" && permissionDenied && (
+        <View style={styles.banner}>
+          <Text variant="caption" style={{ color: colors.text }}>
+            Rastreio ao vivo indisponível: permita o acesso à localização "o tempo todo"
+            nas configurações para o cliente acompanhar a entrega no mapa.
+          </Text>
+        </View>
+      )}
+
       {/* Etapa de entrega */}
       {delivery.status === "picked_up" && (
         <View style={styles.action}>
@@ -136,6 +149,14 @@ const styles = StyleSheet.create({
   card: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, gap: 2 },
   hr: { height: 1, backgroundColor: colors.border, marginVertical: spacing.sm },
   action: { marginTop: spacing.lg, backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md },
+  banner: {
+    marginTop: spacing.lg,
+    backgroundColor: "#FEF3C7",
+    borderWidth: 1,
+    borderColor: colors.warning,
+    borderRadius: radius.md,
+    padding: spacing.md,
+  },
   input: {
     backgroundColor: colors.white,
     borderRadius: radius.md,

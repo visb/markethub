@@ -1,8 +1,9 @@
 import { Body, Controller, Get, Param, Post, Put, Query } from "@nestjs/common";
-import { IsString, MinLength } from "class-validator";
+import { IsISO8601, IsNumber, IsOptional, IsString, Max, Min, MinLength } from "class-validator";
 import { CurrentUser, Roles } from "../auth";
 import type { AuthUser } from "../auth";
 import { DriverService } from "./driver.service";
+import { DriverLocationService } from "./driver-location.service";
 import { DriverVehicleService } from "./driver-vehicle.service";
 
 class ConfirmPickupDto {
@@ -17,6 +18,13 @@ class SelectVehicleDto {
   @IsString() @MinLength(1) vehicleId!: string;
 }
 
+class LocationDto {
+  @IsNumber() @Min(-90) @Max(90) lat!: number;
+  @IsNumber() @Min(-180) @Max(180) lng!: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(360) heading?: number;
+  @IsISO8601() recordedAt!: string;
+}
+
 /** App do entregador (entrega própria): lojas, fila de entregas, coleta e entrega. */
 @Roles("driver")
 @Controller("driver")
@@ -24,6 +32,7 @@ export class DriverController {
   constructor(
     private readonly driver: DriverService,
     private readonly vehicles: DriverVehicleService,
+    private readonly location: DriverLocationService,
   ) {}
 
   /** Lojas em que o usuário atua como entregador. */
@@ -64,6 +73,16 @@ export class DriverController {
   @Post("deliveries/:id/deliver")
   deliver(@CurrentUser() user: AuthUser, @Param("id") id: string, @Body() dto: ConfirmDeliveryDto) {
     return this.driver.confirmDelivery(user.id, id, dto.deliveryCode);
+  }
+
+  /**
+   * Rastreio ao vivo (story 51): publica a posição do entregador (ingest REST
+   * throttled). Só o dono da entrega e apenas em trânsito (coletada). O backend
+   * faz o fan-out via Socket.IO ao cliente do pedido.
+   */
+  @Post("deliveries/:id/location")
+  publishLocation(@CurrentUser() user: AuthUser, @Param("id") id: string, @Body() dto: LocationDto) {
+    return this.location.ingest(user.id, id, dto);
   }
 
   /** Veículos `active` da rede do entregador, p/ seleção no login (story 15). */

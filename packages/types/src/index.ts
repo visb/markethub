@@ -3,6 +3,7 @@ export * from "./auth";
 export * from "./error";
 export * from "./picking";
 export * from "./picking-events";
+export * from "./delivery-events";
 export * from "./refund";
 export * from "./delivery";
 export * from "./reviews";

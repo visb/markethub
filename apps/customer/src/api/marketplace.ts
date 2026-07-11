@@ -120,6 +120,9 @@ export interface OrderTrackingGroup {
   orderGroupId: string;
   storeId: string;
   storeName: string;
+  /** Coordenadas da loja (origem no mapa de rastreio ao vivo, story 51). */
+  storeLat: number | null;
+  storeLng: number | null;
   merchantId: string;
   merchantName: string;
   merchantLogoUrl: string | null;
@@ -136,10 +139,28 @@ export interface OrderTracking {
   hasPickup: boolean;
   hasDelivery: boolean;
   etaWindow: { from: string; to: string } | null;
-  address: { street: string; number: string; city: string | null } | null;
+  address: {
+    street: string;
+    number: string;
+    city: string | null;
+    /** Coordenadas do destino (marcador de entrega no mapa, story 51). */
+    lat: number | null;
+    lng: number | null;
+  } | null;
   totalCents: number;
   groups: OrderTrackingGroup[];
   updatedAt: string;
+}
+
+/** Payload do evento `driver:location` (posição efêmera do entregador, story 51). */
+export interface DriverLocationEvent {
+  v: number;
+  deliveryId: string;
+  orderId: string;
+  lat: number;
+  lng: number;
+  heading: number | null;
+  recordedAt: string;
 }
 
 // Substituição proposta pelo separador aguardando decisão do cliente (S3.4)

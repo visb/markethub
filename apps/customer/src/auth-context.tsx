@@ -3,6 +3,7 @@ import {
   ApiClient,
   ApiClientError,
   createRealtimeClient,
+  DELIVERY_NAMESPACE,
   type AuthUser,
   type RealtimeClient,
 } from "@markethub/api-client";
@@ -13,8 +14,10 @@ interface AuthState {
   user: AuthUser | null;
   loading: boolean;
   api: ApiClient;
-  /** Cliente Socket.IO compartilhado (mesma origem/token da API). */
+  /** Cliente Socket.IO do rastreio de pedido (`/picking`). */
   realtime: RealtimeClient;
+  /** Cliente Socket.IO do rastreio de entrega ao vivo (`/delivery`, story 51). */
+  realtimeDelivery: RealtimeClient;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -40,6 +43,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const realtime = useMemo(
     () => createRealtimeClient({ url: API_URL, getToken: () => tokenStore.getAccess() }),
+    [tokenStore],
+  );
+
+  const realtimeDelivery = useMemo(
+    () =>
+      createRealtimeClient({
+        url: API_URL,
+        getToken: () => tokenStore.getAccess(),
+        namespace: DELIVERY_NAMESPACE,
+      }),
     [tokenStore],
   );
 
@@ -81,8 +94,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [client]);
 
   const value = useMemo(
-    () => ({ user, loading, api: client, realtime, login, logout }),
-    [user, loading, client, realtime, login, logout],
+    () => ({ user, loading, api: client, realtime, realtimeDelivery, login, logout }),
+    [user, loading, client, realtime, realtimeDelivery, login, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
