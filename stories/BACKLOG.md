@@ -20,10 +20,6 @@ customer (polish).
 
 ## App driver
 
-### 11. Ganhos e histórico do entregador
-`Tip` existe e admin Finance já mostra "gorjetas por entregador" — **driver não vê as próprias**.
-- Tela de ganhos: gorjetas por período, entregas concluídas, histórico com detalhe.
-
 ### 12. Fluxo de problema na entrega
 Hoje só caminho feliz (código de coleta → código de entrega). Falta:
 - Cliente ausente / endereço errado / recusa → registrar ocorrência, notificar loja/cliente,
