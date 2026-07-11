@@ -1,5 +1,6 @@
 import React from "react";
 import renderer, { act } from "react-test-renderer";
+import { ApiClientError } from "@markethub/api-client";
 import CheckoutScreen from "../../app/checkout";
 import type { Address, CartView, SlotView } from "../api/marketplace";
 
@@ -35,7 +36,7 @@ const SLOTS: SlotView[] = [
 ];
 
 const checkoutBody: { last?: unknown } = {};
-const mockRequest = jest.fn((url: string, opts?: { method?: string; body?: unknown }) => {
+function defaultRequest(url: string, opts?: { method?: string; body?: unknown }) {
   if (url === "/addresses") return Promise.resolve(ADDR);
   if (url === "/cart") return Promise.resolve(CART);
   if (url.endsWith("/slots")) return Promise.resolve(SLOTS);
@@ -44,7 +45,8 @@ const mockRequest = jest.fn((url: string, opts?: { method?: string; body?: unkno
     return Promise.resolve({ id: "ord1" });
   }
   return Promise.resolve({});
-});
+}
+const mockRequest = jest.fn(defaultRequest);
 jest.mock("../auth-context", () => ({ useAuth: () => ({ api: { request: mockRequest } }) }));
 
 type Inst = renderer.ReactTestInstance;
@@ -79,7 +81,8 @@ function proceed(tree: renderer.ReactTestRenderer) {
 }
 
 beforeEach(() => {
-  mockRequest.mockClear();
+  mockRequest.mockReset();
+  mockRequest.mockImplementation(defaultRequest);
   mockReplace.mockClear();
   mockPush.mockClear();
   checkoutBody.last = undefined;
@@ -110,6 +113,34 @@ describe("CheckoutScreen", () => {
     });
     expect(checkoutBody.last).toEqual({ fulfillment: "pickup", deliverySlotId: null });
     expect(mockReplace).toHaveBeenCalledWith("/payment/ord1");
+  });
+
+  it("loja fechada (STORE_CLOSED): mostra o erro e o CTA de agendamento (story 52)", async () => {
+    mockRequest.mockImplementation((url: string) => {
+      if (url === "/addresses") return Promise.resolve(ADDR);
+      if (url === "/cart") return Promise.resolve(CART);
+      if (url.endsWith("/slots")) return Promise.resolve(SLOTS);
+      if (url === "/checkout") {
+        return Promise.reject(
+          new ApiClientError(400, { code: "STORE_CLOSED", message: "A loja Rede A está fechada agora." }),
+        );
+      }
+      return Promise.resolve({});
+    });
+    const tree = await mount();
+    await act(async () => {
+      await proceed(tree).props.onPress();
+    });
+    const text = JSON.stringify(tree.toJSON());
+    expect(text).toContain("A loja Rede A está fechada agora.");
+    expect(text).toContain("Agendar para um horário disponível");
+    expect(mockReplace).not.toHaveBeenCalled();
+    // CTA leva ao agendamento → aparece a seção de slots
+    act(() => radio(tree, "Agendar para um horário disponível").props.onPress());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(JSON.stringify(tree.toJSON())).toContain("vaga(s)");
   });
 
   it("agendar: carrega slots; sem slot escolhido não cria pedido, com slot inclui o id", async () => {

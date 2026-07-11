@@ -58,4 +58,10 @@ export type {
   ViewportBoundsDTO,
   StoreSummaryDTO,
   StoreSummaryAddressDTO,
+  StoreHoursDTO,
+  StoreHoursEntryInput,
+  SetStoreHoursInput,
+  StoreClosureDTO,
+  CreateStoreClosureInput,
+  StoreOpenStateDTO,
 } from "@markethub/types";

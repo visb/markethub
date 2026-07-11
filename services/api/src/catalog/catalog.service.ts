@@ -3,7 +3,12 @@ import type { Prisma } from "@prisma/client";
 import { etaMinutes, haversineKm } from "../common/geo";
 import { PrismaService } from "../prisma/prisma.service";
 import { DOOR_SURCHARGE_CENTS } from "../shared/pricing";
+import { isStoreOpen, nextOpening, todayHours } from "../shared/store-hours";
 import { StoreFollowsService } from "../store-follows";
+
+// Re-export dos helpers de horário (kernel `shared/store-hours`) mantendo o ponto
+// de import histórico deste módulo (specs/consumidores existentes — story 52).
+export { isOpenAt, saoPauloDayAndMinute } from "../shared/store-hours";
 
 export interface Paginated<T> {
   items: T[];
@@ -241,7 +246,7 @@ export class CatalogService {
   }
 
   /** Seções da vitrine (MVP: regras simples). `userId` informa `following` (story 34). */
-  async storeSections(storeId: string, geo?: GeoFilter, userId?: string) {
+  async storeSections(storeId: string, geo?: GeoFilter, userId?: string, now: Date = new Date()) {
     const store = await this.prisma.store.findUnique({
       where: { id: storeId },
       select: {
@@ -252,6 +257,8 @@ export class CatalogService {
         longitude: true,
         avgPrepMinutes: true,
         merchant: { select: { name: true, logoUrl: true, deliveryFeeCents: true } },
+        hours: { select: { dayOfWeek: true, opensAt: true, closesAt: true } },
+        closures: { select: { date: true } },
       },
     });
     if (!store || !store.active) throw this.notFound("STORE_NOT_FOUND", "Store not found");
@@ -283,6 +290,8 @@ export class CatalogService {
       ? round1(haversineKm(geo.lat, geo.lng, store.latitude!, store.longitude!))
       : null;
     const following = userId ? await this.storeFollows.isFollowing(userId, storeId) : false;
+    const closures = store.closures.map((c) => c.date);
+    const next = nextOpening(store.hours, closures, now);
     return {
       store: {
         id: store.id,
@@ -293,6 +302,10 @@ export class CatalogService {
         distanceKm,
         etaMinutes: etaMinutes(store.avgPrepMinutes, distanceKm ?? 0),
         following,
+        // Estado de funcionamento p/ o badge da página da loja (story 52).
+        openNow: isStoreOpen(store.hours, closures, now),
+        todayHours: todayHours(store.hours, closures, now),
+        nextOpen: next ? { dayOfWeek: next.dayOfWeek, opensAt: next.opensAt } : null,
       },
       featured: featured.map(toOfferView),
       mostBought: mostBought.map(toOfferView),
@@ -325,6 +338,7 @@ export class CatalogService {
         merchantId: true,
         merchant: { select: { name: true, logoUrl: true, deliveryFeeCents: true } },
         hours: { select: { dayOfWeek: true, opensAt: true, closesAt: true } },
+        closures: { select: { date: true } },
       },
     });
     if (!store || !store.active) throw this.notFound("STORE_NOT_FOUND", "Store not found");
@@ -340,7 +354,6 @@ export class CatalogService {
         ? { average: round1(agg._avg.rating), count }
         : null;
 
-    const { dayOfWeek, minuteOfDay } = saoPauloDayAndMinute(now);
     return {
       id: store.id,
       name: store.name,
@@ -359,7 +372,8 @@ export class CatalogService {
       deliveryFeeCents: store.merchant.deliveryFeeCents,
       doorFeeCents: store.merchant.deliveryFeeCents + DOOR_SURCHARGE_CENTS,
       allowsPickup: store.allowsPickup,
-      openNow: isOpenAt(store.hours, dayOfWeek, minuteOfDay),
+      // Fechamento excepcional do dia (story 52) sobrepõe o horário semanal.
+      openNow: isStoreOpen(store.hours, store.closures.map((c) => c.date), now),
     };
   }
 
@@ -411,8 +425,9 @@ export class CatalogService {
     marketplaceCategoryId: string,
     take: number,
     skip = 0,
-    opts: { q?: string; storeId?: string; geo?: GeoFilter } = {},
+    opts: { q?: string; storeId?: string; geo?: GeoFilter; now?: Date } = {},
   ) {
+    const now = opts.now ?? new Date();
     const q = opts.q?.trim();
     const offers = await this.prisma.offer.findMany({
       where: {
@@ -446,6 +461,8 @@ export class CatalogService {
             longitude: true,
             avgPrepMinutes: true,
             merchant: { select: { name: true, logoUrl: true, deliveryFeeCents: true } },
+            hours: { select: { dayOfWeek: true, opensAt: true, closesAt: true } },
+            closures: { select: { date: true } },
           },
         },
         product: {
@@ -453,7 +470,7 @@ export class CatalogService {
         },
       },
     });
-    const views = offers.map((o) => toFeedView(o, opts.geo));
+    const views = offers.map((o) => toFeedView(o, opts.geo, now));
     const filtered =
       opts.geo?.radiusKm != null
         ? views.filter((v) => v.distanceKm != null && v.distanceKm <= opts.geo!.radiusKm!)
@@ -535,6 +552,8 @@ type FeedRow = {
     longitude: number | null;
     avgPrepMinutes: number;
     merchant: { name: string; logoUrl: string | null; deliveryFeeCents: number };
+    hours: { dayOfWeek: number; opensAt: number; closesAt: number }[];
+    closures: { date: Date }[];
   };
   product: {
     id: string;
@@ -549,9 +568,9 @@ type FeedRow = {
 /**
  * Card do feed multi-mercado: produto + mercado + frete + tempo. Com geo, calcula
  * distância e ETA real (preparo da loja + deslocamento, S6.7); sem geo, ETA usa só
- * o preparo (sem distância).
+ * o preparo (sem distância). `openNow` (story 52) dirige o selo "Fechado" no card.
  */
-function toFeedView(row: FeedRow, geo?: GeoFilter) {
+function toFeedView(row: FeedRow, geo?: GeoFilter, now: Date = new Date()) {
   const hasGeo = geo && row.store.latitude != null && row.store.longitude != null;
   const distanceKm = hasGeo
     ? round1(haversineKm(geo.lat, geo.lng, row.store.latitude!, row.store.longitude!))
@@ -568,44 +587,9 @@ function toFeedView(row: FeedRow, geo?: GeoFilter) {
     deliveryEta: `${eta} min`,
     etaMinutes: eta,
     distanceKm,
+    openNow: isStoreOpen(row.store.hours, row.store.closures.map((c) => c.date), now),
     ...row.product,
   };
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
-
-/**
- * Hora atual em America/Sao_Paulo → dia da semana (0=domingo..6=sábado) + minuto
- * do dia (0..1439). Computado no servidor p/ evitar bug de timezone no cliente.
- */
-export function saoPauloDayAndMinute(now: Date): { dayOfWeek: number; minuteOfDay: number } {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Sao_Paulo",
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).formatToParts(now);
-  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
-  const wdMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-  const dayOfWeek = wdMap[get("weekday")] ?? 0;
-  let hour = Number(get("hour"));
-  if (hour === 24) hour = 0; // alguns runtimes emitem "24" à meia-noite
-  const minuteOfDay = hour * 60 + Number(get("minute"));
-  return { dayOfWeek, minuteOfDay };
-}
-
-/**
- * Loja aberta se há linha de horário do dia com `opensAt ≤ minuto < closesAt`
- * (abertura inclusiva, fechamento exclusivo). Dia sem linha = fechado. Janelas que
- * cruzam a meia-noite ficam fora de escopo (assume `closesAt > opensAt`).
- */
-export function isOpenAt(
-  hours: { dayOfWeek: number; opensAt: number; closesAt: number }[],
-  dayOfWeek: number,
-  minuteOfDay: number,
-): boolean {
-  const today = hours.find((h) => h.dayOfWeek === dayOfWeek);
-  if (!today) return false;
-  return today.opensAt <= minuteOfDay && minuteOfDay < today.closesAt;
-}

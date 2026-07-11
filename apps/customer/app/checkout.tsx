@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "reac
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import { ApiClientError } from "@markethub/api-client";
 import { Button, Text, colors, radius, spacing } from "@markethub/ui";
 import { useAuth } from "@/auth-context";
 import { brl, marketplace, type Address, type CartView, type SlotView } from "@/api/marketplace";
@@ -31,6 +32,8 @@ export default function CheckoutScreen() {
   const [slots, setSlots] = useState<SlotView[]>([]);
   const [slotId, setSlotId] = useState<string | null>(null);
   const [cart, setCart] = useState<CartView | null>(null);
+  // Erro de checkout (ex.: loja fechada — story 52); `closed` habilita o CTA de agendar.
+  const [checkoutError, setCheckoutError] = useState<{ message: string; closed: boolean } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -61,6 +64,7 @@ export default function CheckoutScreen() {
     if (fulfillment === "delivery" && !selected) return;
     if (when === "schedule" && !slotId) return; // exige escolher um horário
     setPlacing(true);
+    setCheckoutError(null);
     try {
       const deliverySlotId = when === "schedule" ? slotId : null;
       const order =
@@ -73,9 +77,21 @@ export default function CheckoutScreen() {
               deliverySlotId,
             });
       router.replace(`/payment/${order.id}`);
+    } catch (e) {
+      if (e instanceof ApiClientError) {
+        setCheckoutError({ message: e.body.message, closed: e.body.code === "STORE_CLOSED" });
+      } else {
+        setCheckoutError({ message: "Não foi possível finalizar o pedido.", closed: false });
+      }
     } finally {
       setPlacing(false);
     }
+  }
+
+  /** CTA do erro de loja fechada: leva o cliente ao agendamento por slot. */
+  function goToSchedule() {
+    setCheckoutError(null);
+    setWhen("schedule");
   }
 
   if (loading) {
@@ -210,6 +226,23 @@ export default function CheckoutScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
+        {checkoutError && (
+          <View style={styles.errorBox}>
+            <Ionicons name="alert-circle" size={18} color={colors.danger} />
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text variant="caption" style={{ color: colors.danger }}>
+                {checkoutError.message}
+              </Text>
+              {checkoutError.closed && (
+                <Pressable onPress={goToSchedule}>
+                  <Text variant="caption" style={styles.scheduleCta}>
+                    Agendar para um horário disponível
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+        )}
         <Button title="Prosseguir para Pagamento" variant="outline" loading={placing} onPress={place} />
       </View>
     </SafeAreaView>
@@ -284,5 +317,14 @@ const styles = StyleSheet.create({
   },
   radioOn: { borderColor: colors.primary },
   radioDot: { width: 12, height: 12, borderRadius: radius.full, backgroundColor: colors.primary },
-  footer: { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
+  footer: { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, gap: spacing.sm },
+  errorBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    backgroundColor: colors.primaryLight,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+  },
+  scheduleCta: { color: colors.primary, fontWeight: "700", textDecorationLine: "underline" },
 });

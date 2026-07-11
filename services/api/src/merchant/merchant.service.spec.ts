@@ -549,3 +549,156 @@ describe("MerchantService.listStocks / updateStock / unlockStock", () => {
     });
   });
 });
+
+// ── Story 52: horário de funcionamento + fechamentos (owner-only) ──
+
+function makeHours(opts: {
+  owner?: boolean;
+  store?: Record<string, unknown> | null;
+  hoursRows?: unknown[];
+  closureRows?: { id: string; date: Date; reason: string | null }[];
+  existingClosure?: unknown;
+  closure?: { id: string; storeId: string } | null;
+}) {
+  const isOwner = opts.owner ?? true;
+  const stores = [{ id: "s1", name: "Loja 1", merchantId: "m1" }];
+  const hoursFindMany = jest.fn().mockResolvedValue(opts.hoursRows ?? []);
+  const closureCreate = jest
+    .fn()
+    .mockImplementation(({ data, select }) =>
+      Promise.resolve({ id: "cl-new", date: data.date, reason: data.reason, ...(select ? {} : {}) }),
+    );
+  const closureDelete = jest.fn().mockResolvedValue({});
+  const prisma = {
+    storeStaff: {
+      findMany: jest.fn().mockResolvedValue(stores.map((s) => ({ store: s }))),
+      // owner → sem vínculo admin; caso contrário simula admin (não-owner)
+      findFirst: jest.fn().mockResolvedValue(isOwner ? null : { id: "lnk" }),
+    },
+    store: {
+      findUnique: jest.fn().mockResolvedValue(
+        "store" in opts ? opts.store : { id: "s1", merchantId: "m1" },
+      ),
+      findMany: jest.fn().mockResolvedValue(stores),
+    },
+    storeHours: {
+      findMany: hoursFindMany,
+      deleteMany: jest.fn().mockResolvedValue({}),
+      createMany: jest.fn().mockResolvedValue({}),
+    },
+    storeClosure: {
+      findMany: jest.fn().mockResolvedValue(opts.closureRows ?? []),
+      findUnique: jest
+        .fn()
+        .mockResolvedValueOnce("existingClosure" in opts ? opts.existingClosure : ("closure" in opts ? opts.closure : null)),
+      create: closureCreate,
+      delete: closureDelete,
+    },
+    $transaction: jest.fn().mockResolvedValue([]),
+  } as never;
+  // roles do owner: inclui merchant p/ resolveLevel = owner
+  const geocoding = { geocode: jest.fn() } as never;
+  return { svc: new MerchantService(prisma, geocoding), prisma, closureCreate, closureDelete };
+}
+
+const hoursOwner = { id: "u1", roles: ["merchant"] };
+const hoursManager = { id: "u2", roles: ["customer"] };
+
+describe("MerchantService — horário de funcionamento (story 52)", () => {
+  it("owner lê o horário semanal ordenado", async () => {
+    const rows = [{ id: "h1", dayOfWeek: 1, opensAt: 480, closesAt: 1320 }];
+    const { svc } = makeHours({ hoursRows: rows });
+    const out = await svc.storeHours(hoursOwner, "s1");
+    expect(out).toEqual(rows);
+  });
+
+  it("manager (não-owner) → FORBIDDEN NOT_AN_OWNER", async () => {
+    const { svc } = makeHours({ owner: false });
+    await expect(svc.storeHours(hoursManager, "s1")).rejects.toMatchObject({
+      response: { code: "NOT_AN_OWNER" },
+    });
+  });
+
+  it("loja inexistente → STORE_NOT_FOUND", async () => {
+    const { svc } = makeHours({ store: null });
+    await expect(svc.storeHours(hoursOwner, "s1")).rejects.toMatchObject({
+      response: { code: "STORE_NOT_FOUND" },
+    });
+  });
+
+  it("setStoreHours grava faixas válidas (replace-all)", async () => {
+    const { svc, prisma } = makeHours({});
+    await svc.setStoreHours(hoursOwner, "s1", [{ dayOfWeek: 1, opensAt: 480, closesAt: 1320 }]);
+    expect((prisma as never as { $transaction: jest.Mock }).$transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("setStoreHours: closesAt <= opensAt → INVALID_HOURS", async () => {
+    const { svc } = makeHours({});
+    await expect(
+      svc.setStoreHours(hoursOwner, "s1", [{ dayOfWeek: 1, opensAt: 600, closesAt: 600 }]),
+    ).rejects.toMatchObject({ response: { code: "INVALID_HOURS" } });
+  });
+
+  it("setStoreHours: dia fora de 0–6 → INVALID_DAY", async () => {
+    const { svc } = makeHours({});
+    await expect(
+      svc.setStoreHours(hoursOwner, "s1", [{ dayOfWeek: 7, opensAt: 480, closesAt: 1320 }]),
+    ).rejects.toMatchObject({ response: { code: "INVALID_DAY" } });
+  });
+
+  it("setStoreHours: dia duplicado → DUPLICATE_DAY", async () => {
+    const { svc } = makeHours({});
+    await expect(
+      svc.setStoreHours(hoursOwner, "s1", [
+        { dayOfWeek: 1, opensAt: 480, closesAt: 1320 },
+        { dayOfWeek: 1, opensAt: 500, closesAt: 1000 },
+      ]),
+    ).rejects.toMatchObject({ response: { code: "DUPLICATE_DAY" } });
+  });
+});
+
+describe("MerchantService — fechamentos excepcionais (story 52)", () => {
+  it("lista fechamentos com data normalizada YYYY-MM-DD", async () => {
+    const { svc } = makeHours({
+      closureRows: [{ id: "c1", date: new Date("2026-12-25T00:00:00Z"), reason: "Natal" }],
+    });
+    const out = await svc.storeClosures(hoursOwner, "s1");
+    expect(out).toEqual([{ id: "c1", date: "2026-12-25", reason: "Natal" }]);
+  });
+
+  it("adiciona fechamento novo (data + motivo)", async () => {
+    const { svc, closureCreate } = makeHours({ existingClosure: null });
+    const out = await svc.addStoreClosure(hoursOwner, "s1", { date: "2026-12-25", reason: "Natal" });
+    expect(closureCreate).toHaveBeenCalledTimes(1);
+    expect(out.date).toBe("2026-12-25");
+    expect(out.reason).toBe("Natal");
+  });
+
+  it("data inválida → INVALID_DATE", async () => {
+    const { svc } = makeHours({ existingClosure: null });
+    await expect(
+      svc.addStoreClosure(hoursOwner, "s1", { date: "25/12/2026" }),
+    ).rejects.toMatchObject({ response: { code: "INVALID_DATE" } });
+  });
+
+  it("data duplicada → CLOSURE_EXISTS", async () => {
+    const { svc } = makeHours({ existingClosure: { id: "c1" } });
+    await expect(
+      svc.addStoreClosure(hoursOwner, "s1", { date: "2026-12-25" }),
+    ).rejects.toMatchObject({ response: { code: "CLOSURE_EXISTS" } });
+  });
+
+  it("remove fechamento da loja", async () => {
+    const { svc, closureDelete } = makeHours({ closure: { id: "c1", storeId: "s1" } });
+    const out = await svc.removeStoreClosure(hoursOwner, "s1", "c1");
+    expect(closureDelete).toHaveBeenCalledWith({ where: { id: "c1" } });
+    expect(out).toEqual({ removed: true });
+  });
+
+  it("fechamento de outra loja → CLOSURE_NOT_FOUND", async () => {
+    const { svc } = makeHours({ closure: { id: "c1", storeId: "outra" } });
+    await expect(svc.removeStoreClosure(hoursOwner, "s1", "c1")).rejects.toMatchObject({
+      response: { code: "CLOSURE_NOT_FOUND" },
+    });
+  });
+});

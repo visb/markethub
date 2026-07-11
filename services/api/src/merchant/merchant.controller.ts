@@ -6,9 +6,23 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
 } from "@nestjs/common";
-import { IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, Min, MinLength } from "class-validator";
+import { Type } from "class-transformer";
+import {
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+  MinLength,
+  ValidateNested,
+} from "class-validator";
 import { CurrentUser, Roles } from "../auth";
 import type { AuthUser } from "../auth";
 import { MerchantProductService } from "./merchant-product.service";
@@ -43,6 +57,25 @@ class UpdateStoreDto {
   @IsOptional() @IsNumber() longitude?: number | null;
   @IsOptional() @IsInt() @Min(0) avgPrepMinutes?: number;
   @IsOptional() @IsBoolean() active?: boolean;
+}
+
+/** Uma faixa abre–fecha de um dia (minutos desde a meia-noite) — story 52. */
+class StoreHoursEntryDto {
+  @IsInt() @Min(0) @Max(6) dayOfWeek!: number;
+  @IsInt() @Min(0) @Max(1439) opensAt!: number;
+  @IsInt() @Min(1) @Max(1440) closesAt!: number;
+}
+
+class SetStoreHoursDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => StoreHoursEntryDto)
+  hours!: StoreHoursEntryDto[];
+}
+
+class CreateStoreClosureDto {
+  @IsString() @MinLength(1) date!: string; // YYYY-MM-DD
+  @IsOptional() @IsString() reason?: string | null;
 }
 
 class UpdateOfferDto {
@@ -115,6 +148,45 @@ export class MerchantController {
     @Body() dto: UpdateStoreDto,
   ) {
     return this.merchant.updateStore({ id: user.id, roles: user.roles }, id, dto);
+  }
+
+  // ── Horário de funcionamento + fechamentos (story 52) ──
+
+  @Get("stores/:id/hours")
+  storeHours(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.merchant.storeHours({ id: user.id, roles: user.roles }, id);
+  }
+
+  @Put("stores/:id/hours")
+  setStoreHours(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @Body() dto: SetStoreHoursDto,
+  ) {
+    return this.merchant.setStoreHours({ id: user.id, roles: user.roles }, id, dto.hours);
+  }
+
+  @Get("stores/:id/closures")
+  storeClosures(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.merchant.storeClosures({ id: user.id, roles: user.roles }, id);
+  }
+
+  @Post("stores/:id/closures")
+  addStoreClosure(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @Body() dto: CreateStoreClosureDto,
+  ) {
+    return this.merchant.addStoreClosure({ id: user.id, roles: user.roles }, id, dto);
+  }
+
+  @Delete("stores/:id/closures/:closureId")
+  removeStoreClosure(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @Param("closureId") closureId: string,
+  ) {
+    return this.merchant.removeStoreClosure({ id: user.id, roles: user.roles }, id, closureId);
   }
 
   // ── Ofertas ──

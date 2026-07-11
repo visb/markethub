@@ -246,11 +246,28 @@ model Store {
   orderGroups   OrderGroup[]
   deliverySlots DeliverySlot[]
   hours         StoreHours[]
+  closures      StoreClosure[]
   followers     StoreFollow[]
 
   @@unique([merchantId, externalId])
   @@index([merchantId])
   @@map("stores")
+}
+
+// Fechamento excepcional da loja num dia específico (feriado, evento — story 52).
+// Fecha o dia INTEIRO (`date` @db.Date, sem hora), sobrepondo o horário semanal.
+// `reason` é texto livre opcional (ex.: "Feriado"). Uma linha por (loja, data).
+model StoreClosure {
+  id        String   @id @default(cuid())
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  storeId   String
+  date      DateTime @db.Date
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@unique([storeId, date])
+  @@index([storeId])
+  @@map("store_closures")
 }
 
 // Horário de funcionamento da loja por dia da semana (story 29). Uma faixa

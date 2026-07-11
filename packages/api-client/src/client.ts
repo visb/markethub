@@ -8,6 +8,10 @@ import type {
   MerchantStoreDetailDTO,
   MerchantStoreInput,
   MerchantStoreUpdateInput,
+  StoreHoursDTO,
+  StoreHoursEntryInput,
+  StoreClosureDTO,
+  CreateStoreClosureInput,
   ErpConfigDTO,
   ErpConfigInput,
   ApiKeyDTO,
@@ -235,6 +239,33 @@ export class ApiClient {
   /** Edita uma loja da rede do dono (owner-only — story 08). */
   merchantUpdateStore(id: string, patch: MerchantStoreUpdateInput): Promise<MerchantStoreDetailDTO> {
     return this.request(`/merchant/stores/${id}`, { method: "PATCH", body: patch, auth: true });
+  }
+
+  // ─── Merchant / horário de funcionamento + fechamentos (story 52) ───
+
+  /** Horário semanal da loja (owner-only). */
+  merchantStoreHours(storeId: string): Promise<StoreHoursDTO[]> {
+    return this.request(`/merchant/stores/${storeId}/hours`, { auth: true });
+  }
+
+  /** Substitui o horário semanal inteiro (replace-all). */
+  merchantSetStoreHours(storeId: string, hours: StoreHoursEntryInput[]): Promise<StoreHoursDTO[]> {
+    return this.request(`/merchant/stores/${storeId}/hours`, { method: "PUT", body: { hours }, auth: true });
+  }
+
+  /** Fechamentos excepcionais da loja (feriados/eventos). */
+  merchantStoreClosures(storeId: string): Promise<StoreClosureDTO[]> {
+    return this.request(`/merchant/stores/${storeId}/closures`, { auth: true });
+  }
+
+  /** Adiciona um fechamento excepcional (data YYYY-MM-DD + motivo opcional). */
+  merchantAddStoreClosure(storeId: string, input: CreateStoreClosureInput): Promise<StoreClosureDTO> {
+    return this.request(`/merchant/stores/${storeId}/closures`, { method: "POST", body: input, auth: true });
+  }
+
+  /** Remove um fechamento excepcional da loja. */
+  merchantRemoveStoreClosure(storeId: string, closureId: string): Promise<{ removed: boolean }> {
+    return this.request(`/merchant/stores/${storeId}/closures/${closureId}`, { method: "DELETE", auth: true });
   }
 
   // ─── Merchant / integração (story 09, owner-only) ───────────

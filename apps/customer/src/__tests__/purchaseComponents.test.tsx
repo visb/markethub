@@ -99,6 +99,29 @@ describe("ProductCard", () => {
     expect(json).toContain("(2km)");
   });
 
+  it("com header e loja fechada mostra o selo 'Fechado' (story 52)", () => {
+    const tree = render(
+      <ProductCard
+        product={PRODUCT}
+        header={{ merchant: "Rede A", logoUrl: null, eta: "30 min", distanceKm: 2, deliveryFeeCents: 500 }}
+        closed
+        onAdd={jest.fn()}
+      />,
+    );
+    expect(fullText(tree)).toContain("Fechado");
+  });
+
+  it("com header e loja aberta NÃO mostra 'Fechado'", () => {
+    const tree = render(
+      <ProductCard
+        product={PRODUCT}
+        header={{ merchant: "Rede A", logoUrl: null, eta: "30 min", distanceKm: 2, deliveryFeeCents: 500 }}
+        onAdd={jest.fn()}
+      />,
+    );
+    expect(fullText(tree)).not.toContain("Fechado");
+  });
+
   it("com cartLabel mostra o stepper e dispara inc/dec/onPress", () => {
     const onInc = jest.fn();
     const onDec = jest.fn();

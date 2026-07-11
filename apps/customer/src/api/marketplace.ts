@@ -218,6 +218,8 @@ export interface FeedItem extends ProductView {
   deliveryEta: string;
   etaMinutes: number;
   distanceKm: number | null;
+  /** Loja aberta agora (story 52) — dirige o selo "Fechado" no card. */
+  openNow: boolean;
 }
 export interface FeedSection {
   category: { id: string; name: string; slug: string };
@@ -242,6 +244,12 @@ export interface StoreMeta {
   etaMinutes: number;
   /** Se o cliente logado já segue esta loja (story 34). Guest → false. */
   following: boolean;
+  /** Loja aberta agora (story 52). */
+  openNow: boolean;
+  /** Faixa de hoje (minutos) ou null = hoje fechado (folga/feriado). */
+  todayHours: { opensAt: number; closesAt: number } | null;
+  /** Próxima abertura (dia da semana + minuto) p/ "abre às HH:MM"; null se sem horário. */
+  nextOpen: { dayOfWeek: number; opensAt: number } | null;
 }
 
 /** Loja seguida pelo cliente (story 34). */

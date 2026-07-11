@@ -9,6 +9,12 @@ export const queryKeys = {
   stores: {
     all: ["stores"] as const,
   },
+  storeHours: {
+    /** Horário semanal de uma loja (story 52). */
+    hours: (storeId: string) => ["store-hours", "hours", storeId] as const,
+    /** Fechamentos excepcionais de uma loja (story 52). */
+    closures: (storeId: string) => ["store-hours", "closures", storeId] as const,
+  },
   integration: {
     erp: ["integration", "erp"] as const,
     apiKeys: ["integration", "api-keys"] as const,

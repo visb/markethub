@@ -5,6 +5,8 @@ import { useMerchantContext } from "@/api/hooks/useMerchantContext";
 import { useCreateStore, useStores, useUpdateStore } from "@/api/hooks/useStores";
 import { can } from "@/auth/permissions";
 import { StoreForm, type StoreFormValues, toStorePayload } from "@/components/StoreForm";
+import { StoreHoursSection } from "@/components/StoreHoursSection";
+import { StoreClosuresSection } from "@/components/StoreClosuresSection";
 
 type View = { mode: "list" } | { mode: "create" } | { mode: "edit"; store: MerchantStoreDetailDTO };
 
@@ -102,12 +104,17 @@ function EditStore({ store, onDone }: { store: MerchantStoreDetailDTO; onDone: (
   };
 
   return (
-    <StoreForm
-      store={store}
-      onSubmit={onSubmit}
-      onCancel={onDone}
-      submitting={mutation.isPending}
-      error={error}
-    />
+    <div className="store-edit">
+      <StoreForm
+        store={store}
+        onSubmit={onSubmit}
+        onCancel={onDone}
+        submitting={mutation.isPending}
+        error={error}
+      />
+      {/* Horário + fechamentos excepcionais (story 52) — mesma capability da edição. */}
+      <StoreHoursSection storeId={store.id} />
+      <StoreClosuresSection storeId={store.id} />
+    </div>
   );
 }
