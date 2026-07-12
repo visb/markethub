@@ -53,6 +53,13 @@ describe("can (matriz de permissão — story 07)", () => {
     expect(can("admin", "stores.create")).toBe(false);
   });
 
+  it("reviews.manage (avaliações — story 56): owner e admin sim, manager não", () => {
+    expect(can("owner", "reviews.manage")).toBe(true);
+    expect(can("admin", "reviews.manage")).toBe(true);
+    expect(can("manager", "reviews.manage")).toBe(false);
+    expect(can(null, "reviews.manage")).toBe(false);
+  });
+
   it("slots.manage (agendamento — story 55) vale p/ owner, admin e manager", () => {
     expect(can("owner", "slots.manage")).toBe(true);
     expect(can("admin", "slots.manage")).toBe(true);

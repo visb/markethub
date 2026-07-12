@@ -49,6 +49,12 @@ export const queryKeys = {
     /** Slots de agendamento de uma loja (story 55). */
     byStore: (storeId: string | undefined) => ["slots", storeId ?? "none"] as const,
   },
+  reviews: {
+    all: ["reviews"] as const,
+    /** Lista de gestão das avaliações da rede, por filtro (story 56). */
+    list: (filters: { rating?: number; unanswered?: boolean } = {}) =>
+      ["reviews", "list", filters] as const,
+  },
   reports: {
     all: ["reports"] as const,
     sales: (filters: { from?: string; to?: string; storeId?: string } = {}) =>

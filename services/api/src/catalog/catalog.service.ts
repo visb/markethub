@@ -256,6 +256,7 @@ export class CatalogService {
         latitude: true,
         longitude: true,
         avgPrepMinutes: true,
+        merchantId: true,
         merchant: { select: { name: true, logoUrl: true, deliveryFeeCents: true } },
         hours: { select: { dayOfWeek: true, opensAt: true, closesAt: true } },
         closures: { select: { date: true } },
@@ -296,6 +297,7 @@ export class CatalogService {
       store: {
         id: store.id,
         name: store.name,
+        merchantId: store.merchantId,
         merchantName: store.merchant.name,
         merchantLogoUrl: store.merchant.logoUrl,
         deliveryFeeCents: store.merchant.deliveryFeeCents,

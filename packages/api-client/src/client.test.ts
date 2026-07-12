@@ -518,6 +518,22 @@ describe("ApiClient — endpoints (rota + método + body)", () => {
     expect(url(4)).toBe(`${B}/merchant/reports/reviews`);
   });
 
+  it("avaliações: vitrine pública + gestão + resposta (story 56)", async () => {
+    await client.storeReviews("m1");
+    expect(url(0)).toBe(`${B}/merchants/m1/reviews?axis=merchant&page=1`);
+    expect(init(0).headers.Authorization).toBeUndefined(); // vitrine é pública
+    await client.storeReviews("m 2", 3);
+    expect(url(1)).toBe(`${B}/merchants/m%202/reviews?axis=merchant&page=3`);
+    await client.merchantReviews();
+    expect(url(2)).toBe(`${B}/merchant/reviews`);
+    await client.merchantReviews({ rating: 4, unanswered: true });
+    expect(url(3)).toBe(`${B}/merchant/reviews?rating=4&unanswered=true`);
+    await client.merchantReplyReview("r1", "obrigado");
+    expect(url(4)).toBe(`${B}/merchant/reviews/r1/reply`);
+    expect(init(4).method).toBe("POST");
+    expect(JSON.parse(init(4).body!)).toEqual({ text: "obrigado" });
+  });
+
   it("merchant: upload-url + produtos", async () => {
     await client.merchantUploadUrl("a.png", "image/png");
     expect(url(0)).toBe(`${B}/merchant/products/upload-url`);

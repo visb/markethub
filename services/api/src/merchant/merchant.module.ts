@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { GeocodingModule } from "../geocoding/geocoding.module";
 import { MarketplaceModule } from "../marketplace";
+import { ReviewsModule } from "../reviews/reviews.module";
 import { StorageModule } from "../storage/storage.module";
 import { UsersModule } from "../users/users.module";
 import { MerchantContextController } from "./merchant-context.controller";
@@ -10,6 +11,8 @@ import { MerchantOrdersController } from "./merchant-orders.controller";
 import { MerchantProductService } from "./merchant-product.service";
 import { MerchantReportsController } from "./merchant-reports.controller";
 import { MerchantReportsService } from "./merchant-reports.service";
+import { MerchantReviewsController } from "./merchant-reviews.controller";
+import { MerchantReviewsService } from "./merchant-reviews.service";
 import { MerchantStaffController } from "./merchant-staff.controller";
 import { MerchantStaffService } from "./merchant-staff.service";
 import { MerchantVehiclesController } from "./merchant-vehicles.controller";
@@ -18,7 +21,7 @@ import { MerchantController } from "./merchant.controller";
 import { MerchantService } from "./merchant.service";
 
 @Module({
-  imports: [StorageModule, GeocodingModule, UsersModule, MarketplaceModule],
+  imports: [StorageModule, GeocodingModule, UsersModule, MarketplaceModule, ReviewsModule],
   controllers: [
     MerchantContextController,
     MerchantStaffController,
@@ -26,6 +29,7 @@ import { MerchantService } from "./merchant.service";
     MerchantCouponsController,
     MerchantOrdersController,
     MerchantReportsController,
+    MerchantReviewsController,
     MerchantController,
   ],
   providers: [
@@ -35,6 +39,7 @@ import { MerchantService } from "./merchant.service";
     MerchantVehiclesService,
     MerchantCouponsService,
     MerchantReportsService,
+    MerchantReviewsService,
   ],
   exports: [MerchantService],
 })

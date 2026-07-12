@@ -57,7 +57,9 @@ const ALLOWED_DEPENDENCIES = {
   // cancelamento de sub-pedido (story 54) — operação de escrita no Order/
   // OrderGroup que só o marketplace pode fazer (muta o agregado + emite
   // `order.group_canceled` no outbox). Via barrel público (OrdersService).
-  merchant: ["fulfillment"],
+  // Vitrine/resposta de avaliações (story 56): o merchant resolve escopo/
+  // capability e delega o acesso ao model Review ao engagement (barrel).
+  merchant: ["fulfillment", "engagement"],
 };
 
 /**

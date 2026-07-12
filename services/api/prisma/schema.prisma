@@ -931,6 +931,9 @@ model Review {
   // alvos (weak ref, sem FK p/ preservar histórico) — usados nas agregações
   targetMerchantId String?
   targetDriverId   String?
+  // resposta do lojista (story 56): 1 resposta por review, editável (update sobrescreve; sem histórico)
+  replyText        String?
+  repliedAt        DateTime?
   createdAt        DateTime   @default(now())
 
   // platform/delivery: 1 por pedido; merchant: 1 por mercado do pedido

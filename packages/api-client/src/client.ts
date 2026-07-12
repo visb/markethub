@@ -32,6 +32,9 @@ import type {
   CreateCouponInput,
   AdminCreateCouponInput,
   UpdateCouponInput,
+  StoreReviewsPageDTO,
+  MerchantReviewDTO,
+  MerchantReviewsFilter,
   DriverVehicleDTO,
   MerchantOrderDTO,
   MerchantOrderDetailDTO,
@@ -417,6 +420,33 @@ export class ApiClient {
   /** Remove o cupom (bloqueado se já usado — a UI desativa nesse caso). */
   merchantRemoveCoupon(id: string): Promise<{ id: string; removed: boolean }> {
     return this.request(`/merchant/coupons/${id}`, { method: "DELETE", auth: true });
+  }
+
+  // ─── Avaliações — vitrine pública + gestão do lojista (story 56) ─────
+
+  /** Vitrine pública de avaliações da rede (eixo merchant), paginada. */
+  storeReviews(merchantId: string, page = 1): Promise<StoreReviewsPageDTO> {
+    return this.request(
+      `/merchants/${encodeURIComponent(merchantId)}/reviews?axis=merchant&page=${page}`,
+    );
+  }
+
+  /** Lista de gestão das avaliações da rede (com comentários), filtrável. */
+  merchantReviews(filter: MerchantReviewsFilter = {}): Promise<MerchantReviewDTO[]> {
+    const qs = new URLSearchParams();
+    if (filter.rating) qs.set("rating", String(filter.rating));
+    if (filter.unanswered) qs.set("unanswered", "true");
+    const suffix = qs.toString();
+    return this.request(`/merchant/reviews${suffix ? `?${suffix}` : ""}`, { auth: true });
+  }
+
+  /** Responde/reedita uma avaliação da rede (1–1000 chars; alvo alheio → 404). */
+  merchantReplyReview(id: string, text: string): Promise<MerchantReviewDTO> {
+    return this.request(`/merchant/reviews/${id}/reply`, {
+      method: "POST",
+      body: { text },
+      auth: true,
+    });
   }
 
   // ─── Admin / cupons (globais + por rede — story 53) ─────────────
