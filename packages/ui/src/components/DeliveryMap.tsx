@@ -4,17 +4,16 @@ import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import type { DeliveryMapProps } from "./DeliveryMap.types";
 
 /**
- * Mapa nativo (iOS/Android) do rastreio ao vivo via react-native-maps. Loja (pino
- * vermelho), destino (dot azul "você está aqui") e entregador ao vivo (marcador de
- * moto). Mesma interface (`DeliveryMapProps`) da versão web (Leaflet) — a tela é
- * agnóstica. Story 51.
+ * Mapa de entrega nativo (iOS/Android) via react-native-maps, provider Google.
+ * Loja (pino vermelho), destino (dot verde "endereço de entrega") e marcador móvel
+ * (pino azul — entregador ao vivo no customer, posição atual no driver). Mesma
+ * interface (`DeliveryMapProps`) da versão web (Leaflet) — a tela é agnóstica.
+ * `react-native-maps` é peer dependency (Metro transpila o source do package).
  */
 export function DeliveryMap({ initialRegion, store, destination, driver }: DeliveryMapProps) {
   return (
     <MapView style={StyleSheet.absoluteFill} provider={PROVIDER_GOOGLE} initialRegion={initialRegion}>
-      {store && (
-        <Marker coordinate={store} title="Loja" pinColor="#E11D2A" />
-      )}
+      {store && <Marker coordinate={store} title="Loja" pinColor="#E11D2A" />}
       {destination && (
         <Marker coordinate={destination} title="Entrega" anchor={{ x: 0.5, y: 0.5 }}>
           <View style={styles.destHalo}>
@@ -22,9 +21,7 @@ export function DeliveryMap({ initialRegion, store, destination, driver }: Deliv
           </View>
         </Marker>
       )}
-      {driver && (
-        <Marker coordinate={driver} title="Entregador" pinColor="#2563EB" />
-      )}
+      {driver && <Marker coordinate={driver} title="Entregador" pinColor="#2563EB" />}
     </MapView>
   );
 }

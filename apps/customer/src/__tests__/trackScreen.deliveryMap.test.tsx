@@ -37,13 +37,27 @@ jest.mock("@/api/hooks/useDeliveryLocation", () => ({
   }),
 }));
 
-const mapProps: { current: Record<string, unknown> | null } = { current: null };
-jest.mock("@/components/DeliveryMap", () => ({
-  DeliveryMap: (props: Record<string, unknown>) => {
-    mapProps.current = props;
-    return null;
-  },
+// react-native-maps não importa fora do Metro: mockado para o `requireActual`
+// do @markethub/ui (que agora exporta o DeliveryMap migrado) carregar limpo.
+jest.mock("react-native-maps", () => ({
+  __esModule: true,
+  default: () => null,
+  Marker: () => null,
+  PROVIDER_GOOGLE: "google",
 }));
+
+const mapProps: { current: Record<string, unknown> | null } = { current: null };
+jest.mock("@markethub/ui", () => {
+  const actual = jest.requireActual("@markethub/ui");
+  return {
+    __esModule: true,
+    ...actual,
+    DeliveryMap: (props: Record<string, unknown>) => {
+      mapProps.current = props;
+      return null;
+    },
+  };
+});
 
 function makeTracking(over: Partial<OrderTracking> = {}): OrderTracking {
   return {

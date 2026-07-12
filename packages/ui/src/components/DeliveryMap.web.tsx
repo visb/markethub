@@ -5,10 +5,10 @@ import "leaflet/dist/leaflet.css";
 import type { DeliveryMapProps } from "./DeliveryMap.types";
 
 /**
- * Mapa web (apenas desenvolvimento) do rastreio ao vivo via Leaflet + tiles
- * OpenStreetMap — sem chave do Google. Mesma interface (`DeliveryMapProps`) da
- * versão nativa. Ícones por `divIcon` (pino CSS) p/ evitar o problema das imagens
- * default do Leaflet sob bundler. Story 51.
+ * Mapa de entrega web (apenas desenvolvimento) via Leaflet + tiles OpenStreetMap —
+ * sem chave do Google. Mesma interface (`DeliveryMapProps`) da versão nativa.
+ * Ícones por `divIcon` (pino CSS) p/ evitar o problema das imagens default do
+ * Leaflet sob bundler.
  */
 const pinIcon = (color: string) =>
   L.divIcon({

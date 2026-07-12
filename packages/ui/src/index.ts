@@ -5,3 +5,6 @@ export { Button } from "./components/Button";
 export type { ButtonProps } from "./components/Button";
 export { Screen } from "./components/Screen";
 export type { ScreenProps } from "./components/Screen";
+export { DeliveryMap } from "./components/DeliveryMap";
+export type { DeliveryMapProps, LatLng, MapRegion } from "./components/DeliveryMap.types";
+export { DEFAULT_DELTA, fitRegion, hasCoords } from "./components/mapRegion";

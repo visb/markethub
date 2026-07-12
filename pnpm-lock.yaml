@@ -473,6 +473,16 @@ importers:
         version: 4.1.8(@types/node@22.19.19)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1(@noble/hashes@1.8.0))(vite@6.4.2(@types/node@22.19.19)(jiti@2.7.0)(lightningcss@1.27.0)(terser@5.48.0))
 
   packages/ui:
+    dependencies:
+      leaflet:
+        specifier: '*'
+        version: 1.9.4
+      react-leaflet:
+        specifier: '*'
+        version: 4.2.1(leaflet@1.9.4)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      react-native-maps:
+        specifier: '*'
+        version: 1.18.0(react-native-web@0.19.13(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-native@0.76.5(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@types/react@18.3.29)(react@18.3.1))(react@18.3.1)
     devDependencies:
       '@types/react':
         specifier: ~18.3.12

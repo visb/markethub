@@ -18,9 +18,15 @@ export interface DeliveryDTO {
   status: DeliveryStatusDTO;
   storeId: string;
   storeName: string;
+  /** Coordenadas da loja (origem da entrega). null quando a loja não tem geo. */
+  storeLat?: number | null;
+  storeLng?: number | null;
   customerName: string;
   /** Endereço formatado do cliente (snapshot do pedido). */
   address?: string;
+  /** Coordenadas do endereço de entrega (snapshot). null quando o endereço não tem geo. */
+  destLat?: number | null;
+  destLng?: number | null;
   itemCount: number;
   driverId?: string;
   driverName?: string;

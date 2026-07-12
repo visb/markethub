@@ -3,11 +3,10 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } fro
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Button, Text, colors, radius, spacing } from "@markethub/ui";
+import { Button, DeliveryMap, Text, colors, radius, spacing } from "@markethub/ui";
 import { brl, type OrderTracking, type SubstitutionView } from "@/api/marketplace";
 import { useOrderTracking } from "@/api/hooks/useOrderTracking";
 import { useDeliveryLocation } from "@/api/hooks/useDeliveryLocation";
-import { DeliveryMap } from "@/components/DeliveryMap";
 import { DEFAULT_DELTA, hasCoords, type LatLng, type MapRegion } from "@/lib/mapRegion";
 import { Header } from "@/components/Header";
 import { MerchantLogo } from "@/components/MerchantLogo";

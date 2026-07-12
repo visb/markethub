@@ -40,6 +40,9 @@ jest.mock("@/hooks/useDeliveryTracking", () => ({
   useDeliveryTracking: () => ({ permissionDenied: mockTrackingPermissionDenied }),
 }));
 
+// Mapa da entrega (story 59): device/engine próprios, testado à parte.
+jest.mock("@/components/DeliveryMapView", () => ({ DeliveryMapView: () => null }));
+
 function mkDelivery(over: Partial<DeliveryDTO>): DeliveryDTO {
   return {
     id: "d1",
