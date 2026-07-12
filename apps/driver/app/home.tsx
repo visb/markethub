@@ -78,6 +78,17 @@ export default function HomeScreen() {
         />
       </View>
 
+      {/* Atalho para os ganhos (gorjetas) e histórico de entregas — story 60. */}
+      <Pressable style={styles.earnings} onPress={() => router.push("/earnings")}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontWeight: "700", color: colors.white }}>Meus ganhos</Text>
+          <Text variant="caption" style={{ color: colors.white }}>
+            Gorjetas e histórico de entregas
+          </Text>
+        </View>
+        <Text style={{ color: colors.white, fontWeight: "700", fontSize: 18 }}>›</Text>
+      </Pressable>
+
       {error && <Text style={{ color: colors.danger, marginBottom: spacing.sm }}>{error}</Text>}
 
       {/* Lojas */}
@@ -177,6 +188,15 @@ const styles = StyleSheet.create({
   },
   chipOn: { borderColor: colors.primary, backgroundColor: colors.primary },
   chipOnText: { color: colors.white, fontWeight: "700" },
+  earnings: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
   row: {
     flexDirection: "row",
     alignItems: "center",

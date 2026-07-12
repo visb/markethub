@@ -9,6 +9,27 @@ import { HandoffService } from "../picking/handoff.service";
 import { OrderTrackingService } from "../picking/order-tracking.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { DELIVERY_INCLUDE, toDeliveryDto } from "./delivery.mapper";
+import { HISTORY_INCLUDE, toHistoryItem } from "./earnings.mapper";
+
+/** Janelas fixas dos ganhos (sem range custom). */
+export type EarningsPeriod = "today" | "7d" | "30d";
+
+/** Tamanho de página do histórico de entregas. */
+const HISTORY_PAGE_SIZE = 20;
+
+/**
+ * Início da janela do período. `today` = 00:00 do dia corrente (hora do servidor);
+ * `7d`/`30d` = agora menos N dias. Exportado para teste direto do recorte.
+ */
+export function earningsPeriodStart(period: EarningsPeriod, now: Date = new Date()): Date {
+  if (period === "today") {
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+    return start;
+  }
+  const days = period === "7d" ? 7 : 30;
+  return new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+}
 
 /**
  * Entrega própria — lado do entregador. O entregador é vinculado a uma loja
@@ -149,6 +170,57 @@ export class DriverService {
       data: { status: "delivered", deliveredAt: new Date() },
     });
     return this.detail(deliveryId);
+  }
+
+  /**
+   * Ganhos do entregador no período (story 60). Own-store: só gorjeta é ganho.
+   * Gorjeta paga (status=paid, filtrada por `paidAt`) soma no "recebido"; a
+   * pendente aparece separada (por `createdAt`, sem somar). Conta também as
+   * entregas concluídas (delivered) no período. Consulta `Tip`/`Delivery` direto
+   * via Prisma (kernel compartilhado) — sem import de internals de outro contexto.
+   */
+  async earnings(userId: string, period: EarningsPeriod) {
+    const start = earningsPeriodStart(period);
+    const [paid, pending, deliveriesCompleted] = await Promise.all([
+      this.prisma.tip.aggregate({
+        where: { driverId: userId, status: "paid", paidAt: { gte: start } },
+        _sum: { amountCents: true },
+        _count: { _all: true },
+      }),
+      this.prisma.tip.aggregate({
+        where: { driverId: userId, status: "pending", createdAt: { gte: start } },
+        _sum: { amountCents: true },
+      }),
+      this.prisma.delivery.count({
+        where: { driverId: userId, status: "delivered", deliveredAt: { gte: start } },
+      }),
+    ]);
+    return {
+      period,
+      tipsPaidCents: paid._sum.amountCents ?? 0,
+      tipsPaidCount: paid._count._all,
+      tipsPendingCents: pending._sum.amountCents ?? 0,
+      deliveriesCompleted,
+    };
+  }
+
+  /**
+   * Histórico paginado de entregas concluídas/canceladas do entregador (story 60),
+   * desc por data (entregue/cancelada). Anexa a gorjeta do pedido quando ela é
+   * deste entregador. Busca `pageSize + 1` para saber se há próxima página.
+   */
+  async deliveryHistory(userId: string, page = 1) {
+    const currentPage = Number.isFinite(page) && page >= 1 ? Math.floor(page) : 1;
+    const rows = await this.prisma.delivery.findMany({
+      where: { driverId: userId, status: { in: ["delivered", "canceled"] } },
+      orderBy: { updatedAt: "desc" },
+      skip: (currentPage - 1) * HISTORY_PAGE_SIZE,
+      take: HISTORY_PAGE_SIZE + 1,
+      include: HISTORY_INCLUDE,
+    });
+    const hasMore = rows.length > HISTORY_PAGE_SIZE;
+    const items = rows.slice(0, HISTORY_PAGE_SIZE).map((r) => toHistoryItem(r, userId));
+    return { items, page: currentPage, pageSize: HISTORY_PAGE_SIZE, hasMore };
   }
 
   /** IDs das lojas em que o usuário é entregador ativo. */

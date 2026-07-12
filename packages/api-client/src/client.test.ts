@@ -211,6 +211,22 @@ describe("ApiClient — frota merchant + veículo do entregador", () => {
     expect(init(fetchMock).method).toBe("PUT");
     expect(JSON.parse(init(fetchMock).body)).toEqual({ vehicleId: "v1" });
   });
+
+  it("driverEarnings: GET /driver/earnings com o período (default today)", async () => {
+    const { client, fetchMock } = withFetch();
+    await client.driverEarnings();
+    expect(url(fetchMock)).toBe("http://api.test/api/v1/driver/earnings?period=today");
+    await client.driverEarnings("30d");
+    expect(url(fetchMock, 1)).toBe("http://api.test/api/v1/driver/earnings?period=30d");
+  });
+
+  it("driverDeliveryHistory: GET /driver/deliveries/history com a página (default 1)", async () => {
+    const { client, fetchMock } = withFetch();
+    await client.driverDeliveryHistory();
+    expect(url(fetchMock)).toBe("http://api.test/api/v1/driver/deliveries/history?page=1");
+    await client.driverDeliveryHistory(3);
+    expect(url(fetchMock, 1)).toBe("http://api.test/api/v1/driver/deliveries/history?page=3");
+  });
 });
 
 describe("ApiClient.request — serialização e modos", () => {

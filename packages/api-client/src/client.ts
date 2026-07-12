@@ -47,6 +47,9 @@ import type {
   RefreshInput,
   RegisterInput,
   StoreDriverDTO,
+  EarningsPeriodDTO,
+  DriverEarningsDTO,
+  DeliveryHistoryPageDTO,
 } from "@markethub/types";
 import { MemoryTokenStore, type TokenStore } from "./token-store";
 
@@ -625,6 +628,16 @@ export class ApiClient {
   /** Entrega ao cliente: valida o deliveryCode → entregue. */
   driverConfirmDelivery(id: string, deliveryCode: string): Promise<DeliveryDTO> {
     return this.request(`/driver/deliveries/${id}/deliver`, { method: "POST", body: { deliveryCode }, auth: true });
+  }
+
+  /** Ganhos do entregador (gorjetas + entregas concluídas) no período (story 60). */
+  driverEarnings(period: EarningsPeriodDTO = "today"): Promise<DriverEarningsDTO> {
+    return this.request(`/driver/earnings?period=${period}`, { auth: true });
+  }
+
+  /** Histórico paginado de entregas concluídas/canceladas do entregador (story 60). */
+  driverDeliveryHistory(page = 1): Promise<DeliveryHistoryPageDTO> {
+    return this.request(`/driver/deliveries/history?page=${page}`, { auth: true });
   }
 
   /**
