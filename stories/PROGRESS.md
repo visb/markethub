@@ -29,7 +29,7 @@ Cuidados da rodada:
 | 56 | reviews — resposta do lojista + vitrine pública | — | done |
 | 57 | merchant — pausar loja + toggle de disponibilidade | 52 | done |
 | 58 | config de entrega por loja — taxa, mínimo, raio | — | done |
-| 59 | driver — mapa da entrega + navegação externa | — | todo |
+| 59 | driver — mapa da entrega + navegação externa | — | done |
 | 60 | driver — ganhos (gorjetas) e histórico | — | todo |
 | 61 | driver — problema na entrega (falha, retorno, decisão da loja) | 54 | todo |
 | 62 | driver — turno on/off (disponibilidade) | — | todo |
@@ -55,3 +55,4 @@ Cuidados da rodada:
 [OK] 56 — testes: api 1217/1217, customer 244/244, merchant 281/281, api-client 58/58 — merge: 18c8dd1 — arquivada em done/ — 2026-07-12 — migration story56_review_reply autorada, NÃO aplicada (Postgres P1001 localhost:5433). PENDENTE-MANUAL: `prisma migrate deploy`. Débito api-client perFile não piorado (3 métodos novos 100%). Dep 56→68 satisfeita.
 [OK] 57 — testes: api 1250/1250, customer 247/247, merchant 293/293, api-client 59/59 — merge: 4c0a308 — arquivada em done/ — 2026-07-12 — migration story57_store_paused_at autorada, NÃO aplicada (Docker down). PENDENTE-MANUAL: `prisma migrate deploy`. Dep 52→57 satisfeita. STORE_PAUSED bloqueia imediato E agendado (vs STORE_CLOSED). Débito api-client perFile não piorado.
 [OK] 58 — testes: api 1260/1260, merchant 298/298, customer 251/251, api-client 59/59 — merge: 7f1d51b — arquivada em done/ — 2026-07-12 — migration story58_store_delivery_config autorada, NÃO aplicada (Docker down). PENDENTE-MANUAL: `prisma migrate deploy`. haversineKm reaproveitado de common/geo.ts. Mínimo só nível loja (rede não define); telas customer cart/checkout/store seguem legado useState (só UI derivada, sem fetch novo).
+[OK] 59 — testes: ui 35/35, customer 245/245, driver 127/127, api 1264/1264 — merge: a860f16 — arquivada em done/ — 2026-07-12 — sem migration (join de coords). DESVIO ACEITO: moveu DeliveryMap (mapa 3-marcadores loja/cliente/posição) p/ packages/ui em vez do StoreMap/explore (acoplado a marketplace, semanticamente errado p/ driver); StoreMap segue no customer intacto. StoreMap→packages/ui é follow-up opcional. api-client não tocado.
