@@ -13,4 +13,11 @@ export const queryKeys = {
     /** Busca de ofertas da loja p/ propor substituto (autocomplete). */
     search: (storeId: string, q: string) => ["pick", "search", storeId, q] as const,
   },
+  /** Despacho de entregas da loja (story 61: destaque de falha + reenviar/cancelar). */
+  deliveries: {
+    /** Fila de entregas de uma loja. */
+    queue: (storeId: string) => ["deliveries", "queue", storeId] as const,
+    /** Entregadores vinculados à loja (p/ atribuição). */
+    drivers: (storeId: string) => ["deliveries", "drivers", storeId] as const,
+  },
 } as const;

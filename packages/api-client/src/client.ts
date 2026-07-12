@@ -3,6 +3,7 @@ import type {
   AuthTokens,
   AuthUser,
   DeliveryDTO,
+  FailDeliveryInput,
   LoginInput,
   MerchantContextDTO,
   MerchantStoreDetailDTO,
@@ -630,6 +631,11 @@ export class ApiClient {
     return this.request(`/driver/deliveries/${id}/deliver`, { method: "POST", body: { deliveryCode }, auth: true });
   }
 
+  /** Reporta falha na entrega (story 61): motivo + observação opcional. */
+  driverFailDelivery(id: string, body: FailDeliveryInput): Promise<DeliveryDTO> {
+    return this.request(`/driver/deliveries/${id}/fail`, { method: "POST", body, auth: true });
+  }
+
   /** Ganhos do entregador (gorjetas + entregas concluídas) no período (story 60). */
   driverEarnings(period: EarningsPeriodDTO = "today"): Promise<DriverEarningsDTO> {
     return this.request(`/driver/earnings?period=${period}`, { auth: true });
@@ -684,6 +690,11 @@ export class ApiClient {
 
   unassignDelivery(id: string): Promise<DeliveryDTO> {
     return this.request(`/store/deliveries/${id}/unassign`, { method: "POST", auth: true });
+  }
+
+  /** Reenvia uma entrega com falha (story 61): failed → unassigned. */
+  storeDeliveryRetry(id: string): Promise<DeliveryDTO> {
+    return this.request(`/store/deliveries/${id}/retry`, { method: "POST", auth: true });
   }
 
   /** Retirada na loja: cliente apresenta o código; a loja confirma a entrega. */

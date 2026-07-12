@@ -33,7 +33,7 @@ function makePrisma(over: {
 }
 
 function makeService(prisma: unknown) {
-  return new DriverService(prisma as never, {} as never, {} as never);
+  return new DriverService(prisma as never, {} as never, {} as never, { publish: jest.fn() } as never);
 }
 
 describe("earningsPeriodStart", () => {

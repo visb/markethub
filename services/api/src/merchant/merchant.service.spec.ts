@@ -436,6 +436,109 @@ describe("MerchantService.listOrders (story 12)", () => {
       totalCents: 1800,
     });
     expect(out[0].createdAt).toBe("2026-01-02T10:00:00.000Z");
+    // retirada / sem Delivery → delivery = null
+    expect(out[0].delivery).toBeNull();
+  });
+
+  it("expõe a Delivery com falha p/ o board destacar (story 61)", async () => {
+    const failedAt = new Date("2026-01-02T11:00:00Z");
+    const { svc } = makeManager({
+      managed: ["s1"],
+      hasAdminLink: true,
+      groups: [
+        {
+          id: "g1",
+          orderId: "ord1",
+          storeId: "s1",
+          status: "on_the_way",
+          fulfillment: "delivery",
+          subtotalCents: 1000,
+          deliveryCents: 0,
+          prepCents: 0,
+          platformFeeCents: 0,
+          pickupCode: null,
+          store: { name: "Loja s1" },
+          order: { createdAt: new Date("2026-01-02T10:00:00Z") },
+          delivery: { id: "d1", status: "failed", failReason: "customer_absent", failedAt },
+          _count: { items: 1 },
+        },
+      ],
+    });
+    const out = await svc.listOrders({ id: "u3", roles: ["merchant"] });
+    expect(out[0].delivery).toEqual({
+      id: "d1",
+      status: "failed",
+      failReason: "customer_absent",
+      failedAt: "2026-01-02T11:00:00.000Z",
+    });
+  });
+});
+
+describe("MerchantService.orderGroupDetail (story 54/61)", () => {
+  function detailGroup(over: Record<string, unknown> = {}) {
+    return {
+      id: "g1",
+      orderId: "ord1",
+      storeId: "s1",
+      status: "on_the_way",
+      fulfillment: "delivery",
+      subtotalCents: 1000,
+      deliveryCents: 0,
+      prepCents: 0,
+      platformFeeCents: 0,
+      pickupCode: null,
+      store: { name: "Loja s1" },
+      pickTask: { status: "ready_for_pickup", startedAt: null, packedAt: null, readyAt: null },
+      delivery: null,
+      order: {
+        createdAt: new Date("2026-01-02T10:00:00Z"),
+        scheduledFrom: null,
+        scheduledTo: null,
+        user: { name: "Cliente" },
+        payment: null,
+      },
+      items: [],
+      ...over,
+    };
+  }
+
+  function setup(group: Record<string, unknown> | null) {
+    const { svc, prisma } = makeManager({ managed: ["s1"], hasAdminLink: true });
+    (prisma as unknown as { orderGroup: { findUnique: jest.Mock } }).orderGroup.findUnique = jest
+      .fn()
+      .mockResolvedValue(group);
+    return { svc };
+  }
+
+  it("entrega failed → cancelable=true (exceção story 61) e expõe a delivery", async () => {
+    const failedAt = new Date("2026-01-02T11:00:00Z");
+    const { svc } = setup(
+      detailGroup({ delivery: { id: "d1", status: "failed", failReason: "wrong_address", failedAt } }),
+    );
+    const out = await svc.orderGroupDetail({ id: "u3", roles: ["merchant"] }, "g1");
+    expect(out.cancelable).toBe(true);
+    expect(out.delivery).toEqual({
+      id: "d1",
+      status: "failed",
+      failReason: "wrong_address",
+      failedAt: "2026-01-02T11:00:00.000Z",
+    });
+  });
+
+  it("on_the_way sem falha → cancelable=false (invariante padrão) e delivery mapeada", async () => {
+    const { svc } = setup(
+      detailGroup({ delivery: { id: "d1", status: "picked_up", failReason: null, failedAt: null } }),
+    );
+    const out = await svc.orderGroupDetail({ id: "u3", roles: ["merchant"] }, "g1");
+    expect(out.cancelable).toBe(false);
+    expect(out.delivery).toMatchObject({ id: "d1", status: "picked_up", failReason: null, failedAt: null });
+  });
+
+  it("grupo fora do escopo → 404", async () => {
+    const { svc } = setup(detailGroup({ storeId: "outra" }));
+    await expect(svc.orderGroupDetail({ id: "u3", roles: ["merchant"] }, "g1")).rejects.toMatchObject({
+      response: { code: "ORDER_GROUP_NOT_FOUND" },
+    });
   });
 });
 

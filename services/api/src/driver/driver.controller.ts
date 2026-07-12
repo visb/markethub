@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Post, Put, Query } from "@nestjs/common";
-import { IsIn, IsISO8601, IsNumber, IsOptional, IsString, Max, Min, MinLength } from "class-validator";
+import type { DeliveryFailReason } from "@prisma/client";
+import { IsIn, IsISO8601, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from "class-validator";
 import { CurrentUser, Roles } from "../auth";
 import type { AuthUser } from "../auth";
 import { DriverService } from "./driver.service";
@@ -12,6 +13,13 @@ class ConfirmPickupDto {
 
 class ConfirmDeliveryDto {
   @IsString() @MinLength(1) deliveryCode!: string;
+}
+
+const FAIL_REASONS = ["customer_absent", "wrong_address", "refused", "other"] as const;
+
+class FailDeliveryDto {
+  @IsIn(FAIL_REASONS) reason!: DeliveryFailReason;
+  @IsOptional() @IsString() @MaxLength(500) note?: string;
 }
 
 class SelectVehicleDto {
@@ -89,6 +97,12 @@ export class DriverController {
   @Post("deliveries/:id/deliver")
   deliver(@CurrentUser() user: AuthUser, @Param("id") id: string, @Body() dto: ConfirmDeliveryDto) {
     return this.driver.confirmDelivery(user.id, id, dto.deliveryCode);
+  }
+
+  /** Reporta falha na entrega (story 61): motivo + observação opcional. */
+  @Post("deliveries/:id/fail")
+  fail(@CurrentUser() user: AuthUser, @Param("id") id: string, @Body() dto: FailDeliveryDto) {
+    return this.driver.fail(user.id, id, dto.reason, dto.note);
   }
 
   /**

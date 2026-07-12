@@ -2,9 +2,17 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ApiClientError, type MerchantOrderItemDTO } from "@markethub/api-client";
+import {
+  ApiClientError,
+  type MerchantDeliveryStatusDTO,
+  type MerchantOrderItemDTO,
+} from "@markethub/api-client";
 import { useMerchantContext } from "@/api/hooks/useMerchantContext";
-import { useCancelOrderGroup, useMerchantOrderDetail } from "@/api/hooks/useMerchantOrderDetail";
+import {
+  useCancelOrderGroup,
+  useMerchantOrderDetail,
+  useRetryDelivery,
+} from "@/api/hooks/useMerchantOrderDetail";
 import { can } from "@/auth/permissions";
 
 function formatBRL(cents: number): string {
@@ -31,6 +39,19 @@ const cancelFormSchema = z.object({
 });
 type CancelFormValues = z.infer<typeof cancelFormSchema>;
 
+/** Motivo cru → texto legível da falha de entrega (story 61). */
+const FAIL_REASON_LABEL: Record<NonNullable<MerchantDeliveryStatusDTO["failReason"]>, string> = {
+  customer_absent: "Cliente ausente",
+  wrong_address: "Endereço errado / não localizado",
+  refused: "Cliente recusou o pedido",
+  other: "Outro motivo",
+};
+
+/** HH:MM da falha (hora local). */
+function failTime(iso: string | null): string {
+  return iso ? new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "";
+}
+
 /**
  * Drawer lateral de detalhe do sub-pedido (story 54): itens linha a linha
  * (+substituições), pagamento, cliente e timeline. Ação "Cancelar sub-pedido"
@@ -42,6 +63,7 @@ export function OrderDrawer({ groupId, onClose }: { groupId: string; onClose: ()
   const { data: ctx } = useMerchantContext();
   const { data: detail, isLoading, isError } = useMerchantOrderDetail(groupId);
   const cancelMutation = useCancelOrderGroup(groupId);
+  const retryMutation = useRetryDelivery(groupId);
   const [confirming, setConfirming] = useState(false);
 
   const { register, handleSubmit } = useForm<CancelFormValues>({
@@ -60,6 +82,15 @@ export function OrderDrawer({ groupId, onClose }: { groupId: string; onClose: ()
       : cancelMutation.error
         ? "Não foi possível cancelar o sub-pedido."
         : null;
+
+  const retryError =
+    retryMutation.error instanceof ApiClientError
+      ? retryMutation.error.body.message
+      : retryMutation.error
+        ? "Não foi possível reenviar a entrega."
+        : null;
+
+  const failed = detail?.delivery?.status === "failed";
 
   return (
     <aside className="drawer" role="dialog" aria-label="Detalhe do sub-pedido">
@@ -111,6 +142,33 @@ export function OrderDrawer({ groupId, onClose }: { groupId: string; onClose: ()
             </ul>
             <div className="drawer-total">Total: {formatBRL(detail.totalCents)}</div>
           </section>
+
+          {failed && detail.delivery && (
+            <section className="drawer-section delivery-failed" role="alert">
+              <h3>Falha na entrega</h3>
+              <p>
+                <strong>
+                  {detail.delivery.failReason
+                    ? FAIL_REASON_LABEL[detail.delivery.failReason]
+                    : "Falha reportada"}
+                </strong>
+                {detail.delivery.failedAt ? ` · ${failTime(detail.delivery.failedAt)}` : ""}
+              </p>
+              {canManage && (
+                <div className="delivery-actions">
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={retryMutation.isPending}
+                    onClick={() => retryMutation.mutate(detail.delivery!.id)}
+                  >
+                    {retryMutation.isPending ? "Reenviando…" : "Reenviar entrega"}
+                  </button>
+                  {retryError && <p className="error">{retryError}</p>}
+                </div>
+              )}
+            </section>
+          )}
 
           {canManage && (
             <section className="drawer-section">

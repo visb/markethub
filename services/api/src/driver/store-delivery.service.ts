@@ -29,7 +29,7 @@ export class StoreDeliveryService {
     await this.assertStoreStaff(userId, storeId);
     const where = status
       ? { storeId, status: status as DeliveryStatus }
-      : { storeId, status: { in: ["unassigned", "assigned", "picked_up"] as DeliveryStatus[] } };
+      : { storeId, status: { in: ["unassigned", "assigned", "picked_up", "failed"] as DeliveryStatus[] } };
     const deliveries = await this.prisma.delivery.findMany({
       where,
       orderBy: { createdAt: "asc" },
@@ -104,6 +104,38 @@ export class StoreDeliveryService {
         message: "Só é possível desatribuir entregas atribuídas (não coletadas)",
       });
     }
+    await this.emitTracking(delivery.orderGroupId);
+    return this.detail(deliveryId);
+  }
+
+  /**
+   * Reenvia uma entrega com falha (story 61): a loja decide tentar de novo. Só
+   * `failed → unassigned` — limpa o entregador e os timestamps de coleta, mas
+   * PRESERVA a última falha (`failReason`/`failNote`/`failedAt`) para histórico/
+   * contexto. Na MESMA TX devolve o OrderGroup a `ready_for_pickup` (ele estava
+   * `on_the_way` desde a coleta) para que o fluxo de coleta funcione de novo: a
+   * entrega volta ao pool e à fila de coleta. Estoque NÃO é mexido. Não-`failed`
+   * → `DELIVERY_NOT_FAILED`.
+   */
+  async retry(userId: string, deliveryId: string) {
+    const delivery = await this.loadDelivery(deliveryId);
+    await this.assertStoreStaff(userId, delivery.storeId);
+    await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.delivery.updateMany({
+        where: { id: deliveryId, status: "failed" },
+        data: { status: "unassigned", driverId: null, assignedAt: null, pickedUpAt: null },
+      });
+      if (count === 0) {
+        throw new BadRequestException({
+          code: "DELIVERY_NOT_FAILED",
+          message: "Só é possível reenviar entregas com falha",
+        });
+      }
+      await tx.orderGroup.update({
+        where: { id: delivery.orderGroupId },
+        data: { status: "ready_for_pickup" },
+      });
+    });
     await this.emitTracking(delivery.orderGroupId);
     return this.detail(deliveryId);
   }

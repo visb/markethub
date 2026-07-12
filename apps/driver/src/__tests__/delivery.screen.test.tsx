@@ -15,11 +15,13 @@ import DeliveryScreen from "../../app/delivery/[id]";
 const mockReplace = jest.fn();
 const mockPickupMutate = jest.fn();
 const mockDeliverMutate = jest.fn();
+const mockFailMutate = jest.fn();
 
 const mockState = {
   detail: { data: null as DeliveryDTO | null, isLoading: false, isError: false },
   pickup: { isPending: false, isError: false },
   deliver: { isPending: false, isError: false },
+  fail: { isPending: false, isError: false },
 };
 
 jest.mock("expo-router", () => ({
@@ -32,6 +34,7 @@ jest.mock("@/api/hooks/useDriverDeliveries", () => ({
   useDeliveryDetail: () => mockState.detail,
   useConfirmPickup: () => ({ mutate: mockPickupMutate, ...mockState.pickup }),
   useConfirmDelivery: () => ({ mutate: mockDeliverMutate, ...mockState.deliver }),
+  useFailDelivery: () => ({ mutate: mockFailMutate, ...mockState.fail }),
 }));
 
 // Rastreio ao vivo (story 51): isolado do teste da tela (device/auth próprios).
@@ -69,9 +72,11 @@ beforeEach(() => {
   mockReplace.mockReset();
   mockPickupMutate.mockReset();
   mockDeliverMutate.mockReset();
+  mockFailMutate.mockReset();
   mockState.detail = { data: null, isLoading: false, isError: false };
   mockState.pickup = { isPending: false, isError: false };
   mockState.deliver = { isPending: false, isError: false };
+  mockState.fail = { isPending: false, isError: false };
   mockTrackingPermissionDenied = false;
 });
 
@@ -136,5 +141,26 @@ describe("DeliveryScreen", () => {
     mockState.detail = { data: mkDelivery({ status: "picked_up" }), isLoading: false, isError: false };
     const tree = render(<DeliveryScreen />);
     expect(JSON.stringify(tree.toJSON())).toContain("Rastreio ao vivo indisponível");
+  });
+
+  // ── Problema na entrega (story 61) ──
+
+  it("picked_up: botão 'Problema na entrega' abre o sheet", () => {
+    mockState.detail = { data: mkDelivery({ status: "picked_up" }), isLoading: false, isError: false };
+    const tree = render(<DeliveryScreen />);
+    const btn = tree.root.findAllByType(Button).find((b) => b.props.title === "Problema na entrega");
+    expect(btn).toBeDefined();
+    act(() => btn!.props.onPress());
+    // sheet aberto: título do sheet no render
+    expect(JSON.stringify(tree.toJSON())).toContain("Escolha o que aconteceu");
+  });
+
+  it("status failed: mostra 'aguardando decisão da loja' e Voltar leva à home", () => {
+    mockState.detail = { data: mkDelivery({ status: "failed", failReason: "customer_absent" }), isLoading: false, isError: false };
+    const tree = render(<DeliveryScreen />);
+    expect(JSON.stringify(tree.toJSON())).toContain("Aguardando a decisão da loja");
+    const voltar = tree.root.findAllByType(Button).find((b) => b.props.title === "Voltar");
+    act(() => voltar!.props.onPress());
+    expect(mockReplace).toHaveBeenCalledWith("/home");
   });
 });

@@ -52,6 +52,12 @@ export class StoreDeliveriesController {
     return this.store.unassign(user.id, id);
   }
 
+  /** Reenvia uma entrega com falha (story 61): failed → unassigned. */
+  @Post("deliveries/:id/retry")
+  retry(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.store.retry(user.id, id);
+  }
+
   /** Retirada na loja: cliente apresenta o código e a loja confirma a entrega. */
   @Post("order-groups/:id/handover")
   handover(@CurrentUser() user: AuthUser, @Param("id") id: string, @Body() dto: HandoverDto) {

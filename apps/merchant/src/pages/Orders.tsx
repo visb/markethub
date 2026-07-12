@@ -106,11 +106,17 @@ export function Orders() {
                     <li key={o.id} className="list-item order-card">
                       <button
                         type="button"
-                        className="order-card-btn"
+                        className={`order-card-btn${o.delivery?.status === "failed" ? " order-card-failed" : ""}`}
                         onClick={() => setSelectedId(o.id)}
                       >
                         <strong>#{o.orderId.slice(-6)}</strong>
                         <span className="badge-muted"> {o.fulfillment === "pickup" ? "Retirada" : "Entrega"}</span>
+                        {o.delivery?.status === "failed" && (
+                          <span className="badge-danger" title="Falha na entrega">
+                            {" "}
+                            Falha na entrega
+                          </span>
+                        )}
                         <div className="muted">{o.storeName}</div>
                         <div className="muted">
                           {o.itemCount} {o.itemCount === 1 ? "item" : "itens"} · {formatBRL(o.totalCents)}

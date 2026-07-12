@@ -8,7 +8,11 @@ export type DeliveryStatusDTO =
   | "assigned"
   | "picked_up"
   | "delivered"
+  | "failed"
   | "canceled";
+
+/** Motivo da falha de entrega reportada pelo entregador (story 61). */
+export type DeliveryFailReasonDTO = "customer_absent" | "wrong_address" | "refused" | "other";
 
 /** Entrega de uma OrderGroup feita por um entregador da própria loja. */
 export interface DeliveryDTO {
@@ -37,7 +41,19 @@ export interface DeliveryDTO {
   assignedAt?: string;
   pickedUpAt?: string;
   deliveredAt?: string;
+  /** Motivo da falha (story 61) — presente quando status = `failed`. */
+  failReason?: DeliveryFailReasonDTO | null;
+  /** Observação livre do entregador na falha (story 61). */
+  failNote?: string | null;
+  /** Momento da falha (story 61). */
+  failedAt?: string;
   createdAt?: string;
+}
+
+/** Corpo de `POST /driver/deliveries/:id/fail` (story 61): motivo + observação. */
+export interface FailDeliveryInput {
+  reason: DeliveryFailReasonDTO;
+  note?: string;
 }
 
 /** Entregador vinculado a uma loja (StoreStaff role driver), p/ atribuição. */

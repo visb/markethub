@@ -46,6 +46,7 @@ const order: MerchantOrderDTO = {
   totalCents: 1500,
   pickupCode: null,
   createdAt: "2026-06-22T10:00:00.000Z",
+  delivery: null,
 };
 
 function wrapper() {

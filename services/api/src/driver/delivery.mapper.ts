@@ -1,4 +1,4 @@
-import type { DeliveryStatus } from "@prisma/client";
+import type { DeliveryFailReason, DeliveryStatus } from "@prisma/client";
 
 const iso = (d: Date | null | undefined) => (d ? d.toISOString() : undefined);
 
@@ -51,6 +51,9 @@ type DeliveryWithRels = {
   assignedAt: Date | null;
   pickedUpAt: Date | null;
   deliveredAt: Date | null;
+  failReason: DeliveryFailReason | null;
+  failNote: string | null;
+  failedAt: Date | null;
   createdAt: Date;
   storeId: string;
   orderGroup: {
@@ -84,6 +87,9 @@ export function toDeliveryDto(d: DeliveryWithRels) {
     assignedAt: iso(d.assignedAt),
     pickedUpAt: iso(d.pickedUpAt),
     deliveredAt: iso(d.deliveredAt),
+    failReason: d.failReason ?? null,
+    failNote: d.failNote ?? null,
+    failedAt: iso(d.failedAt),
     createdAt: iso(d.createdAt),
   };
 }

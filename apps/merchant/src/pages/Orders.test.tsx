@@ -48,6 +48,7 @@ const order = (over: Partial<MerchantOrderDTO> = {}): MerchantOrderDTO => ({
   totalCents: 1500,
   pickupCode: null,
   createdAt: "2026-06-22T10:00:00.000Z",
+  delivery: null,
   ...over,
 });
 
@@ -119,5 +120,25 @@ describe("Orders page", () => {
     render(<Orders />);
     fireEvent.click(screen.getByLabelText("Ligar som de novos pedidos"));
     expect(toggleSound).toHaveBeenCalled();
+  });
+
+  it("card com entrega failed exibe o badge 'Falha na entrega' (story 61)", () => {
+    ordersResult = {
+      orders: [
+        order({
+          status: "on_the_way",
+          delivery: { id: "d1", status: "failed", failReason: "customer_absent", failedAt: null },
+        }),
+      ],
+      loading: false,
+      connected: true,
+    };
+    render(<Orders />);
+    expect(screen.getByText("Falha na entrega")).toBeInTheDocument();
+  });
+
+  it("card sem falha não exibe o badge", () => {
+    render(<Orders />);
+    expect(screen.queryByText("Falha na entrega")).not.toBeInTheDocument();
   });
 });

@@ -2,9 +2,15 @@ import React, { useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { Button, Text, colors, radius, spacing } from "@markethub/ui";
-import { useConfirmDelivery, useConfirmPickup, useDeliveryDetail } from "@/api/hooks/useDriverDeliveries";
+import {
+  useConfirmDelivery,
+  useConfirmPickup,
+  useDeliveryDetail,
+  useFailDelivery,
+} from "@/api/hooks/useDriverDeliveries";
 import { useDeliveryTracking } from "@/hooks/useDeliveryTracking";
 import { DeliveryMapView } from "@/components/DeliveryMapView";
+import { ProblemDeliverySheet } from "@/components/ProblemDeliverySheet";
 
 export default function DeliveryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -12,8 +18,10 @@ export default function DeliveryScreen() {
   const detail = useDeliveryDetail(id);
   const confirmPickup = useConfirmPickup(id);
   const confirmDelivery = useConfirmDelivery(id);
+  const failDelivery = useFailDelivery(id);
   const [pickupCode, setPickupCode] = useState("");
   const [deliveryCode, setDeliveryCode] = useState("");
+  const [problemOpen, setProblemOpen] = useState(false);
 
   const delivery = detail.data;
   // Rastreio ao vivo: inicia ao coletar (picked_up), para ao entregar/sair.
@@ -132,8 +140,38 @@ export default function DeliveryScreen() {
             onPress={() => confirmDelivery.mutate(deliveryCode.trim())}
             style={{ marginTop: spacing.sm }}
           />
+          <Button
+            title="Problema na entrega"
+            variant="secondary"
+            disabled={busy}
+            onPress={() => setProblemOpen(true)}
+            style={{ marginTop: spacing.sm }}
+          />
         </View>
       )}
+
+      {/* Falha reportada: aguardando a decisão da loja (story 61) */}
+      {delivery.status === "failed" && (
+        <View style={{ marginTop: spacing.lg }}>
+          <View style={styles.banner}>
+            <Text style={{ fontWeight: "700", color: colors.text }}>Problema reportado</Text>
+            <Text variant="caption" style={{ color: colors.text, marginTop: spacing.xs }}>
+              O pedido voltou para a loja. Aguardando a decisão da loja (reenviar ou cancelar).
+            </Text>
+          </View>
+          <Button title="Voltar" onPress={() => router.replace("/home")} style={{ marginTop: spacing.md }} />
+        </View>
+      )}
+
+      <ProblemDeliverySheet
+        visible={problemOpen}
+        submitting={failDelivery.isPending}
+        error={failDelivery.isError ? "Não foi possível reportar o problema." : null}
+        onClose={() => setProblemOpen(false)}
+        onSubmit={(input) =>
+          failDelivery.mutate(input, { onSuccess: () => setProblemOpen(false) })
+        }
+      />
 
       {delivery.status === "delivered" && (
         <View style={{ marginTop: spacing.lg }}>

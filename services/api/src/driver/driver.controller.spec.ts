@@ -17,6 +17,7 @@ function makeController() {
     accept: jest.fn().mockResolvedValue({ id: "d1" }),
     confirmPickup: jest.fn().mockResolvedValue({ id: "d1" }),
     confirmDelivery: jest.fn().mockResolvedValue({ id: "d1" }),
+    fail: jest.fn().mockResolvedValue({ id: "d1" }),
     earnings: jest.fn().mockResolvedValue({ tipsPaidCents: 0 }),
     deliveryHistory: jest.fn().mockResolvedValue({ items: [] }),
   };
@@ -73,6 +74,12 @@ describe("DriverController", () => {
     const { controller, driver } = makeController();
     controller.deliver(user, "d1", { deliveryCode: "9999" });
     expect(driver.confirmDelivery).toHaveBeenCalledWith("u1", "d1", "9999");
+  });
+
+  it("fail: repassa motivo + observação do dto (story 61)", () => {
+    const { controller, driver } = makeController();
+    controller.fail(user, "d1", { reason: "customer_absent", note: "portão fechado" });
+    expect(driver.fail).toHaveBeenCalledWith("u1", "d1", "customer_absent", "portão fechado");
   });
 
   // ── Ganhos e histórico (story 60) ──

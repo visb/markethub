@@ -56,7 +56,7 @@ Convenção: enums em `services/api/prisma/schema.prisma`; regras em services do
 
 ### Cancelamento por sub-pedido (OrderGroup — story 54)
 
-- A loja/marketplace cancela **um** sub-pedido (grupo de uma loja); os demais grupos do pedido seguem. Invariante espelha a de Order: o grupo cancela se `status ∈ {created, paid, preparing}` **e** a PickTask do grupo (se houver) ainda não passou de `assigned`. Caso contrário `CANNOT_CANCEL_GROUP`.
+- A loja/marketplace cancela **um** sub-pedido (grupo de uma loja); os demais grupos do pedido seguem. Invariante espelha a de Order: o grupo cancela se `status ∈ {created, paid, preparing}` **e** a PickTask do grupo (se houver) ainda não passou de `assigned`. Caso contrário `CANNOT_CANCEL_GROUP`. **Exceção (story 61):** grupo com `Delivery` em `failed` pode cancelar mesmo já avançado (ver "Falha na entrega + decisão da loja"); estoque não volta.
 - Ator: capability **`orders.manage`** (owner, administrador e gerente no escopo da loja). Grupo de loja fora do escopo → 404 (não vaza existência).
 - Efeitos atômicos (mesma TX): grupo → `canceled`; PickTask do grupo removida da fila; evento `order.group_canceled` no outbox (payload `orderId`, `groupId`, `amountCents` já rateado, `reason`). Quando é o **último grupo ativo** (os demais já cancelados), o Order inteiro vira `canceled` e o slot de entrega (Order-level) é liberado — **sem** emitir `order.canceled` (o handler do grupo já cobre o estorno; emitir os dois duplicaria o reembolso).
 - Estorno **parcial** durável: handler do evento acumula um `RefundComponent` (`reason = group_canceled`) no `Refund` 1:1 do pedido e estorna o valor no gateway (retry isolado, idempotente via `ProcessedEvent` + presença do component do grupo — padrão story 48). Push ao cliente ("itens de X foram cancelados e estornados").
@@ -96,13 +96,24 @@ Convenção: enums em `services/api/prisma/schema.prisma`; regras em services do
 ## Delivery (entrega própria da loja)
 
 - Modelo **own-store**: 1 `Delivery` por OrderGroup com `fulfillment = delivery`. Sem marketplace de entregadores — o `driver` é entregador vinculado à loja (`StoreStaff` role `driver`), atribuído **manualmente** pela loja.
-- **DeliveryStatus**: `unassigned → assigned → picked_up → delivered`, ou `canceled` (`DELIVERY_NOT_ASSIGNED`).
+- **DeliveryStatus**: `unassigned → assigned → picked_up → delivered`, ou `canceled` (`DELIVERY_NOT_ASSIGNED`), ou `failed` (story 61 — ver abaixo).
 - **Códigos curtos** (4 dígitos, `common/codes.ts`):
   - `pickupCode` (OrderGroup, loja→entregador): picker/merchant digita p/ liberar a coleta.
   - `deliveryCode` (Order, entregador→cliente): entregador digita p/ confirmar a entrega.
   - Não são segredo forte — protegidos por limite de tentativas (anti-brute-force).
 - `pickup` (retirada): cliente retira, sem Delivery.
 - *Pointer:* `src/driver/*`, `src/common/codes.ts`, modelo `Delivery`.
+
+### Falha na entrega + decisão da loja (story 61)
+
+- **Falha é da `Delivery`, não do OrderGroup.** O entregador que já coletou (`picked_up`) mas não consegue entregar reporta a falha: `Delivery → failed` com `failReason` (`customer_absent | wrong_address | refused | other`), `failNote?` e `failedAt`. Só o **dono** da entrega e só a partir de `picked_up` (antes da coleta ele apenas não aceita/desatribui) — senão `NOT_DELIVERY_DRIVER` / `DELIVERY_NOT_PICKED_UP`. Guarda só a **última** falha (histórico de tentativas fora de escopo). Idempotente quando já `failed`.
+- O **status do OrderGroup NÃO ganha estado novo** (segue `on_the_way`): os painéis (merchant board/drawer, fila do picker) derivam a **exibição** da `Delivery` — evita ripple em DTOs/boards.
+- Na MESMA TX do `fail`: evento `delivery.failed` no outbox (payload `orderId`, `groupId`, `deliveryId`, `reason`). Handler (fila própria, idempotente via `ProcessedEvent` — padrão story 48): **push ao cliente** ("problema na sua entrega: <motivo>, a loja vai entrar em contato") + **realtime ao merchant** (`order.status_changed` à store room — mesmo canal do som/badge da story 54).
+- **A loja decide** (`store/deliveries/:id/retry`, mesmo guard/RBAC do despacho — manager/picker da loja; `NOT_STORE_STAFF`):
+  - **Reenviar** (`retry`): `failed → unassigned`, limpa `driverId` + timestamps de coleta (`assignedAt`/`pickedUpAt`) mas **PRESERVA** a última falha (`failReason`/`failNote`/`failedAt`); na mesma TX o OrderGroup volta a `ready_for_pickup` (estava `on_the_way`) — a entrega retorna ao pool e à fila de coleta. Não-`failed` → `DELIVERY_NOT_FAILED`.
+  - **Cancelar o sub-pedido**: usa o fluxo da story 54 (cancelamento por grupo + estorno).
+- **Exceção à trava de cancelamento (story 54):** um grupo com `Delivery` em `failed` **PODE** ser cancelado mesmo com o grupo `on_the_way` e a PickTask avançada (`ready_for_pickup`) — a loja escolhe entre reenviar e cancelar. **Estoque NÃO volta** (os itens separados ficam como estão; devolução de estoque fora de escopo). Fora esse caso, a invariante padrão (só antes de a separação começar) vale.
+- *Pointer:* `src/driver/driver.service.ts` (`fail`), `src/driver/store-delivery.service.ts` (`retry`), `src/events/handlers/delivery-failed.handlers.ts`, `src/marketplace/orders.service.ts` (`cancelGroup` — exceção `deliveryFailed`).
 
 ---
 

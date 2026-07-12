@@ -1,4 +1,4 @@
-import type { ApiClient, MerchantOrderDetailDTO, MerchantOrderDTO } from "@markethub/api-client";
+import type { ApiClient, DeliveryDTO, MerchantOrderDetailDTO, MerchantOrderDTO } from "@markethub/api-client";
 
 /**
  * Módulo de API tipado dos pedidos do merchant (story 12 / 54). Toda chamada HTTP
@@ -23,4 +23,9 @@ export function cancelOrderGroup(
   reason?: string,
 ): Promise<{ id: string; status: string }> {
   return api.merchantCancelOrderGroup(id, reason);
+}
+
+/** Reenvia uma entrega com falha (story 61): failed → unassigned. */
+export function retryDelivery(api: ApiClient, deliveryId: string): Promise<DeliveryDTO> {
+  return api.storeDeliveryRetry(deliveryId);
 }
