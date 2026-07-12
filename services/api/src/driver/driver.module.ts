@@ -5,6 +5,7 @@ import { PickingModule } from "../picking/picking.module";
 import { DeliveryGateway } from "./delivery.gateway";
 import { DriverController } from "./driver.controller";
 import { DriverService } from "./driver.service";
+import { DriverAvailabilityService } from "./driver-availability.service";
 import { DriverLocationService } from "./driver-location.service";
 import { DriverVehicleService } from "./driver-vehicle.service";
 import { StoreDeliveryService } from "./store-delivery.service";
@@ -16,6 +17,7 @@ import { StoreDeliveriesController } from "./store-deliveries.controller";
   providers: [
     DriverService,
     DriverVehicleService,
+    DriverAvailabilityService,
     StoreDeliveryService,
     DriverLocationService,
     DeliveryGateway,

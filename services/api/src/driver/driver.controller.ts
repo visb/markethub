@@ -1,9 +1,10 @@
 import { Body, Controller, Get, Param, Post, Put, Query } from "@nestjs/common";
 import type { DeliveryFailReason } from "@prisma/client";
-import { IsIn, IsISO8601, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from "class-validator";
+import { IsBoolean, IsIn, IsISO8601, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength } from "class-validator";
 import { CurrentUser, Roles } from "../auth";
 import type { AuthUser } from "../auth";
 import { DriverService } from "./driver.service";
+import { DriverAvailabilityService } from "./driver-availability.service";
 import { DriverLocationService } from "./driver-location.service";
 import { DriverVehicleService } from "./driver-vehicle.service";
 
@@ -26,6 +27,10 @@ class SelectVehicleDto {
   @IsString() @MinLength(1) vehicleId!: string;
 }
 
+class SetAvailabilityDto {
+  @IsBoolean() available!: boolean;
+}
+
 class LocationDto {
   @IsNumber() @Min(-90) @Max(90) lat!: number;
   @IsNumber() @Min(-180) @Max(180) lng!: number;
@@ -45,7 +50,20 @@ export class DriverController {
     private readonly driver: DriverService,
     private readonly vehicles: DriverVehicleService,
     private readonly location: DriverLocationService,
+    private readonly availability: DriverAvailabilityService,
   ) {}
+
+  /** Estado do turno do entregador (story 62): disponível + "desde". */
+  @Get("availability")
+  driverAvailability(@CurrentUser() user: AuthUser) {
+    return this.availability.current(user.id);
+  }
+
+  /** Liga/desliga o turno (idempotente); recusa aceite se indisponível. */
+  @Post("availability")
+  setAvailability(@CurrentUser() user: AuthUser, @Body() dto: SetAvailabilityDto) {
+    return this.availability.set(user.id, dto.available);
+  }
 
   /** Lojas em que o usuário atua como entregador. */
   @Get("stores")

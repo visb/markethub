@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Button, Text, colors, radius, spacing } from "@markethub/ui";
 import { useAuth } from "@/auth-context";
 import { VehicleIndicator } from "@/components/VehicleIndicator";
 import { useCurrentVehicle } from "@/api/hooks/useDriverVehicle";
+import { useDriverAvailability, useSetAvailability } from "@/api/hooks/useDriverAvailability";
 import {
   useAcceptDelivery,
   useAvailableDeliveries,
@@ -17,10 +18,20 @@ const STATUS_LABEL: Record<string, string> = {
   picked_up: "A caminho",
 };
 
+/** HH:MM (hora local) do início do turno para o chip "desde". */
+function sinceLabel(iso?: string | null): string {
+  if (!iso) return "";
+  return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+
 export default function HomeScreen() {
   const { user, logout } = useAuth();
   const router = useRouter();
   const currentVehicle = useCurrentVehicle();
+
+  const availabilityQuery = useDriverAvailability();
+  const setAvailability = useSetAvailability();
+  const available_ = availabilityQuery.data?.available ?? false;
 
   const storesQuery = useDriverStores();
   const stores = storesQuery.data ?? [];
@@ -70,6 +81,31 @@ export default function HomeScreen() {
         <Text variant="h1">Olá, {user?.name ?? "—"}</Text>
       </View>
 
+      {/* Turno on/off (story 62): switch proeminente no topo. Verde quando de turno,
+          cinza quando de folga; "desde HH:MM" quando ligado. Otimista com rollback. */}
+      <View
+        testID="availability-card"
+        style={[styles.shift, available_ ? styles.shiftOn : styles.shiftOff]}
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontWeight: "700", color: available_ ? colors.success : colors.textMuted }}>
+            {available_ ? "Disponível" : "Indisponível"}
+          </Text>
+          <Text muted variant="caption">
+            {available_
+              ? `De turno desde ${sinceLabel(availabilityQuery.data?.availableSince)}`
+              : "Você não recebe nem aceita entregas de folga"}
+          </Text>
+        </View>
+        <Switch
+          testID="availability-switch"
+          value={available_}
+          disabled={setAvailability.isPending || availabilityQuery.isLoading}
+          onValueChange={(next) => setAvailability.mutate(next)}
+          trackColor={{ true: colors.success, false: colors.border }}
+        />
+      </View>
+
       {/* Indicador do veículo do turno — tocável, abre o seletor (≤2 cliques). */}
       <View style={{ marginBottom: spacing.md }}>
         <VehicleIndicator
@@ -110,6 +146,15 @@ export default function HomeScreen() {
       <Text variant="title" style={{ marginTop: spacing.md, marginBottom: spacing.sm }}>
         Disponíveis
       </Text>
+      {/* Indisponível (story 62): banner sobre a lista; aceitar desabilitado. */}
+      {!available_ && (
+        <View testID="unavailable-banner" style={styles.banner}>
+          <Text style={{ color: colors.warning, fontWeight: "700" }}>Você está indisponível</Text>
+          <Text muted variant="caption">
+            Ligue seu turno acima para aceitar entregas.
+          </Text>
+        </View>
+      )}
       {available.length === 0 ? (
         <Text muted>Nenhuma entrega disponível.</Text>
       ) : (
@@ -131,7 +176,7 @@ export default function HomeScreen() {
             <Button
               title={accept.isPending && accept.variables === d.id ? "Aceitando…" : "Aceitar"}
               onPress={() => accept.mutate(d.id)}
-              disabled={accept.isPending}
+              disabled={accept.isPending || !available_}
             />
           </View>
         ))
@@ -178,6 +223,25 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background },
   top: { marginTop: spacing.lg, marginBottom: spacing.md },
+  shift: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  shiftOn: { borderColor: colors.success, backgroundColor: "#F0FDF4" },
+  shiftOff: { borderColor: colors.border, backgroundColor: colors.surface },
+  banner: {
+    backgroundColor: "#FFFBEB",
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.warning,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   chip: {
     borderWidth: 1,

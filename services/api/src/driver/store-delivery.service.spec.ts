@@ -5,6 +5,8 @@ import { StoreDeliveryService } from "./store-delivery.service";
 function makePrisma(over: Record<string, unknown> = {}) {
   return {
     storeStaff: { findFirst: jest.fn().mockResolvedValue({ id: "s1" }) },
+    // Story 62: guarda de disponibilidade — driver disponível por padrão.
+    user: { findUnique: jest.fn().mockResolvedValue({ driverAvailableAt: new Date() }) },
     delivery: {
       findUnique: jest.fn().mockResolvedValue({ id: "d1", storeId: "store1", status: "unassigned" }),
       findUniqueOrThrow: jest.fn().mockResolvedValue({
@@ -40,6 +42,7 @@ describe("StoreDeliveryService.assign", () => {
   it("falha se já atribuída (count = 0)", async () => {
     const prisma = makePrisma({
       storeStaff: { findFirst: jest.fn().mockResolvedValue({ id: "s1" }) },
+      user: { findUnique: jest.fn().mockResolvedValue({ driverAvailableAt: new Date() }) },
       delivery: {
         findUnique: jest.fn().mockResolvedValue({ id: "d1", storeId: "store1", status: "assigned" }),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
@@ -47,6 +50,20 @@ describe("StoreDeliveryService.assign", () => {
     });
     const svc = new StoreDeliveryService(prisma, handoff, tracking, push);
     await expect(svc.assign("mgr", "d1", "drv1")).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it("recusa atribuição a driver indisponível (DRIVER_UNAVAILABLE) sem tocar a entrega", async () => {
+    const updateMany = jest.fn().mockResolvedValue({ count: 1 });
+    const prisma = makePrisma({
+      user: { findUnique: jest.fn().mockResolvedValue({ driverAvailableAt: null }) },
+      delivery: {
+        findUnique: jest.fn().mockResolvedValue({ id: "d1", storeId: "store1", status: "unassigned" }),
+        updateMany,
+      },
+    });
+    const svc = new StoreDeliveryService(prisma, handoff, tracking, push);
+    await expect(svc.assign("mgr", "d1", "drv1")).rejects.toBeInstanceOf(BadRequestException);
+    expect(updateMany).not.toHaveBeenCalled();
   });
 
   it("recusa quem não é staff da loja", async () => {
@@ -137,6 +154,32 @@ describe("StoreDeliveryService.retry", () => {
     (prisma as unknown as { storeStaff: { findFirst: jest.Mock } }).storeStaff.findFirst.mockResolvedValue(null);
     const svc = new StoreDeliveryService(prisma, handoff, tracking, push);
     await expect(svc.retry("intruso", "d1")).rejects.toBeInstanceOf(ForbiddenException);
+  });
+});
+
+/**
+ * Story 62 — a lista de entregadores para atribuição inclui o badge de turno:
+ * `available` + `availableSince` (todos aparecem; a UI desabilita o indisponível).
+ */
+describe("StoreDeliveryService.drivers (badge de disponibilidade)", () => {
+  it("expõe available/availableSince por entregador", async () => {
+    const since = new Date("2026-07-12T09:00:00.000Z");
+    const prisma = makePrisma({
+      storeStaff: {
+        findFirst: jest.fn().mockResolvedValue({ id: "s1" }),
+        findMany: jest.fn().mockResolvedValue([
+          { user: { id: "drvA", name: "Ana", driverAvailableAt: since } },
+          { user: { id: "drvB", name: "Beto", driverAvailableAt: null } },
+        ]),
+      },
+      delivery: { groupBy: jest.fn().mockResolvedValue([{ driverId: "drvA", _count: { _all: 2 } }]) },
+    });
+    const svc = new StoreDeliveryService(prisma, handoff, tracking, push);
+    const list = await svc.drivers("mgr", "store1");
+    expect(list).toEqual([
+      { id: "drvA", name: "Ana", activeDeliveries: 2, available: true, availableSince: "2026-07-12T09:00:00.000Z" },
+      { id: "drvB", name: "Beto", activeDeliveries: 0, available: false, availableSince: null },
+    ]);
   });
 });
 

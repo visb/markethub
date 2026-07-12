@@ -48,6 +48,7 @@ import type {
   RefreshInput,
   RegisterInput,
   StoreDriverDTO,
+  DriverAvailabilityDTO,
   EarningsPeriodDTO,
   DriverEarningsDTO,
   DeliveryHistoryPageDTO,
@@ -671,6 +672,17 @@ export class ApiClient {
   /** Seleciona/troca o veículo do turno; valida escopo+active no backend. */
   driverSelectVehicle(vehicleId: string): Promise<DriverVehicleDTO> {
     return this.request("/driver/vehicle", { method: "PUT", body: { vehicleId }, auth: true });
+  }
+
+  // ─── Entregador: turno on/off / disponibilidade (story 62) ───
+  /** Estado do turno do entregador (disponível + "desde"). */
+  driverAvailability(): Promise<DriverAvailabilityDTO> {
+    return this.request("/driver/availability", { auth: true });
+  }
+
+  /** Liga/desliga o turno (idempotente). Indisponível não recebe/aceita entrega. */
+  driverSetAvailability(available: boolean): Promise<DriverAvailabilityDTO> {
+    return this.request("/driver/availability", { method: "POST", body: { available }, auth: true });
   }
 
   // ─── Loja: despacho de entregas (manager/picker) ─────
