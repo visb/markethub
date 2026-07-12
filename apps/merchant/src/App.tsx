@@ -12,6 +12,7 @@ import { Vehicles } from "@/pages/Vehicles";
 import { Coupons } from "@/pages/Coupons";
 import { Catalog } from "@/pages/Catalog";
 import { Orders } from "@/pages/Orders";
+import { Slots } from "@/pages/Slots";
 import { Reports } from "@/pages/Reports";
 
 const queryClient = new QueryClient({
@@ -46,6 +47,9 @@ export function App() {
                 </Route>
                 <Route element={<RequireCapability capability="orders.view" />}>
                   <Route path="orders" element={<Orders />} />
+                </Route>
+                <Route element={<RequireCapability capability="slots.manage" />}>
+                  <Route path="slots" element={<Slots />} />
                 </Route>
                 <Route element={<RequireCapability capability="reports.view" />}>
                   <Route path="reports" element={<Reports />} />

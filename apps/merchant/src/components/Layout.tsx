@@ -26,6 +26,7 @@ const NAV: NavItem[] = [
   { to: "/coupons", label: "Cupons", capability: "coupons.manage" },
   { to: "/catalog", label: "Catálogo", capability: "catalog.manage" },
   { to: "/orders", label: "Pedidos", capability: "orders.view" },
+  { to: "/slots", label: "Agendamento", capability: "slots.manage" },
   { to: "/reports", label: "Relatórios", capability: "reports.view" },
 ];
 
