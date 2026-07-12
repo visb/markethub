@@ -12,9 +12,17 @@
     "test:coverage": "vitest run --coverage"
   },
   "peerDependencies": {
+    "leaflet": "*",
     "react": "*",
+    "react-leaflet": "*",
     "react-native": "*",
+    "react-native-maps": "*",
     "react-native-safe-area-context": "*"
+  },
+  "peerDependenciesMeta": {
+    "leaflet": { "optional": true },
+    "react-leaflet": { "optional": true },
+    "react-native-maps": { "optional": true }
   },
   "devDependencies": {
     "@types/react": "~18.3.12",

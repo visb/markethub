@@ -1,21 +1,30 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
-const rnMock = fileURLToPath(new URL("./src/test/react-native.mock.tsx", import.meta.url));
-const safeAreaMock = fileURLToPath(
-  new URL("./src/test/safe-area-context.mock.tsx", import.meta.url),
-);
+const mock = (rel: string) => fileURLToPath(new URL(rel, import.meta.url));
+
+const rnMock = mock("./src/test/react-native.mock.tsx");
+const safeAreaMock = mock("./src/test/safe-area-context.mock.tsx");
+const mapsMock = mock("./src/test/react-native-maps.mock.tsx");
+const reactLeafletMock = mock("./src/test/react-leaflet.mock.tsx");
+const leafletMock = mock("./src/test/leaflet.mock.ts");
+const leafletCssMock = mock("./src/test/leaflet-css.mock.ts");
 
 export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.{ts,tsx}"],
-    // RN não importa fora do Metro/jest-expo: aliasamos para mocks leves e
-    // renderizamos os componentes com react-test-renderer (ver src/test/).
-    alias: {
-      "react-native-safe-area-context": safeAreaMock,
-      "react-native": rnMock,
-    },
+    // RN e os engines de mapa não importam fora do Metro/jest-expo: aliasamos para
+    // mocks leves e renderizamos com react-test-renderer (ver src/test/). Aliases
+    // exatos (regex) p/ "leaflet" não capturar "leaflet/dist/leaflet.css".
+    alias: [
+      { find: /^react-native-safe-area-context$/, replacement: safeAreaMock },
+      { find: /^react-native$/, replacement: rnMock },
+      { find: /^react-native-maps$/, replacement: mapsMock },
+      { find: /^react-leaflet$/, replacement: reactLeafletMock },
+      { find: /^leaflet\/dist\/leaflet\.css$/, replacement: leafletCssMock },
+      { find: /^leaflet$/, replacement: leafletMock },
+    ],
     coverage: {
       provider: "v8",
       include: ["src/**/*.{ts,tsx}"],

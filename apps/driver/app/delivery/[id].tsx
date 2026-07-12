@@ -4,6 +4,7 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { Button, Text, colors, radius, spacing } from "@markethub/ui";
 import { useConfirmDelivery, useConfirmPickup, useDeliveryDetail } from "@/api/hooks/useDriverDeliveries";
 import { useDeliveryTracking } from "@/hooks/useDeliveryTracking";
+import { DeliveryMapView } from "@/components/DeliveryMapView";
 
 export default function DeliveryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -48,6 +49,9 @@ export default function DeliveryScreen() {
       <Stack.Screen options={{ headerShown: true, title: `Pedido #${delivery.orderId.slice(-6)}` }} />
 
       {error && <Text style={{ color: colors.danger, marginBottom: spacing.sm }}>{error}</Text>}
+
+      {/* Mapa da entrega (story 59): loja, cliente, posição atual + navegação por fase */}
+      <DeliveryMapView delivery={delivery} />
 
       {/* Resumo */}
       <View style={styles.card}>

@@ -8,7 +8,7 @@ export const DELIVERY_INCLUDE = {
     select: {
       id: true,
       orderId: true,
-      store: { select: { id: true, name: true } },
+      store: { select: { id: true, name: true, latitude: true, longitude: true } },
       _count: { select: { items: true } },
       order: {
         select: {
@@ -28,7 +28,14 @@ type AddressLike = {
   district?: string | null;
   city?: string | null;
   state?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 };
+
+/** lat/lng finito → número; caso contrário null (o app esconde o marcador). */
+function coord(v: number | null | undefined): number | null {
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
 
 function addressLine(a: AddressLike | null | undefined): string | undefined {
   if (!a) return undefined;
@@ -49,7 +56,7 @@ type DeliveryWithRels = {
   orderGroup: {
     id: string;
     orderId: string;
-    store: { id: string; name: string } | null;
+    store: { id: string; name: string; latitude: number | null; longitude: number | null } | null;
     _count: { items: number };
     order: { deliveryCode: string | null; addressSnapshot: unknown; user: { name: string } } | null;
   };
@@ -65,8 +72,12 @@ export function toDeliveryDto(d: DeliveryWithRels) {
     status: d.status,
     storeId: d.orderGroup.store?.id ?? d.storeId,
     storeName: d.orderGroup.store?.name ?? "",
+    storeLat: coord(d.orderGroup.store?.latitude),
+    storeLng: coord(d.orderGroup.store?.longitude),
     customerName: d.orderGroup.order?.user.name ?? "",
     address: addressLine(addr),
+    destLat: coord(addr?.latitude),
+    destLng: coord(addr?.longitude),
     itemCount: d.orderGroup._count.items,
     driverId: d.driver?.id,
     driverName: d.driver?.name,

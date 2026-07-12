@@ -54,6 +54,7 @@ export function Pressable({
 }
 
 export const StyleSheet = {
+  absoluteFill: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
   create<T extends Record<string, unknown>>(styles: T): T {
     return styles;
   },
