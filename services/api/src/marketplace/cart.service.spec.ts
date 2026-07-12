@@ -24,6 +24,11 @@ const STORE = {
   longitude: -49.27,
   avgPrepMinutes: 20,
   merchantId: "m1",
+  // Config de entrega por loja (story 58): null = herda a tarifa da rede / sem mínimo / sem raio.
+  deliveryFeeCents: null as number | null,
+  minOrderCents: null as number | null,
+  deliveryRadiusKm: null as number | null,
+  allowsPickup: true,
   merchant: MERCHANT,
 };
 
@@ -39,9 +44,15 @@ function makeItem(over: {
   available?: boolean;
   note?: string | null;
   merchantId?: string;
+  storeId?: string;
+  deliveryFeeCents?: number | null;
+  minOrderCents?: number | null;
+  deliveryRadiusKm?: number | null;
+  allowsPickup?: boolean;
 } = {}) {
   const saleType = over.saleType ?? "unit";
   const merchantId = over.merchantId ?? "m1";
+  const storeId = over.storeId ?? STORE.id;
   return {
     id: over.id ?? "item1",
     offerId: over.offerId ?? "offer1",
@@ -50,7 +61,7 @@ function makeItem(over: {
     note: over.note ?? null,
     createdAt: new Date("2026-06-28T10:00:00Z"),
     offer: {
-      storeId: STORE.id,
+      storeId,
       available: over.available ?? true,
       priceCents: over.priceCents ?? 1000,
       promoPriceCents: over.promoPriceCents ?? null,
@@ -62,7 +73,17 @@ function makeItem(over: {
         saleType,
         packageSize: "1un",
       },
-      store: { ...STORE, merchantId, merchant: MERCHANT },
+      store: {
+        ...STORE,
+        id: storeId,
+        storeId,
+        merchantId,
+        deliveryFeeCents: over.deliveryFeeCents ?? null,
+        minOrderCents: over.minOrderCents ?? null,
+        deliveryRadiusKm: over.deliveryRadiusKm ?? null,
+        allowsPickup: over.allowsPickup ?? true,
+        merchant: MERCHANT,
+      },
     },
   };
 }
@@ -355,6 +376,81 @@ describe("CartService.getCart / buildView (ETA + agrupamento)", () => {
     const view = await svc.getCart("u1", {});
     expect(view.groups[0]!.distanceKm).toBeNull();
     expect(view.groups[0]!.etaMinutes).toBeGreaterThan(0);
+  });
+
+  // ── Config de entrega por loja (story 58) ──
+
+  it("taxa: sem override, herda a tarifa da rede (700)", async () => {
+    const { svc } = makePrisma({ items: [makeItem({ quantity: 1, priceCents: 1000 })] });
+    const view = await svc.getCart("u1", { fulfillment: "delivery" });
+    expect(view.groups[0]!.deliveryFeeCents).toBe(700);
+    expect(view.totals.deliveryCents).toBe(700);
+  });
+
+  it("taxa: override da loja tem prioridade sobre a rede", async () => {
+    const { svc } = makePrisma({
+      items: [makeItem({ quantity: 1, priceCents: 1000, deliveryFeeCents: 250 })],
+    });
+    const view = await svc.getCart("u1", { fulfillment: "delivery" });
+    expect(view.groups[0]!.deliveryFeeCents).toBe(250);
+    expect(view.totals.deliveryCents).toBe(250);
+  });
+
+  it("taxa: override 0 (frete grátis da loja) sobrepõe a rede", async () => {
+    const { svc } = makePrisma({
+      items: [makeItem({ quantity: 1, priceCents: 1000, deliveryFeeCents: 0 })],
+    });
+    const view = await svc.getCart("u1", { fulfillment: "delivery" });
+    expect(view.groups[0]!.deliveryFeeCents).toBe(0);
+  });
+
+  it("taxa: retirada zera o frete mesmo com override da loja", async () => {
+    const { svc } = makePrisma({
+      items: [makeItem({ quantity: 1, priceCents: 1000, deliveryFeeCents: 250 })],
+    });
+    const view = await svc.getCart("u1", { fulfillment: "pickup" });
+    expect(view.groups[0]!.deliveryFeeCents).toBe(0);
+    expect(view.totals.deliveryCents).toBe(0);
+  });
+
+  it("mínimo: sem mínimo configurado → missingForMinCents 0", async () => {
+    const { svc } = makePrisma({ items: [makeItem({ quantity: 1, priceCents: 1000 })] });
+    const view = await svc.getCart("u1", {});
+    expect(view.groups[0]!.minOrderCents).toBeNull();
+    expect(view.groups[0]!.missingForMinCents).toBe(0);
+  });
+
+  it("mínimo: subtotal abaixo do mínimo → missingForMinCents = faltante", async () => {
+    // 1×1000 = 1000; mínimo 3000 → faltam 2000
+    const { svc } = makePrisma({
+      items: [makeItem({ quantity: 1, priceCents: 1000, minOrderCents: 3000 })],
+    });
+    const view = await svc.getCart("u1", {});
+    expect(view.groups[0]!.minOrderCents).toBe(3000);
+    expect(view.groups[0]!.missingForMinCents).toBe(2000);
+  });
+
+  it("mínimo: subtotal atingido → missingForMinCents 0", async () => {
+    // 4×1000 = 4000 ≥ 3000
+    const { svc } = makePrisma({
+      items: [makeItem({ quantity: 4, priceCents: 1000, minOrderCents: 3000 })],
+    });
+    const view = await svc.getCart("u1", {});
+    expect(view.groups[0]!.missingForMinCents).toBe(0);
+  });
+
+  it("mínimo multi-loja: só o grupo abaixo do mínimo aponta faltante", async () => {
+    const { svc } = makePrisma({
+      items: [
+        makeItem({ id: "i1", offerId: "o1", quantity: 1, priceCents: 1000, merchantId: "m1", storeId: "s1", minOrderCents: 3000 }),
+        makeItem({ id: "i2", offerId: "o2", quantity: 5, priceCents: 1000, merchantId: "m2", storeId: "s2", minOrderCents: 3000 }),
+      ],
+    });
+    const view = await svc.getCart("u1", {});
+    const g1 = view.groups.find((g) => g.merchantId === "m1")!;
+    const g2 = view.groups.find((g) => g.merchantId === "m2")!;
+    expect(g1.missingForMinCents).toBe(2000); // 1000 < 3000
+    expect(g2.missingForMinCents).toBe(0); // 5000 ≥ 3000
   });
 
   it("agrupa itens por merchant", async () => {

@@ -23,7 +23,12 @@ interface ViewItem {
 
 const VIEW_GROUP = {
   merchantId: "m1",
+  merchant: "Mercado X",
   storeId: "store1",
+  // Config de entrega por loja (story 58): defaults sem mínimo/atingido.
+  minOrderCents: null as number | null,
+  missingForMinCents: 0,
+  allowsPickup: true,
   items: [
     {
       productId: "p1",
@@ -50,6 +55,7 @@ const VIEW_TOTALS_GROUP = {
 function makeView(over: Partial<typeof VIEW_GROUP> & { available?: boolean } = {}) {
   const group = {
     ...VIEW_GROUP,
+    ...over,
     items: VIEW_GROUP.items.map((i) => ({ ...i, available: over.available ?? true })),
   };
   return {
@@ -83,13 +89,36 @@ function makeDeps(opts: {
   order?: Record<string, unknown> | null;
   tasks?: { id: string; status: string }[];
   slotWindow?: { start: Date; end: Date };
-  /** Lojas devolvidas por store.findMany nas checagens STORE_CLOSED/STORE_PAUSED (stories 52/57). */
-  stores?: { id: string; name: string; pausedAt?: Date | null; hours: unknown[]; closures: unknown[] }[];
+  /**
+   * Lojas devolvidas por store.findMany. Usado tanto nas checagens
+   * STORE_CLOSED/STORE_PAUSED (stories 52/57) quanto no raio de cobertura
+   * (story 58) — o mock ignora o `select`, então os objetos carregam os campos
+   * dos dois casos (hours/closures/pausedAt + latitude/longitude/deliveryRadiusKm).
+   */
+  stores?: {
+    id: string;
+    name: string;
+    pausedAt?: Date | null;
+    hours: unknown[];
+    closures: unknown[];
+    latitude?: number | null;
+    longitude?: number | null;
+    deliveryRadiusKm?: number | null;
+  }[];
 } = {}) {
   const view = opts.view ?? makeView();
   const openStores =
     opts.stores ??
-    view.groups.map((g) => ({ id: g.storeId, name: `Loja ${g.storeId}`, pausedAt: null, hours: ALWAYS_OPEN_HOURS, closures: [] }));
+    view.groups.map((g) => ({
+      id: g.storeId,
+      name: `Loja ${g.storeId}`,
+      pausedAt: null,
+      hours: ALWAYS_OPEN_HOURS,
+      closures: [],
+      latitude: null,
+      longitude: null,
+      deliveryRadiusKm: null,
+    }));
 
   const tx = {
     order: {
@@ -407,6 +436,104 @@ describe("OrdersService.checkout", () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  // ── Story 58: pedido mínimo por grupo + raio de cobertura no checkout ──
+
+  it("grupo abaixo do mínimo → MIN_ORDER_NOT_MET (não cria pedido)", async () => {
+    const view = makeView({ minOrderCents: 3000, missingForMinCents: 1000 });
+    const order = { id: "order1", userId: "u1", status: "created", groups: [] };
+    const { svc, tx } = makeDeps({ address: validAddress, order, view });
+    await expect(svc.checkout("u1", deliveryInput)).rejects.toMatchObject({
+      response: {
+        code: "MIN_ORDER_NOT_MET",
+        stores: [{ storeId: "store1", name: "Mercado X", missingCents: 1000 }],
+      },
+    });
+    expect(tx.order.create).not.toHaveBeenCalled();
+  });
+
+  it("mínimo atingido (missingForMinCents 0) → checkout segue", async () => {
+    const view = makeView({ minOrderCents: 3000, missingForMinCents: 0 });
+    const order = { id: "order1", userId: "u1", status: "created", groups: [] };
+    const { svc, tx } = makeDeps({ address: validAddress, order, view });
+    await svc.checkout("u1", deliveryInput);
+    expect(tx.order.create).toHaveBeenCalled();
+  });
+
+  it("retirada ignora o mínimo do grupo (não valida MIN_ORDER)", async () => {
+    const view = makeView({ minOrderCents: 3000, missingForMinCents: 1000 });
+    const order = { id: "order1", userId: "u1", status: "created", groups: [] };
+    const { svc, tx } = makeDeps({ order, view });
+    await svc.checkout("u1", pickupInput);
+    expect(tx.order.create).toHaveBeenCalled();
+  });
+
+  it("raio: distância loja→endereço acima do raio → OUT_OF_DELIVERY_AREA", async () => {
+    const order = { id: "order1", userId: "u1", status: "created", groups: [] };
+    // loja em Curitiba (-25.43,-49.27), endereço ~5km, raio 2km → fora
+    const { svc, tx } = makeDeps({
+      address: { id: "addr1", userId: "u1", street: "Rua A", latitude: -25.47, longitude: -49.30 },
+      order,
+      stores: [
+        { id: "store1", name: "Europa Centro", hours: ALWAYS_OPEN_HOURS, closures: [], latitude: -25.43, longitude: -49.27, deliveryRadiusKm: 2 },
+      ],
+    });
+    await expect(svc.checkout("u1", deliveryInput)).rejects.toMatchObject({
+      response: { code: "OUT_OF_DELIVERY_AREA", stores: [{ id: "store1", name: "Europa Centro" }] },
+    });
+    expect(tx.order.create).not.toHaveBeenCalled();
+  });
+
+  it("raio: dentro do raio → checkout segue", async () => {
+    const order = { id: "order1", userId: "u1", status: "created", groups: [] };
+    const { svc, tx } = makeDeps({
+      address: { id: "addr1", userId: "u1", street: "Rua A", latitude: -25.44, longitude: -49.28 },
+      order,
+      stores: [
+        { id: "store1", name: "Europa Centro", hours: ALWAYS_OPEN_HOURS, closures: [], latitude: -25.43, longitude: -49.27, deliveryRadiusKm: 10 },
+      ],
+    });
+    await svc.checkout("u1", deliveryInput);
+    expect(tx.order.create).toHaveBeenCalled();
+  });
+
+  it("raio: endereço SEM lat/lng cai na validação por cidade (não bloqueia por raio)", async () => {
+    const order = { id: "order1", userId: "u1", status: "created", groups: [] };
+    const { svc, tx } = makeDeps({
+      address: { id: "addr1", userId: "u1", street: "Rua A", latitude: null, longitude: null },
+      order,
+      stores: [
+        { id: "store1", name: "Europa Centro", hours: ALWAYS_OPEN_HOURS, closures: [], latitude: -25.43, longitude: -49.27, deliveryRadiusKm: 1 },
+      ],
+    });
+    await svc.checkout("u1", deliveryInput);
+    expect(tx.order.create).toHaveBeenCalled();
+  });
+
+  it("raio: retirada não valida raio (fora do raio ainda cria)", async () => {
+    const order = { id: "order1", userId: "u1", status: "created", groups: [] };
+    const { svc, tx } = makeDeps({
+      order,
+      stores: [
+        { id: "store1", name: "Europa Centro", hours: ALWAYS_OPEN_HOURS, closures: [], latitude: -25.43, longitude: -49.27, deliveryRadiusKm: 1 },
+      ],
+    });
+    await svc.checkout("u1", pickupInput);
+    expect(tx.order.create).toHaveBeenCalled();
+  });
+
+  it("raio: loja sem raio configurado → sem limite além da cidade (não bloqueia)", async () => {
+    const order = { id: "order1", userId: "u1", status: "created", groups: [] };
+    const { svc, tx } = makeDeps({
+      address: { id: "addr1", userId: "u1", street: "Rua A", latitude: -30.0, longitude: -55.0 },
+      order,
+      stores: [
+        { id: "store1", name: "Europa Centro", hours: ALWAYS_OPEN_HOURS, closures: [], latitude: -25.43, longitude: -49.27, deliveryRadiusKm: null },
+      ],
+    });
+    await svc.checkout("u1", deliveryInput);
+    expect(tx.order.create).toHaveBeenCalled();
   });
 });
 

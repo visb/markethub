@@ -50,10 +50,14 @@ export interface StoreSummaryDTO {
   rating: { average: number; count: number } | null;
   /** ETA em minutos (avgPrepMinutes). */
   etaMinutes: number;
-  /** piso da faixa de frete. */
+  /** piso da faixa de frete (taxa efetiva da loja — story 58). */
   deliveryFeeCents: number;
   /** teto da faixa de frete (deliveryFee + door surcharge). */
   doorFeeCents: number;
+  /** Pedido mínimo da loja em centavos (story 58); null = sem mínimo. */
+  minOrderCents: number | null;
+  /** Raio de entrega da loja em km (story 58); null = sem limite além da cidade. */
+  deliveryRadiusKm: number | null;
   allowsPickup: boolean;
   openNow: boolean;
   /** Loja em pausa temporária (story 57): força `openNow=false` e distingue de "fechada". */

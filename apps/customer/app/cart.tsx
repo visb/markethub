@@ -76,6 +76,8 @@ export default function CartScreen() {
   }
 
   const t = cart.totals;
+  // CTA de checkout bloqueado enquanto houver grupo abaixo do mínimo (story 58).
+  const belowMin = cart.groups.some((g) => g.missingForMinCents > 0);
   return (
     <SafeAreaView style={styles.flex} edges={["top"]}>
       <Header title="Meu carrinho" />
@@ -117,6 +119,17 @@ export default function CartScreen() {
                 />
               </View>
             ))}
+
+            {/* Pedido mínimo da loja (story 58): progresso quando ainda não atingido. */}
+            {g.missingForMinCents > 0 && (
+              <View style={styles.minOrder} testID={`min-order-${g.merchantId}`}>
+                <Ionicons name="alert-circle-outline" size={16} color={colors.danger} />
+                <Text variant="caption" style={styles.minOrderText}>
+                  Faltam {brl(g.missingForMinCents)} para o mínimo de {g.merchant}
+                  {g.minOrderCents != null ? ` (${brl(g.minOrderCents)})` : ""}
+                </Text>
+              </View>
+            )}
 
           </View>
           );
@@ -190,7 +203,17 @@ export default function CartScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <Button title="Finalizar Compra" variant="outline" onPress={() => router.push("/checkout")} />
+        {belowMin && (
+          <Text variant="caption" style={styles.footerHint} testID="cart-min-hint">
+            Ajuste os itens para atingir o pedido mínimo das lojas destacadas.
+          </Text>
+        )}
+        <Button
+          title="Finalizar Compra"
+          variant="outline"
+          disabled={belowMin}
+          onPress={() => router.push("/checkout")}
+        />
       </View>
     </SafeAreaView>
   );
@@ -253,5 +276,15 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: "row", justifyContent: "space-between" },
   divider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.xs },
-  footer: { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
+  footer: { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, gap: spacing.sm },
+  footerHint: { color: colors.danger, textAlign: "center" },
+  minOrder: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.primaryLight,
+  },
+  minOrderText: { flex: 1, color: colors.danger, fontWeight: "700" },
 });

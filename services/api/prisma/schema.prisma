@@ -237,6 +237,11 @@ model Store {
   allowsPickup  Boolean        @default(true)
   // tempo médio de preparo do pedido (min) — compõe o ETA real (S6.7)
   avgPrepMinutes Int           @default(15)
+  // Config de entrega por loja (story 58). `null` = herda a tarifa da rede
+  // (Merchant.deliveryFeeCents) / não tem pedido mínimo / sem raio além da cidade.
+  deliveryFeeCents  Int?
+  minOrderCents     Int?
+  deliveryRadiusKm  Float?
   active        Boolean        @default(true)
   // Pausa temporária de emergência (story 57): null = operando; timestamp = "pausada
   // desde HH:MM". Independente de `active` (ativação administrativa) e do horário

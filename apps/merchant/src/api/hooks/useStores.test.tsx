@@ -41,6 +41,10 @@ const store: MerchantStoreDetailDTO = {
   avgPrepMinutes: 15,
   active: true,
   pausedAt: null,
+  deliveryFeeCents: null,
+  minOrderCents: null,
+  deliveryRadiusKm: null,
+  merchantDeliveryFeeCents: 700,
 };
 
 let qc: QueryClient;

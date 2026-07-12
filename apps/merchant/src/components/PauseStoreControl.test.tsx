@@ -28,6 +28,10 @@ const store = (over: Partial<MerchantStoreDetailDTO> = {}): MerchantStoreDetailD
   avgPrepMinutes: 15,
   active: true,
   pausedAt: null,
+  deliveryFeeCents: null,
+  minOrderCents: null,
+  deliveryRadiusKm: null,
+  merchantDeliveryFeeCents: 700,
   ...over,
 });
 

@@ -50,6 +50,12 @@ export const merchantStoreDetailSchema = z.object({
   active: z.boolean(),
   /** Pausa temporária (story 57): ISO timestamp = "pausada desde"; null = operando. */
   pausedAt: z.string().nullable(),
+  /** Config de entrega por loja (story 58): `null` = herda da rede / sem mínimo / sem raio. */
+  deliveryFeeCents: z.number().nullable(),
+  minOrderCents: z.number().nullable(),
+  deliveryRadiusKm: z.number().nullable(),
+  /** Tarifa da rede (Merchant.deliveryFeeCents) — placeholder do campo quando herda. */
+  merchantDeliveryFeeCents: z.number(),
 });
 export type MerchantStoreDetailDTO = z.infer<typeof merchantStoreDetailSchema>;
 
@@ -68,6 +74,10 @@ export const merchantStoreInputSchema = z.object({
   longitude: z.number().nullable().optional(),
   avgPrepMinutes: z.number().int().min(0).optional(),
   active: z.boolean().optional(),
+  // Config de entrega por loja (story 58): `null` = herda da rede.
+  deliveryFeeCents: z.number().int().min(0).nullable().optional(),
+  minOrderCents: z.number().int().min(0).nullable().optional(),
+  deliveryRadiusKm: z.number().min(0).nullable().optional(),
 });
 export type MerchantStoreInput = z.infer<typeof merchantStoreInputSchema>;
 export type MerchantStoreUpdateInput = Partial<MerchantStoreInput>;

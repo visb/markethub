@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import { Prisma } from "@prisma/client";
 import type { DeliveryMethod, FulfillmentType } from "@prisma/client";
 import { shortCode } from "../common/codes";
+import { haversineKm } from "../common/geo";
 import { OutboxPublisher } from "../events";
 import { OrderTrackingService } from "../picking/order-tracking.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -71,6 +72,13 @@ export class OrdersService {
     // Loja fechada por horário (story 52) só bloqueia o imediato: o pedido agendado
     // num slot futuro válido pula a checagem de abertura (o slot já garante janela).
     await this.assertStoresAcceptOrders(storeIds, { immediate: !input.deliverySlotId });
+
+    // Config de entrega por loja (story 58) — só na entrega (retirada ignora ambas):
+    // pedido mínimo por grupo e raio de cobertura da loja ao endereço.
+    if (!pickup) {
+      this.assertMinOrder(view.groups);
+      await this.assertWithinDeliveryArea(storeIds, address);
+    }
 
     const order = await this.prisma.$transaction(async (tx) => {
       // reserva o slot (S5.3) atomicamente; a janela do slot define scheduledFrom/To
@@ -425,6 +433,65 @@ export class OrdersService {
         stores: closed.map((s) => ({ id: s.id, name: s.name })),
       });
     }
+  }
+
+  /**
+   * Pedido mínimo por grupo (story 58): cada loja pode exigir um subtotal mínimo.
+   * `missingForMinCents > 0` num grupo bloqueia o checkout inteiro (multi-loja: só
+   * o grupo abaixo do mínimo trava). Lista as lojas faltantes com o valor restante.
+   */
+  private assertMinOrder(
+    groups: { merchant: string; storeId: string; minOrderCents: number | null; missingForMinCents: number }[],
+  ) {
+    const below = groups.filter((g) => g.missingForMinCents > 0);
+    if (below.length === 0) return;
+    const names = below.map((g) => g.merchant).join(", ");
+    throw new BadRequestException({
+      code: "MIN_ORDER_NOT_MET",
+      message:
+        below.length === 1
+          ? `O pedido mínimo da loja ${names} não foi atingido.`
+          : `O pedido mínimo das lojas ${names} não foi atingido.`,
+      stores: below.map((g) => ({
+        storeId: g.storeId,
+        name: g.merchant,
+        minOrderCents: g.minOrderCents,
+        missingCents: g.missingForMinCents,
+      })),
+    });
+  }
+
+  /**
+   * Raio de cobertura por loja (story 58): a distância loja→endereço (haversine)
+   * não pode exceder `deliveryRadiusKm`. Só valida quando a loja tem raio E o
+   * endereço tem coordenadas — sem lat/lng cai na validação por cidade (na criação
+   * do endereço, como hoje). Loja sem raio = sem limite além da cidade. Retirada
+   * não chega aqui (o checkout só chama na entrega).
+   */
+  private async assertWithinDeliveryArea(
+    storeIds: string[],
+    address: { latitude: number | null; longitude: number | null } | null,
+  ) {
+    if (!address || address.latitude == null || address.longitude == null) return;
+    const stores = await this.prisma.store.findMany({
+      where: { id: { in: storeIds }, deliveryRadiusKm: { not: null } },
+      select: { id: true, name: true, latitude: true, longitude: true, deliveryRadiusKm: true },
+    });
+    const outside = stores.filter((s) => {
+      if (s.latitude == null || s.longitude == null || s.deliveryRadiusKm == null) return false;
+      const distanceKm = haversineKm(address.latitude!, address.longitude!, s.latitude, s.longitude);
+      return distanceKm > s.deliveryRadiusKm;
+    });
+    if (outside.length === 0) return;
+    const names = outside.map((s) => s.name).join(", ");
+    throw new BadRequestException({
+      code: "OUT_OF_DELIVERY_AREA",
+      message:
+        outside.length === 1
+          ? `A loja ${names} não entrega no endereço selecionado (fora do raio de cobertura).`
+          : `As lojas ${names} não entregam no endereço selecionado (fora do raio de cobertura).`,
+      stores: outside.map((s) => ({ id: s.id, name: s.name })),
+    });
   }
 
   private async assertAddress(userId: string, addressId?: string | null) {

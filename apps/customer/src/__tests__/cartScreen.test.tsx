@@ -33,6 +33,10 @@ function cart(over: Partial<CartView> = {}): CartView {
         storeId: "s1",
         etaMinutes: 30,
         distanceKm: 2,
+        deliveryFeeCents: 800,
+        minOrderCents: null,
+        missingForMinCents: 0,
+        allowsPickup: true,
         items: [
           { id: "it1", offerId: "o1", name: "Arroz", imageUrl: null, saleType: "unit", packageSize: "1kg", unitPriceCents: 1000, quantity: 2, weightGrams: null, available: true },
           { id: "it2", offerId: "o2", name: "Carne", imageUrl: "http://x/c.png", saleType: "weight", packageSize: null, unitPriceCents: 4000, quantity: 1, weightGrams: 500, available: true },
@@ -130,6 +134,35 @@ describe("CartScreen", () => {
       auth: true,
       body: { quantity: 3 },
     });
+  });
+
+  it("mostra a barra de mínimo e desabilita o checkout quando abaixo do mínimo (story 58)", async () => {
+    current = cart({
+      groups: [
+        {
+          ...cart().groups[0]!,
+          minOrderCents: 8000,
+          missingForMinCents: 2000,
+        },
+      ],
+    });
+    const tree = await mount();
+    const j = json(tree);
+    // texto renderiza em pedaços (Faltam / valor / loja) — casa os trechos e o testID.
+    expect(j).toContain("min-order-m1");
+    expect(j).toContain("para o mínimo de");
+    expect(j).toContain("R$ 20,00");
+    expect(j).toContain("cart-min-hint");
+    const finalizar = tree.root.findAll((n) => n.props.title === "Finalizar Compra")[0]!;
+    expect(finalizar.props.disabled).toBe(true);
+  });
+
+  it("mínimo atingido: checkout habilitado, sem barra (story 58)", async () => {
+    const tree = await mount();
+    const j = json(tree);
+    expect(j).not.toContain("para o mínimo de");
+    const finalizar = tree.root.findAll((n) => n.props.title === "Finalizar Compra")[0]!;
+    expect(finalizar.props.disabled).toBe(false);
   });
 
   it("aplica cupom pelo campo e exibe o código", async () => {

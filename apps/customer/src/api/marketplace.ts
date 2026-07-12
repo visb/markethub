@@ -83,6 +83,14 @@ export interface CartView {
     storeId: string;
     etaMinutes: number | null;
     distanceKm: number | null;
+    /** Taxa de entrega efetiva do grupo (story 58); 0 na retirada. */
+    deliveryFeeCents: number;
+    /** Pedido mínimo da loja (story 58); null = sem mínimo. */
+    minOrderCents: number | null;
+    /** Quanto falta p/ atingir o mínimo (story 58); 0 quando atingido ou sem mínimo. */
+    missingForMinCents: number;
+    /** Loja permite retirada — sugere retirada quando fora do raio (story 58). */
+    allowsPickup: boolean;
     items: CartItemView[];
   }[];
   totals: CartTotals;
@@ -251,7 +259,12 @@ export interface StoreMeta {
   merchantId: string;
   merchantName: string;
   merchantLogoUrl: string | null;
+  /** Taxa de entrega efetiva da loja (story 58): override da loja > tarifa da rede. */
   deliveryFeeCents: number;
+  /** Pedido mínimo da loja (story 58); null = sem mínimo. */
+  minOrderCents: number | null;
+  /** Raio de entrega da loja em km (story 58); null = sem limite além da cidade. */
+  deliveryRadiusKm: number | null;
   distanceKm: number | null;
   etaMinutes: number;
   /** Se o cliente logado já segue esta loja (story 34). Guest → false. */

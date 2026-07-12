@@ -129,6 +129,18 @@ export default function StoreHome() {
           <Text variant="caption" muted>
             ⏱ {store ? `${store.etaMinutes} min` : "30 min"} ou programada
           </Text>
+          {store && (store.deliveryRadiusKm != null || store.minOrderCents != null) && (
+            <Text variant="caption" muted testID="store-delivery-config">
+              {[
+                store.deliveryRadiusKm != null
+                  ? `Entrega até ${String(store.deliveryRadiusKm).replace(".", ",")} km`
+                  : null,
+                store.minOrderCents != null ? `mínimo ${brl(store.minOrderCents)}` : null,
+              ]
+                .filter(Boolean)
+                .join(" • ")}
+            </Text>
+          )}
           {store && reviews.count > 0 && (
             <View style={styles.ratingBadge} testID="store-rating-badge">
               <Stars rating={reviews.average} size={13} />

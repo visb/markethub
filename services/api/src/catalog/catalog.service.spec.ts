@@ -299,6 +299,10 @@ describe("CatalogService.storeSections", () => {
       latitude: 0,
       longitude: 0,
       avgPrepMinutes: 15,
+      // Config de entrega por loja (story 58): null = herda / sem mínimo / sem raio.
+      deliveryFeeCents: null,
+      minOrderCents: null,
+      deliveryRadiusKm: null,
       merchant: { name: "Mercado", logoUrl: null, deliveryFeeCents: 500 },
       hours: [],
       closures: [],
@@ -327,6 +331,27 @@ describe("CatalogService.storeSections", () => {
     expect(res.featured).toHaveLength(1);
     expect(res.mostBought).toHaveLength(1);
     expect(res.recommended).toHaveLength(1);
+  });
+
+  // ── Story 58: taxa efetiva, mínimo e raio expostos ao customer ──
+  it("expõe taxa efetiva (override da loja > rede), mínimo e raio", async () => {
+    const { prisma, m } = makeCatalog();
+    m.store.findUnique.mockResolvedValue(
+      sectionStore({ deliveryFeeCents: 250, minOrderCents: 3000, deliveryRadiusKm: 6 }),
+    );
+    const res = await new CatalogService(prisma, followsStub).storeSections("s1");
+    expect(res.store.deliveryFeeCents).toBe(250); // override da loja
+    expect(res.store.minOrderCents).toBe(3000);
+    expect(res.store.deliveryRadiusKm).toBe(6);
+  });
+
+  it("sem override herda a taxa da rede e mínimo/raio nulos", async () => {
+    const { prisma, m } = makeCatalog();
+    m.store.findUnique.mockResolvedValue(sectionStore());
+    const res = await new CatalogService(prisma, followsStub).storeSections("s1");
+    expect(res.store.deliveryFeeCents).toBe(500); // herda a rede
+    expect(res.store.minOrderCents).toBeNull();
+    expect(res.store.deliveryRadiusKm).toBeNull();
   });
 
   it("sem geo a distância é nula", async () => {
@@ -524,6 +549,10 @@ describe("CatalogService.storeSummary (story 29)", () => {
     allowsPickup: true,
     avgPrepMinutes: 30,
     merchantId: "m1",
+    // Config de entrega por loja (story 58): null = herda / sem mínimo / sem raio.
+    deliveryFeeCents: null,
+    minOrderCents: null,
+    deliveryRadiusKm: null,
     merchant: { name: "Supermercado Europa", logoUrl: null, deliveryFeeCents: 700 },
     hours: [{ dayOfWeek: 0, opensAt: 480, closesAt: 1200 }],
     closures: [],
@@ -553,6 +582,25 @@ describe("CatalogService.storeSummary (story 29)", () => {
     const prisma = makeSummaryPrisma(baseStore, { _avg: { rating: null }, _count: { _all: 0 } });
     const out = await new CS(prisma, followsStub).storeSummary("s1", sundayMorning);
     expect(out.rating).toBeNull();
+  });
+
+  // ── Story 58: taxa efetiva, mínimo e raio no resumo ──
+  it("override da loja: taxa efetiva, doorFee, mínimo e raio", async () => {
+    const store = { ...baseStore, deliveryFeeCents: 300, minOrderCents: 2500, deliveryRadiusKm: 4 };
+    const prisma = makeSummaryPrisma(store, { _avg: { rating: null }, _count: { _all: 0 } });
+    const out = await new CS(prisma, followsStub).storeSummary("s1", sundayMorning);
+    expect(out.deliveryFeeCents).toBe(300);
+    expect(out.doorFeeCents).toBe(300 + 400);
+    expect(out.minOrderCents).toBe(2500);
+    expect(out.deliveryRadiusKm).toBe(4);
+  });
+
+  it("sem override herda a taxa da rede; mínimo/raio nulos", async () => {
+    const prisma = makeSummaryPrisma(baseStore, { _avg: { rating: null }, _count: { _all: 0 } });
+    const out = await new CS(prisma, followsStub).storeSummary("s1", sundayMorning);
+    expect(out.deliveryFeeCents).toBe(700);
+    expect(out.minOrderCents).toBeNull();
+    expect(out.deliveryRadiusKm).toBeNull();
   });
 
   it("rating agrega média + contagem das reviews axis=merchant", async () => {
