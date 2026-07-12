@@ -6,6 +6,7 @@ export * from "./picking-events";
 export * from "./delivery-events";
 export * from "./refund";
 export * from "./delivery";
+export * from "./driver";
 export * from "./reviews";
 export * from "./stores";
 export * from "./store-hours";

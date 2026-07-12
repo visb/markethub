@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post, Put, Query } from "@nestjs/common";
-import { IsISO8601, IsNumber, IsOptional, IsString, Max, Min, MinLength } from "class-validator";
+import { IsIn, IsISO8601, IsNumber, IsOptional, IsString, Max, Min, MinLength } from "class-validator";
 import { CurrentUser, Roles } from "../auth";
 import type { AuthUser } from "../auth";
 import { DriverService } from "./driver.service";
@@ -23,6 +23,10 @@ class LocationDto {
   @IsNumber() @Min(-180) @Max(180) lng!: number;
   @IsOptional() @IsNumber() @Min(0) @Max(360) heading?: number;
   @IsISO8601() recordedAt!: string;
+}
+
+class EarningsQueryDto {
+  @IsOptional() @IsIn(["today", "7d", "30d"]) period?: "today" | "7d" | "30d";
 }
 
 /** App do entregador (entrega própria): lojas, fila de entregas, coleta e entrega. */
@@ -55,6 +59,18 @@ export class DriverController {
   @Get("deliveries/available")
   available(@CurrentUser() user: AuthUser, @Query("storeId") storeId?: string) {
     return this.driver.listAvailable(user.id, { storeId });
+  }
+
+  /** Ganhos do entregador (gorjetas + entregas concluídas) no período (story 60). */
+  @Get("earnings")
+  earnings(@CurrentUser() user: AuthUser, @Query() query: EarningsQueryDto) {
+    return this.driver.earnings(user.id, query.period ?? "today");
+  }
+
+  /** Histórico paginado de entregas concluídas/canceladas do entregador (story 60). */
+  @Get("deliveries/history")
+  deliveryHistory(@CurrentUser() user: AuthUser, @Query("page") page?: string) {
+    return this.driver.deliveryHistory(user.id, page ? Number(page) : 1);
   }
 
   /** Aceita uma entrega do pool (auto-atribuição). */

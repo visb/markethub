@@ -17,6 +17,8 @@ function makeController() {
     accept: jest.fn().mockResolvedValue({ id: "d1" }),
     confirmPickup: jest.fn().mockResolvedValue({ id: "d1" }),
     confirmDelivery: jest.fn().mockResolvedValue({ id: "d1" }),
+    earnings: jest.fn().mockResolvedValue({ tipsPaidCents: 0 }),
+    deliveryHistory: jest.fn().mockResolvedValue({ items: [] }),
   };
   const vehicles = {
     listAvailable: jest.fn().mockResolvedValue([{ id: "v1" }]),
@@ -71,6 +73,24 @@ describe("DriverController", () => {
     const { controller, driver } = makeController();
     controller.deliver(user, "d1", { deliveryCode: "9999" });
     expect(driver.confirmDelivery).toHaveBeenCalledWith("u1", "d1", "9999");
+  });
+
+  // ── Ganhos e histórico (story 60) ──
+
+  it("earnings: repassa o período do query (default today)", () => {
+    const { controller, driver } = makeController();
+    controller.earnings(user, { period: "7d" });
+    expect(driver.earnings).toHaveBeenCalledWith("u1", "7d");
+    controller.earnings(user, {});
+    expect(driver.earnings).toHaveBeenLastCalledWith("u1", "today");
+  });
+
+  it("deliveryHistory: converte page para número (default 1)", () => {
+    const { controller, driver } = makeController();
+    controller.deliveryHistory(user, "3");
+    expect(driver.deliveryHistory).toHaveBeenCalledWith("u1", 3);
+    controller.deliveryHistory(user, undefined);
+    expect(driver.deliveryHistory).toHaveBeenLastCalledWith("u1", 1);
   });
 
   // ── Seleção de veículo (story 15) ──
