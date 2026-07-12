@@ -1,8 +1,10 @@
-import React, { useState } from "react";
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import type { PickItemDTO } from "@markethub/api-client";
 import { Button, Text, colors, radius, spacing } from "@markethub/ui";
+import { ScannerSheet, type MatchFeedback } from "@/components/ScannerSheet";
+import type { ScanMatch } from "@/lib/scanMatcher";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import {
   SUBSTITUTE_MIN_QUERY,
@@ -65,6 +67,78 @@ export default function TaskScreen() {
   const [pickupCode, setPickupCode] = useState("");
   const [subFor, setSubFor] = useState<string | null>(null);
   const [subQuery, setSubQuery] = useState("");
+
+  // ── scanner de código de barras (story 63) ──
+  const [scannerOpen, setScannerOpen] = useState(false);
+  // Item por peso selecionado por um bip: revela o input de gramas (autoFocus).
+  const [focusWeightId, setFocusWeightId] = useState<string | null>(null);
+  const [weightInput, setWeightInput] = useState("");
+  // Itens bipados por unidade aguardando commit (janela do "desfazer"): contam
+  // no contador do scanner e viram "já separado" se re-bipados.
+  const [optimisticPicked, setOptimisticPicked] = useState<Set<string>>(() => new Set());
+  const commitTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  useEffect(() => {
+    const timers = commitTimers.current;
+    return () => timers.forEach((t) => clearTimeout(t));
+  }, []);
+
+  // Decide o efeito de cada bip e devolve o aviso a exibir no scanner. O commit
+  // do pick por unidade é adiado (janela do "desfazer") — sem endpoint de reset
+  // no backend, o desfazer é cancelar o commit antes de disparar.
+  const handleScanMatch = (result: ScanMatch): MatchFeedback => {
+    switch (result.kind) {
+      case "pick-unit": {
+        const item = result.item;
+        setOptimisticPicked((s) => new Set(s).add(item.id));
+        const timer = setTimeout(() => {
+          commitTimers.current.delete(item.id);
+          updateItemMut.mutate({
+            itemId: item.id,
+            input: { action: "pick", quantityPicked: item.quantity },
+          });
+        }, 3500);
+        commitTimers.current.set(item.id, timer);
+        return {
+          message: `${item.nameSnapshot}: separado`,
+          tone: "success",
+          undo: () => {
+            const t = commitTimers.current.get(item.id);
+            if (t) clearTimeout(t);
+            commitTimers.current.delete(item.id);
+            setOptimisticPicked((s) => {
+              const next = new Set(s);
+              next.delete(item.id);
+              return next;
+            });
+          },
+        };
+      }
+      case "focus-weight": {
+        const item = result.item;
+        setScannerOpen(false);
+        setFocusWeightId(item.id);
+        setWeightInput(item.weightGrams != null ? String(item.weightGrams) : "");
+        return { message: `${item.nameSnapshot}: pese e confirme`, tone: "success" };
+      }
+      case "already-resolved":
+        return { message: `${result.item.nameSnapshot}: já separado`, tone: "warn" };
+      case "unknown":
+        return { message: "Produto não é deste pedido", tone: "error" };
+    }
+  };
+
+  const confirmWeight = (item: PickItemDTO) => {
+    const grams = Number(weightInput);
+    updateItemMut.mutate(
+      { itemId: item.id, input: { action: "pick", weightGramsPicked: grams } },
+      {
+        onSuccess: () => {
+          setFocusWeightId(null);
+          setWeightInput("");
+        },
+      },
+    );
+  };
 
   // Autocomplete de substituto: busca com debounce + gate de 2 caracteres.
   const debouncedQuery = useDebouncedValue(subQuery, 300);
@@ -146,6 +220,15 @@ export default function TaskScreen() {
         <Button title="Iniciar separação" loading={busy} onPress={() => startMut.mutate()} />
       )}
 
+      {/* Scanner de código de barras — só nativo (câmera); atalho da separação. */}
+      {task.status === "picking" && Platform.OS !== "web" && (
+        <Button
+          title="Escanear código"
+          onPress={() => setScannerOpen(true)}
+          style={{ marginTop: spacing.md }}
+        />
+      )}
+
       {/* Itens */}
       <Text variant="title" style={{ marginTop: spacing.md, marginBottom: spacing.sm }}>
         Itens
@@ -170,6 +253,26 @@ export default function TaskScreen() {
                 <Action label="Separar" onPress={() => pickItem(item)} disabled={busy} />
                 <Action label="Recusar" onPress={() => refuseItem(item)} disabled={busy} danger />
                 <Action label="Substituir" onPress={() => openSubFor(item.id)} disabled={busy} />
+              </View>
+            )}
+            {/* Input de gramas revelado por um bip em item por peso (story 63). */}
+            {focusWeightId === item.id && item.status === "pending" && (
+              <View style={{ marginTop: spacing.sm, gap: spacing.sm }}>
+                <TextInput
+                  value={weightInput}
+                  onChangeText={(t) => setWeightInput(t.replace(/[^0-9]/g, ""))}
+                  keyboardType="number-pad"
+                  placeholder="Peso em gramas (balança)"
+                  placeholderTextColor={colors.textMuted}
+                  style={styles.subInput}
+                  autoFocus
+                />
+                <Button
+                  title="Confirmar peso"
+                  size="sm"
+                  disabled={busy || weightInput.trim() === "" || Number(weightInput) <= 0}
+                  onPress={() => confirmWeight(item)}
+                />
               </View>
             )}
             {subFor === item.id && (
@@ -293,6 +396,17 @@ export default function TaskScreen() {
             style={{ marginTop: spacing.sm }}
           />
         </View>
+      )}
+
+      {/* Sheet do scanner — só nativo; câmera + matcher de bip contra os itens. */}
+      {Platform.OS !== "web" && (
+        <ScannerSheet
+          visible={scannerOpen}
+          onClose={() => setScannerOpen(false)}
+          items={task.items}
+          resolvedIds={optimisticPicked}
+          onMatch={handleScanMatch}
+        />
       )}
     </ScrollView>
   );

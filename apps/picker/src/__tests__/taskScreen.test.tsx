@@ -1,5 +1,5 @@
 import React from "react";
-import { ActivityIndicator, Alert, Pressable, TextInput } from "react-native";
+import { ActivityIndicator, Alert, Platform, Pressable, TextInput } from "react-native";
 import renderer, { act } from "react-test-renderer";
 import { Button } from "@markethub/ui";
 import type { PickItemDTO, PickTaskDTO } from "@markethub/api-client";
@@ -33,6 +33,17 @@ jest.mock("expo-router", () => ({
   useLocalSearchParams: () => ({ id: "t1" }),
   useRouter: () => ({ back: mockBack }),
   Stack: { Screen: () => null },
+}));
+
+// Câmera mockada (story 63): sem device no CI. Captura o onBarcodeScanned p/
+// simular bipagens e assume a permissão concedida.
+const mockTaskCamera: { onScan: ((e: { data: string }) => void) | null } = { onScan: null };
+jest.mock("expo-camera", () => ({
+  useCameraPermissions: () => [{ granted: true, canAskAgain: true }, jest.fn()],
+  CameraView: (props: { onBarcodeScanned?: (e: { data: string }) => void }) => {
+    mockTaskCamera.onScan = props.onBarcodeScanned ?? null;
+    return null;
+  },
 }));
 
 jest.mock("@/hooks/useDebouncedValue", () => ({
@@ -77,11 +88,14 @@ function mkTask(over: Partial<PickTaskDTO> = {}): PickTaskDTO {
   } as PickTaskDTO;
 }
 
+const trees: renderer.ReactTestRenderer[] = [];
+
 function render() {
   let tree: renderer.ReactTestRenderer;
   act(() => {
     tree = renderer.create(<TaskScreen />);
   });
+  trees.push(tree!);
   return tree!;
 }
 
@@ -112,6 +126,14 @@ beforeEach(() => {
   mockState.search = { data: [], isFetching: false };
   mockState.pending = false;
   mockState.error = null;
+  mockTaskCamera.onScan = null;
+});
+
+afterEach(() => {
+  // Desmonta as árvores p/ o cleanup zerar os timers do scanner (banner/commit).
+  act(() => {
+    while (trees.length) trees.pop()!.unmount();
+  });
 });
 
 describe("TaskScreen — estados de carga", () => {
@@ -316,5 +338,70 @@ describe("TaskScreen — pós-separação", () => {
     mockState.error = new Error("Tarefa já assumida");
     const tree = render();
     expect(JSON.stringify(tree.toJSON())).toContain("Tarefa já assumida");
+  });
+});
+
+describe("TaskScreen — scanner de código de barras (story 63)", () => {
+  const GTIN = "7891234567890";
+
+  it("picking (nativo): mostra o botão Escanear código", () => {
+    mockState.task = { data: mkTask(), isLoading: false, isError: false };
+    const tree = render();
+    expect(btnByTitle(tree, "Escanear código")).toBeTruthy();
+  });
+
+  it("web: não renderiza o botão de escanear", () => {
+    const original = Platform.OS;
+    (Platform as { OS: string }).OS = "web";
+    mockState.task = { data: mkTask(), isLoading: false, isError: false };
+    const tree = render();
+    expect(btnByTitle(tree, "Escanear código")).toBeFalsy();
+    (Platform as { OS: string }).OS = original;
+  });
+
+  it("assigned: sem botão de escanear (só em picking)", () => {
+    mockState.task = { data: mkTask({ status: "assigned" }), isLoading: false, isError: false };
+    const tree = render();
+    expect(btnByTitle(tree, "Escanear código")).toBeFalsy();
+  });
+
+  it("bip de item unit agenda o pick após a janela do desfazer", () => {
+    jest.useFakeTimers();
+    mockState.task = {
+      data: mkTask({ items: [mkItem({ gtin: GTIN, quantity: 3 })] }),
+      isLoading: false,
+      isError: false,
+    };
+    const tree = render();
+    act(() => btnByTitle(tree, "Escanear código")!.props.onPress());
+    act(() => mockTaskCamera.onScan!({ data: GTIN }));
+    // commit adiado: nada disparado ainda
+    expect(mockUpdateItemMutate).not.toHaveBeenCalled();
+    act(() => {
+      jest.advanceTimersByTime(3500);
+    });
+    expect(mockUpdateItemMutate).toHaveBeenCalledWith({
+      itemId: "i1",
+      input: { action: "pick", quantityPicked: 3 },
+    });
+    jest.useRealTimers();
+  });
+
+  it("bip de item por peso revela o input de gramas p/ confirmar", () => {
+    mockState.task = {
+      data: mkTask({ items: [mkItem({ gtin: GTIN, saleType: "weight", weightGrams: 500 })] }),
+      isLoading: false,
+      isError: false,
+    };
+    const tree = render();
+    act(() => btnByTitle(tree, "Escanear código")!.props.onPress());
+    act(() => mockTaskCamera.onScan!({ data: GTIN }));
+    const confirm = btnByTitle(tree, "Confirmar peso");
+    expect(confirm).toBeTruthy();
+    act(() => confirm!.props.onPress());
+    expect(mockUpdateItemMutate).toHaveBeenCalledWith(
+      { itemId: "i1", input: { action: "pick", weightGramsPicked: 500 } },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
   });
 });

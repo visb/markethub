@@ -26,6 +26,8 @@ export interface PickItemDTO {
   id: string;
   orderItemId: string;
   nameSnapshot: string;
+  /** GTIN/EAN snapshot do produto (quando houver) — usado no scanner de bipagem. */
+  gtin?: string;
   saleType: 'unit' | 'weight';
   status: PickItemStatusDTO;
   quantity: number;
