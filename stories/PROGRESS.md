@@ -33,7 +33,7 @@ Cuidados da rodada:
 | 60 | driver — ganhos (gorjetas) e histórico | — | done |
 | 61 | driver — problema na entrega (falha, retorno, decisão da loja) | 54 | done |
 | 62 | driver — turno on/off (disponibilidade) | — | done |
-| 63 | picker — scanner de código de barras (GTIN) | — | todo |
+| 63 | picker — scanner de código de barras (GTIN) | — | done |
 | 64 | substituição — push ao cliente + feedback ao picker | 50 | todo |
 | 65 | picker — métricas próprias + visão por colaborador | — | todo |
 | 66 | admin — dashboard real (KPIs + alertas) | — | todo |
@@ -59,3 +59,4 @@ Cuidados da rodada:
 [OK] 60 — testes: api 1281/1281, driver 145/145, api-client 61/61 — merge: b65c402 — arquivada em done/ — 2026-07-12 — sem migration (Tip/Delivery já existem). Tip/Delivery via Prisma kernel (sem cross-context). Pending filtra por createdAt, paid por paidAt; histórico ordena updatedAt desc (Delivery não tem canceledAt).
 [OK] 61 — testes: api 1307/1307, driver 154/154, picker 101/101, merchant 312/312, api-client 61/61 — merge: 62feeba — arquivada em done/ — 2026-07-12 — 1ª tentativa cortada por limite de sessão (parcial no working tree); retomei o mesmo agente via SendMessage → concluiu. migration story61_delivery_failed autorada, NÃO aplicada. PENDENTE-MANUAL: `prisma migrate deploy`. Dep 54→61 satisfeita; invariante da 54 aceita grupo com delivery failed (estoque NÃO volta, doc em BUSINESS_RULES). retry: failed→unassigned + grupo volta a ready_for_pickup. driver ganhou rhf+zod. Débito api-client perFile não piorado (2 métodos novos 100%).
 [OK] 62 — testes: api 1327/1327, driver 163/163, picker 106/106, api-client 63/63 — merge: e465de2 — arquivada em done/ — 2026-07-12 — migration story62_driver_available_at autorada, NÃO aplicada. PENDENTE-MANUAL: `prisma migrate deploy`. driverAvailableAt global no User; logout limpa turno (só role driver); guards DRIVER_UNAVAILABLE em assign+accept. Débito api-client perFile não piorado.
+[OK] 63 — testes: api 1330/1330, picker 138/138 — merge: 0531d23 — arquivada em done/ — 2026-07-12 — sem migration (reusa OrderItem.gtinSnapshot já no include). expo-camera ~16.0.18 (repinado p/ Expo SDK 52; latest vinha ^57). CameraView mockado nos testes. matcher puro em lib/scanMatcher. "Desfazer" via commit adiado ~3.5s client-side (sem endpoint reset). PENDENTE-MANUAL: bipar EAN real em device físico com câmera. api-client não tocado.
