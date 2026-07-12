@@ -77,4 +77,9 @@ export type {
   CreateCouponInput,
   AdminCreateCouponInput,
   UpdateCouponInput,
+  StoreReviewDTO,
+  StoreReviewsPageDTO,
+  MerchantReviewDTO,
+  MerchantReviewsFilter,
+  ReplyReviewInput,
 } from "@markethub/types";

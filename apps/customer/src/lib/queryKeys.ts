@@ -19,6 +19,10 @@ export const queryKeys = {
     /** Estado seguido/não-seguido de uma loja específica. */
     status: (storeId: string) => ["store-follows", "status", storeId] as const,
   },
+  storeReviews: {
+    /** Vitrine pública paginada das avaliações da rede (story 56). */
+    byMerchant: (merchantId: string) => ["store-reviews", merchantId] as const,
+  },
   tracking: {
     /** Snapshot de rastreio (OrderTracking) de um pedido. */
     order: (orderId: string) => ["tracking", "order", orderId] as const,

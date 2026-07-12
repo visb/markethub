@@ -1,8 +1,16 @@
 import type { ApiClient } from "@markethub/api-client";
-import type { NearbyStoreDTO, StoreSummaryDTO, ViewportBoundsDTO } from "@markethub/types";
+import type {
+  NearbyStoreDTO,
+  StoreReviewDTO,
+  StoreReviewsPageDTO,
+  StoreSummaryDTO,
+  ViewportBoundsDTO,
+} from "@markethub/types";
 
 // Re-export dos contratos compartilhados do mapa (stories 04/05/06/29) — fonte única em packages/types.
 export type { NearbyStoreDTO, StoreSummaryDTO, ViewportBoundsDTO } from "@markethub/types";
+// Vitrine pública de avaliações da rede (story 56).
+export type { StoreReviewDTO, StoreReviewsPageDTO } from "@markethub/types";
 
 export type SaleType = "unit" | "weight";
 
@@ -237,6 +245,8 @@ export interface GeoQuery {
 export interface StoreMeta {
   id: string;
   name: string;
+  /** Rede (merchant) da loja — alvo das avaliações públicas (story 56). */
+  merchantId: string;
   merchantName: string;
   merchantLogoUrl: string | null;
   deliveryFeeCents: number;
@@ -423,6 +433,12 @@ export function marketplace(api: ApiClient) {
         method: "POST",
         auth: true,
       }),
+
+    // Vitrine pública de avaliações da rede (story 56) — sem auth, alinhada ao catálogo.
+    storeReviews: (merchantId: string, page = 1) =>
+      api.request<StoreReviewsPageDTO>(
+        `/merchants/${encodeURIComponent(merchantId)}/reviews?axis=merchant&page=${page}`,
+      ),
 
     reviews: (id: string) => api.request<Review[]>(`/orders/${id}/reviews`, { auth: true }),
     createReview: (

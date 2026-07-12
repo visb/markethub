@@ -23,7 +23,8 @@ export type Capability =
   | "orders.view"
   | "orders.manage"
   | "slots.manage"
-  | "reports.view";
+  | "reports.view"
+  | "reviews.manage";
 
 const OWNER_CAPS: ReadonlySet<Capability> = new Set<Capability>([
   "stores.view",
@@ -37,10 +38,12 @@ const OWNER_CAPS: ReadonlySet<Capability> = new Set<Capability>([
   "orders.manage",
   "slots.manage",
   "reports.view",
+  "reviews.manage",
 ]);
 
 // Admin da loja: tudo menos criar/editar lojas (nível de rede, owner-only).
 // Cupons são de rede, mas a gestão fica no nível owner/administrador (story 53).
+// Avaliações da rede seguem o mesmo nível (owner/admin) — story 56.
 const ADMIN_CAPS: ReadonlySet<Capability> = new Set<Capability>([
   "stores.view",
   "integration.manage",
@@ -52,6 +55,7 @@ const ADMIN_CAPS: ReadonlySet<Capability> = new Set<Capability>([
   "orders.manage",
   "slots.manage",
   "reports.view",
+  "reviews.manage",
 ]);
 
 const MANAGER_CAPS: ReadonlySet<Capability> = new Set<Capability>([

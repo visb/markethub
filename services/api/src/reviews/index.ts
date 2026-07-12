@@ -4,3 +4,6 @@
  * internos. DI do módulo via reviews.module direto.
  */
 export * from "./reviews-aggregate.service";
+// Vitrine pública + gestão/resposta do lojista (story 56) — consumido pelo
+// contexto merchant via barrel (delega o acesso ao model Review).
+export * from "./reviews-management.service";

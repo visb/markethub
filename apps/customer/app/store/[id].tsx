@@ -14,6 +14,8 @@ import { Header } from "@/components/Header";
 import { FollowButton } from "@/components/FollowButton";
 import { MerchantLogo } from "@/components/MerchantLogo";
 import { useStoreFollow } from "@/api/hooks/useStoreFollow";
+import { useStoreReviews } from "@/api/hooks/useStoreReviews";
+import { StoreReviews, Stars } from "@/components/StoreReviews";
 import { storeOpenLabel } from "@/lib/storeOpen";
 import { getRadiusKm } from "@/prefs";
 
@@ -35,6 +37,8 @@ export default function StoreHome() {
   const [loading, setLoading] = useState(true);
   // Seguir loja (story 34): estado inicial vem do sections; toggle via React Query.
   const follow = useStoreFollow(id ?? "", store?.following);
+  // Avaliações públicas da rede (story 56) — só busca quando o merchantId chegar.
+  const reviews = useStoreReviews(store?.merchantId);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -125,6 +129,15 @@ export default function StoreHome() {
           <Text variant="caption" muted>
             ⏱ {store ? `${store.etaMinutes} min` : "30 min"} ou programada
           </Text>
+          {store && reviews.count > 0 && (
+            <View style={styles.ratingBadge} testID="store-rating-badge">
+              <Stars rating={reviews.average} size={13} />
+              <Text variant="caption" style={styles.ratingText}>
+                {reviews.average.toFixed(1).replace(".", ",")} · {reviews.count}{" "}
+                {reviews.count === 1 ? "avaliação" : "avaliações"}
+              </Text>
+            </View>
+          )}
           {store && (
             <View
               style={[styles.openBadge, { borderColor: store.openNow ? colors.success : colors.textMuted }]}
@@ -182,6 +195,17 @@ export default function StoreHome() {
           {renderSection("Ofertas em destaque", sections?.featured ?? [])}
           {renderSection("Mais comprados", sections?.mostBought ?? [])}
           {renderSection("Recomendados para você", sections?.recommended ?? [])}
+          {store && (
+            <StoreReviews
+              merchantName={store.merchantName}
+              items={reviews.items}
+              count={reviews.count}
+              isLoading={reviews.isLoading}
+              hasMore={reviews.hasMore}
+              isLoadingMore={reviews.isLoadingMore}
+              onLoadMore={reviews.loadMore}
+            />
+          )}
         </ScrollView>
       )}
 
@@ -202,6 +226,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
   },
+  ratingBadge: { flexDirection: "row", alignItems: "center", gap: spacing.xs, marginTop: 4 },
+  ratingText: { color: colors.text, fontWeight: "700" },
   searchWrap: {
     flexDirection: "row",
     alignItems: "center",

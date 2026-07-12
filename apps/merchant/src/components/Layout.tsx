@@ -28,6 +28,7 @@ const NAV: NavItem[] = [
   { to: "/orders", label: "Pedidos", capability: "orders.view" },
   { to: "/slots", label: "Agendamento", capability: "slots.manage" },
   { to: "/reports", label: "Relatórios", capability: "reports.view" },
+  { to: "/reviews", label: "Avaliações", capability: "reviews.manage" },
 ];
 
 export function Layout() {
