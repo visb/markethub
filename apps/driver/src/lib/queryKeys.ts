@@ -29,4 +29,8 @@ export const queryKeys = {
   earnings: {
     byPeriod: (period: string) => ["earnings", period] as const,
   },
+  /** Turno on/off do entregador (story 62). */
+  availability: {
+    current: ["availability", "current"] as const,
+  },
 } as const;

@@ -1,5 +1,6 @@
 import { DriverController } from "./driver.controller";
 import type { DriverService } from "./driver.service";
+import type { DriverAvailabilityService } from "./driver-availability.service";
 import type { DriverVehicleService } from "./driver-vehicle.service";
 import type { DriverLocationService } from "./driver-location.service";
 import type { AuthUser } from "../auth";
@@ -29,12 +30,17 @@ function makeController() {
   const location = {
     ingest: jest.fn().mockResolvedValue({ accepted: true }),
   };
+  const availability = {
+    current: jest.fn().mockResolvedValue({ available: true, availableSince: "2026-07-12T10:00:00.000Z" }),
+    set: jest.fn().mockResolvedValue({ available: false, availableSince: null }),
+  };
   const controller = new DriverController(
     driver as unknown as DriverService,
     vehicles as unknown as DriverVehicleService,
     location as unknown as DriverLocationService,
+    availability as unknown as DriverAvailabilityService,
   );
-  return { controller, driver, vehicles, location };
+  return { controller, driver, vehicles, location, availability };
 }
 
 const user: AuthUser = { id: "u1", email: "d@x.com", roles: ["driver"] };
@@ -118,6 +124,22 @@ describe("DriverController", () => {
     const { controller, vehicles } = makeController();
     controller.selectVehicle(user, { vehicleId: "v1" });
     expect(vehicles.select).toHaveBeenCalledWith("u1", "v1");
+  });
+
+  // ── Turno on/off / disponibilidade (story 62) ──
+
+  it("driverAvailability: delega current(user.id)", () => {
+    const { controller, availability } = makeController();
+    controller.driverAvailability(user);
+    expect(availability.current).toHaveBeenCalledWith("u1");
+  });
+
+  it("setAvailability: extrai o flag do dto e delega set(user.id, available)", () => {
+    const { controller, availability } = makeController();
+    controller.setAvailability(user, { available: true });
+    expect(availability.set).toHaveBeenCalledWith("u1", true);
+    controller.setAvailability(user, { available: false });
+    expect(availability.set).toHaveBeenLastCalledWith("u1", false);
   });
 
   // ── Rastreio ao vivo (story 51) ──

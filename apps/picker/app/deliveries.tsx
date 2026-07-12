@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
-import type { DeliveryFailReasonDTO } from "@markethub/api-client";
+import { ApiClientError, type DeliveryFailReasonDTO } from "@markethub/api-client";
 import { Button, Text, colors, radius, spacing } from "@markethub/ui";
 import { useDeliveryActions, useStoreDeliveries, useStoreDrivers } from "@/api/hooks/useStoreDeliveries";
 
@@ -38,16 +38,41 @@ export default function DeliveriesScreen() {
   const driversQuery = useStoreDrivers(id);
   const { assign, unassign, retry, cancel } = useDeliveryActions(id);
   const [expanded, setExpanded] = useState<string | null>(null);
+  // Toast de corrida (story 62): driver ficou indisponível entre o load e o clique.
+  const [toast, setToast] = useState<string | null>(null);
 
   const deliveries = deliveriesQuery.data ?? [];
   const drivers = driversQuery.data ?? [];
   const busy = assign.isPending || unassign.isPending || retry.isPending || cancel.isPending;
   const error =
-    deliveriesQuery.isError || assign.isError || unassign.isError || retry.isError || cancel.isError
+    deliveriesQuery.isError || unassign.isError || retry.isError || cancel.isError
       ? "Erro ao carregar ou executar a ação."
       : null;
 
   const closeExpanded = () => setExpanded(null);
+
+  /**
+   * Atribui um entregador. Trata a corrida (story 62): se ele ficou indisponível
+   * entre o carregamento da lista e o clique, o backend responde DRIVER_UNAVAILABLE
+   * — mostra o toast e revalida a lista de entregadores (o badge fica indisponível).
+   */
+  const handleAssign = (deliveryId: string, driverId: string) => {
+    setToast(null);
+    assign.mutate(
+      { id: deliveryId, driverId },
+      {
+        onSuccess: closeExpanded,
+        onError: (err) => {
+          if (err instanceof ApiClientError && err.body.code === "DRIVER_UNAVAILABLE") {
+            setToast("Entregador ficou indisponível. Atualizamos a lista.");
+            void driversQuery.refetch();
+          } else {
+            setToast("Não foi possível atribuir. Tente novamente.");
+          }
+        },
+      },
+    );
+  };
 
   if (deliveriesQuery.isLoading) {
     return (
@@ -68,6 +93,14 @@ export default function DeliveriesScreen() {
       <Stack.Screen options={{ headerShown: true, title: "Entregas" }} />
 
       {error && <Text style={{ color: colors.danger, marginBottom: spacing.sm }}>{error}</Text>}
+
+      {toast && (
+        <View testID="assign-toast" style={styles.toast}>
+          <Text style={{ color: colors.white }} variant="caption">
+            {toast}
+          </Text>
+        </View>
+      )}
 
       {deliveries.length === 0 ? (
         <Text muted style={{ marginTop: spacing.lg }}>
@@ -113,16 +146,26 @@ export default function DeliveriesScreen() {
                       {drivers.map((drv) => (
                         <Pressable
                           key={drv.id}
-                          style={styles.driverRow}
-                          disabled={busy}
-                          onPress={() =>
-                            assign.mutate({ id: d.id, driverId: drv.id }, { onSuccess: closeExpanded })
-                          }
+                          style={[styles.driverRow, !drv.available && styles.driverRowOff]}
+                          disabled={busy || !drv.available}
+                          onPress={() => handleAssign(d.id, drv.id)}
                         >
-                          <Text style={{ flex: 1 }}>{drv.name}</Text>
-                          <Text muted variant="caption">
-                            {drv.activeDeliveries} em aberto
-                          </Text>
+                          <View style={{ flex: 1 }}>
+                            <Text style={!drv.available ? { color: colors.textMuted } : undefined}>
+                              {drv.name}
+                            </Text>
+                            <Text muted variant="caption">
+                              {drv.activeDeliveries} em aberto
+                            </Text>
+                          </View>
+                          {/* Badge de turno (story 62): disponível (verde) / indisponível (cinza). */}
+                          <View
+                            style={[styles.badge, drv.available ? styles.badgeOn : styles.badgeOff]}
+                          >
+                            <Text style={{ color: colors.white, fontSize: 11, fontWeight: "700" }}>
+                              {drv.available ? "Disponível" : "Indisponível"}
+                            </Text>
+                          </View>
                         </Pressable>
                       ))}
                     </View>
@@ -176,9 +219,20 @@ const styles = StyleSheet.create({
   driverRow: {
     flexDirection: "row",
     alignItems: "center",
+    gap: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
     padding: spacing.md,
+  },
+  driverRowOff: { opacity: 0.6, backgroundColor: colors.surface },
+  badge: { borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 2 },
+  badgeOn: { backgroundColor: colors.success },
+  badgeOff: { backgroundColor: colors.textMuted },
+  toast: {
+    backgroundColor: colors.textMuted,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    marginBottom: spacing.sm,
   },
 });

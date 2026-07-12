@@ -9,6 +9,7 @@ import { OutboxPublisher } from "../events";
 import { HandoffService } from "../picking/handoff.service";
 import { OrderTrackingService } from "../picking/order-tracking.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { assertDriverAvailable } from "./driver-availability.service";
 import { DELIVERY_INCLUDE, toDeliveryDto } from "./delivery.mapper";
 import { HISTORY_INCLUDE, toHistoryItem } from "./earnings.mapper";
 
@@ -89,6 +90,8 @@ export class DriverService {
         message: "Você não é entregador desta loja",
       });
     }
+    // Turno on/off (story 62): só aceita quem está disponível (em turno).
+    await assertDriverAvailable(this.prisma, userId);
     const { count } = await this.prisma.delivery.updateMany({
       where: { id: deliveryId, status: "unassigned" },
       data: { status: "assigned", driverId: userId, assignedAt: new Date() },

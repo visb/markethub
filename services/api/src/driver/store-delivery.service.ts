@@ -9,6 +9,7 @@ import { PushService } from "../notifications";
 import { HandoffService } from "../picking/handoff.service";
 import { OrderTrackingService } from "../picking/order-tracking.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { assertDriverAvailable, toAvailabilityView } from "./driver-availability.service";
 import { DELIVERY_INCLUDE, toDeliveryDto } from "./delivery.mapper";
 
 /**
@@ -43,7 +44,7 @@ export class StoreDeliveryService {
     await this.assertStoreStaff(userId, storeId);
     const staff = await this.prisma.storeStaff.findMany({
       where: { storeId, staffRole: "driver", active: true },
-      include: { user: { select: { id: true, name: true } } },
+      include: { user: { select: { id: true, name: true, driverAvailableAt: true } } },
     });
     const loads = await this.prisma.delivery.groupBy({
       by: ["driverId"],
@@ -51,11 +52,17 @@ export class StoreDeliveryService {
       _count: { _all: true },
     });
     const loadByDriver = new Map(loads.map((l) => [l.driverId, l._count._all]));
-    return staff.map((s) => ({
-      id: s.user.id,
-      name: s.user.name,
-      activeDeliveries: loadByDriver.get(s.user.id) ?? 0,
-    }));
+    return staff.map((s) => {
+      // Turno on/off (story 62): a lista mostra todos com badge disponível/indisponível.
+      const availability = toAvailabilityView(s.user.driverAvailableAt);
+      return {
+        id: s.user.id,
+        name: s.user.name,
+        activeDeliveries: loadByDriver.get(s.user.id) ?? 0,
+        available: availability.available,
+        availableSince: availability.availableSince,
+      };
+    });
   }
 
   /** Atribui um entregador da loja à entrega (lock otimista em unassigned). */
@@ -71,6 +78,8 @@ export class StoreDeliveryService {
         message: "Usuário não é entregador desta loja",
       });
     }
+    // Turno on/off (story 62): não atribui a entregador fora de turno (indisponível).
+    await assertDriverAvailable(this.prisma, driverId);
     const { count } = await this.prisma.delivery.updateMany({
       where: { id: deliveryId, status: "unassigned" },
       data: { status: "assigned", driverId, assignedAt: new Date() },

@@ -21,6 +21,8 @@ export type {
   DeliveryDTO,
   FailDeliveryInput,
   StoreDriverDTO,
+  DriverAvailabilityDTO,
+  SetAvailabilityInput,
   EarningsPeriodDTO,
   DriverEarningsDTO,
   DeliveryHistoryTipDTO,

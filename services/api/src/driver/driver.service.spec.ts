@@ -64,6 +64,49 @@ describe("DriverService.confirmDelivery", () => {
 });
 
 /**
+ * Story 62 — turno on/off. O aceite self-service (pool) só é permitido a quem
+ * está disponível (em turno). Indisponível → DRIVER_UNAVAILABLE, sem tocar a
+ * entrega. A guarda roda depois de confirmar que o ator é entregador da loja.
+ */
+describe("DriverService.accept (guarda de disponibilidade)", () => {
+  function makeAcceptPrisma(driverAvailableAt: Date | null) {
+    const updateMany = jest.fn().mockResolvedValue({ count: 1 });
+    const prisma = {
+      delivery: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ id: "d1", storeId: "store1", status: "unassigned", orderGroupId: "g1" }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue(detail),
+        updateMany,
+      },
+      storeStaff: { findFirst: jest.fn().mockResolvedValue({ id: "s1" }) },
+      user: { findUnique: jest.fn().mockResolvedValue({ driverAvailableAt }) },
+      orderGroup: { findUnique: jest.fn().mockResolvedValue({ orderId: "o1" }) },
+    } as never;
+    return { prisma, updateMany };
+  }
+
+  const tracking = { emit: jest.fn() } as never;
+
+  it("recusa aceite de entregador indisponível (DRIVER_UNAVAILABLE) sem tocar a entrega", async () => {
+    const { prisma, updateMany } = makeAcceptPrisma(null);
+    const svc = new DriverService(prisma, {} as never, tracking, noopOutbox);
+    await expect(svc.accept("drv1", "d1")).rejects.toBeInstanceOf(BadRequestException);
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it("permite aceite quando disponível (avança a entrega)", async () => {
+    const { prisma, updateMany } = makeAcceptPrisma(new Date());
+    const svc = new DriverService(prisma, {} as never, tracking, noopOutbox);
+    await expect(svc.accept("drv1", "d1")).resolves.toMatchObject({ id: "d1" });
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: "d1", status: "unassigned" },
+      data: expect.objectContaining({ status: "assigned", driverId: "drv1" }),
+    });
+  });
+});
+
+/**
  * Story 61 — falha na entrega. Só o entregador DONO e só após a coleta
  * (`picked_up`). Na TX: Delivery → `failed` (motivo + observação) + evento
  * `delivery.failed` no outbox. Idempotente quando já está `failed`.

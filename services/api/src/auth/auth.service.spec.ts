@@ -34,6 +34,7 @@ function makePrisma(over: Record<string, unknown> = {}) {
     user: {
       findUnique: jest.fn(),
       create: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
     session: {
       findUnique: jest.fn(),
@@ -298,6 +299,23 @@ describe("AuthService.logout", () => {
 
     await expect(svc.logout("token-invalido")).resolves.toBeUndefined();
     expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it("desliga o turno do entregador no logout (story 62): limpa driverAvailableAt só p/ driver", async () => {
+    const token = await tokens.signRefresh({ sub: "u1", sid: "sess1" });
+    const userUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
+    const prisma = makePrisma({
+      session: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      user: { updateMany: userUpdateMany },
+    });
+    const svc = new AuthService(prisma, tokens);
+
+    await svc.logout(token);
+
+    expect(userUpdateMany).toHaveBeenCalledWith({
+      where: { id: "u1", roles: { some: { role: { name: "driver" } } } },
+      data: { driverAvailableAt: null },
+    });
   });
 });
 

@@ -1,6 +1,6 @@
 import React from "react";
 import renderer, { act } from "react-test-renderer";
-import { ActivityIndicator, Pressable } from "react-native";
+import { ActivityIndicator, Pressable, Switch } from "react-native";
 import { Button, Text } from "@markethub/ui";
 import type { DeliveryDTO } from "@markethub/api-client";
 import HomeScreen from "../../app/home";
@@ -16,6 +16,7 @@ import HomeScreen from "../../app/home";
 const mockPush = jest.fn();
 const mockLogout = jest.fn();
 const mockMutate = jest.fn();
+const mockSetAvailability = jest.fn();
 
 const mockState = {
   stores: [{ id: "s1", name: "Loja 1" }] as { id: string; name: string }[],
@@ -25,6 +26,10 @@ const mockState = {
   mineLoading: false,
   acceptPending: false,
   anyError: false,
+  // Story 62: turno on/off.
+  isAvailable: true,
+  availableSince: "2026-07-12T10:00:00.000Z" as string | null,
+  availabilityPending: false,
 };
 
 jest.mock("expo-router", () => ({
@@ -37,6 +42,14 @@ jest.mock("@/auth-context", () => ({
 
 jest.mock("@/api/hooks/useDriverVehicle", () => ({
   useCurrentVehicle: () => ({ data: { id: "v1", plate: "ABC1D23", type: "car", description: null } }),
+}));
+
+jest.mock("@/api/hooks/useDriverAvailability", () => ({
+  useDriverAvailability: () => ({
+    data: { available: mockState.isAvailable, availableSince: mockState.availableSince },
+    isLoading: false,
+  }),
+  useSetAvailability: () => ({ mutate: mockSetAvailability, isPending: mockState.availabilityPending }),
 }));
 
 jest.mock("@/api/hooks/useDriverDeliveries", () => ({
@@ -97,6 +110,7 @@ beforeEach(() => {
   mockPush.mockReset();
   mockLogout.mockReset();
   mockMutate.mockReset();
+  mockSetAvailability.mockReset();
   mockState.stores = [{ id: "s1", name: "Loja 1" }];
   mockState.mine = [];
   mockState.available = [];
@@ -104,6 +118,9 @@ beforeEach(() => {
   mockState.mineLoading = false;
   mockState.acceptPending = false;
   mockState.anyError = false;
+  mockState.isAvailable = true;
+  mockState.availableSince = "2026-07-12T10:00:00.000Z";
+  mockState.availabilityPending = false;
 });
 
 describe("HomeScreen", () => {
@@ -172,5 +189,38 @@ describe("HomeScreen", () => {
     const sair = tree.root.findAllByType(Button).find((b) => b.props.title === "Sair");
     act(() => sair!.props.onPress());
     expect(mockLogout).toHaveBeenCalled();
+  });
+
+  // ── Turno on/off (story 62) ──
+
+  it("disponível: switch ligado + rótulo 'desde HH:MM', sem banner", () => {
+    mockState.isAvailable = true;
+    const tree = render(<HomeScreen />);
+    const sw = tree.root.findByType(Switch);
+    expect(sw.props.value).toBe(true);
+    const text = screenText(tree);
+    expect(text).toContain("Disponível");
+    expect(text).toContain("De turno desde");
+    expect(tree.root.findAllByProps({ testID: "unavailable-banner" }).length).toBe(0);
+  });
+
+  it("indisponível: banner sobre a lista + aceitar desabilitado", () => {
+    mockState.isAvailable = false;
+    mockState.availableSince = null;
+    mockState.available = [mkDelivery({ id: "p1", status: "unassigned" })];
+    const tree = render(<HomeScreen />);
+    const sw = tree.root.findByType(Switch);
+    expect(sw.props.value).toBe(false);
+    expect(screenText(tree)).toContain("Você está indisponível");
+    const acceptBtn = tree.root.findAllByType(Button).find((b) => b.props.title === "Aceitar");
+    expect(acceptBtn!.props.disabled).toBe(true);
+  });
+
+  it("alternar o switch dispara a mutation com o novo estado", () => {
+    mockState.isAvailable = false;
+    const tree = render(<HomeScreen />);
+    const sw = tree.root.findByType(Switch);
+    act(() => sw.props.onValueChange(true));
+    expect(mockSetAvailability).toHaveBeenCalledWith(true);
   });
 });

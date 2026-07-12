@@ -227,6 +227,23 @@ describe("ApiClient — frota merchant + veículo do entregador", () => {
     await client.driverDeliveryHistory(3);
     expect(url(fetchMock, 1)).toBe("http://api.test/api/v1/driver/deliveries/history?page=3");
   });
+
+  it("driverAvailability: GET /driver/availability (story 62)", async () => {
+    const { client, fetchMock } = withFetch();
+    await client.driverAvailability();
+    expect(url(fetchMock)).toBe("http://api.test/api/v1/driver/availability");
+    expect(init(fetchMock).method ?? "GET").toBe("GET");
+  });
+
+  it("driverSetAvailability: POST /driver/availability com o flag (story 62)", async () => {
+    const { client, fetchMock } = withFetch();
+    await client.driverSetAvailability(true);
+    expect(url(fetchMock)).toBe("http://api.test/api/v1/driver/availability");
+    expect(init(fetchMock).method).toBe("POST");
+    expect(JSON.parse(init(fetchMock).body)).toEqual({ available: true });
+    await client.driverSetAvailability(false);
+    expect(JSON.parse(init(fetchMock, 1).body)).toEqual({ available: false });
+  });
 });
 
 describe("ApiClient.request — serialização e modos", () => {

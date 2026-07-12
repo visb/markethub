@@ -111,6 +111,12 @@ export class AuthService {
         where: { id: payload.sid, revokedAt: null },
         data: { revokedAt: new Date() },
       });
+      // Turno on/off (story 62): logout desliga o turno do entregador. Escopado
+      // à role driver — no-op para os demais (single query, sem passo extra).
+      await this.prisma.user.updateMany({
+        where: { id: payload.sub, roles: { some: { role: { name: "driver" } } } },
+        data: { driverAvailableAt: null },
+      });
     } catch {
       // Token inválido no logout é no-op idempotente.
     }

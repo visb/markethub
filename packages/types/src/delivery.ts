@@ -63,6 +63,23 @@ export interface StoreDriverDTO {
   name: string;
   /** Entregas em aberto atribuídas a ele (carga atual). */
   activeDeliveries: number;
+  /** Está de turno agora (story 62). Indisponível não pode ser atribuído. */
+  available: boolean;
+  /** Momento em que ligou o turno (ISO); null quando indisponível. */
+  availableSince: string | null;
+}
+
+/** Estado de turno on/off do entregador (story 62) — app driver. */
+export interface DriverAvailabilityDTO {
+  /** O entregador está de turno (disponível para receber/aceitar entregas). */
+  available: boolean;
+  /** Momento em que ligou o turno (ISO); null quando indisponível. */
+  availableSince: string | null;
+}
+
+/** Corpo de `POST /driver/availability` (story 62): liga/desliga o turno. */
+export interface SetAvailabilityInput {
+  available: boolean;
 }
 
 // ── Seleção de veículo pelo entregador (story 15) ──
