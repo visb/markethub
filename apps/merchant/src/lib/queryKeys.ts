@@ -45,6 +45,10 @@ export const queryKeys = {
     /** Detalhe de um sub-pedido (OrderGroup) — story 54. */
     detail: (id: string) => ["orders", "detail", id] as const,
   },
+  slots: {
+    /** Slots de agendamento de uma loja (story 55). */
+    byStore: (storeId: string | undefined) => ["slots", storeId ?? "none"] as const,
+  },
   reports: {
     all: ["reports"] as const,
     sales: (filters: { from?: string; to?: string; storeId?: string } = {}) =>

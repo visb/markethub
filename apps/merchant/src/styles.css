@@ -512,3 +512,49 @@ body {
   color: var(--success, #16a34a);
   font-size: 13px;
 }
+
+/* Slots de agendamento (story 55) */
+.slot-form,
+.slot-batch-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 16px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+}
+.slot-batch-form .weekday-options {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.slot-batch-form .weekday-option {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.slot-batch-form .preview {
+  font-weight: 600;
+}
+.slot-day {
+  margin-bottom: 16px;
+}
+.slot-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.slot-bar {
+  margin-top: 6px;
+  height: 6px;
+  width: 160px;
+  background: var(--border, #e5e7eb);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.slot-bar-fill {
+  height: 100%;
+  background: var(--primary, #2563eb);
+}

@@ -74,6 +74,33 @@ describe("SchedulingService.create", () => {
   });
 });
 
+describe("SchedulingService — RBAC de gestão (slots.manage — story 55)", () => {
+  const valid = { storeId: "st1", start: "2026-07-01T10:00:00Z", end: "2026-07-01T11:00:00Z", capacity: 5 };
+
+  it("gerente da loja (StoreStaff manager ativo) pode criar slot", async () => {
+    const { svc, upsert } = makeService({ staff: { id: "s", staffRole: "manager" } });
+    await svc.create("gerente", ["merchant"], valid);
+    expect(upsert).toHaveBeenCalled();
+  });
+
+  it("gerente da loja também pode remover slot sem reserva", async () => {
+    const { svc, del } = makeService({
+      staff: { id: "s", staffRole: "manager" },
+      slot: { id: "sl1", storeId: "st1", reserved: 0 },
+    });
+    expect(await svc.deleteSlot("gerente", ["merchant"], "sl1")).toEqual({ removed: true });
+    expect(del).toHaveBeenCalledWith({ where: { id: "sl1" } });
+  });
+
+  it("picker (sem vínculo de manager) é negado", async () => {
+    const { svc, upsert } = makeService({ staff: null });
+    await expect(svc.create("picker", ["picker"], valid)).rejects.toMatchObject({
+      response: expect.objectContaining({ code: "NOT_STORE_MANAGER" }),
+    });
+    expect(upsert).not.toHaveBeenCalled();
+  });
+});
+
 describe("SchedulingService.deleteSlot", () => {
   it("SLOT_NOT_FOUND quando o slot não existe", async () => {
     const { svc } = makeService({ slot: null });

@@ -12,6 +12,8 @@ import type {
   StoreHoursEntryInput,
   StoreClosureDTO,
   CreateStoreClosureInput,
+  SlotDTO,
+  CreateSlotInput,
   ErpConfigDTO,
   ErpConfigInput,
   ApiKeyDTO,
@@ -271,6 +273,23 @@ export class ApiClient {
   /** Remove um fechamento excepcional da loja. */
   merchantRemoveStoreClosure(storeId: string, closureId: string): Promise<{ removed: boolean }> {
     return this.request(`/merchant/stores/${storeId}/closures/${closureId}`, { method: "DELETE", auth: true });
+  }
+
+  // ─── Slots de agendamento por loja (S5.3 / gestão story 55) ───
+
+  /** Slots da loja p/ gestão (inclui cheios), a partir de agora. */
+  merchantStoreSlots(storeId: string): Promise<SlotDTO[]> {
+    return this.request(`/store/slots?storeId=${encodeURIComponent(storeId)}`, { auth: true });
+  }
+
+  /** Cria (ou reajusta capacidade de) um slot da loja. */
+  merchantCreateSlot(input: CreateSlotInput): Promise<SlotDTO> {
+    return this.request("/store/slots", { method: "POST", body: input, auth: true });
+  }
+
+  /** Remove um slot da loja (bloqueado no backend se já houver reserva). */
+  merchantDeleteSlot(slotId: string): Promise<{ removed: boolean }> {
+    return this.request(`/store/slots/${slotId}`, { method: "DELETE", auth: true });
   }
 
   // ─── Merchant / integração (story 09, owner-only) ───────────

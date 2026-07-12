@@ -585,6 +585,28 @@ describe("ApiClient — endpoints (rota + método + body)", () => {
     expect(JSON.parse(init(5).body!)).toEqual({ code: "9999" });
   });
 
+  it("merchant: slots de agendamento (listar/criar/remover — story 55)", async () => {
+    await client.merchantStoreSlots("st 1");
+    expect(url(0)).toBe(`${B}/store/slots?storeId=st%201`);
+    await client.merchantCreateSlot({
+      storeId: "s1",
+      start: "2026-07-01T11:00:00.000Z",
+      end: "2026-07-01T12:00:00.000Z",
+      capacity: 5,
+    });
+    expect(url(1)).toBe(`${B}/store/slots`);
+    expect(init(1).method).toBe("POST");
+    expect(JSON.parse(init(1).body!)).toEqual({
+      storeId: "s1",
+      start: "2026-07-01T11:00:00.000Z",
+      end: "2026-07-01T12:00:00.000Z",
+      capacity: 5,
+    });
+    await client.merchantDeleteSlot("slot1");
+    expect(url(2)).toBe(`${B}/store/slots/slot1`);
+    expect(init(2).method).toBe("DELETE");
+  });
+
   it("notificações: registra e remove device token", async () => {
     await client.registerDeviceToken("tok", "ios");
     expect(url(0)).toBe(`${B}/notifications/device-tokens`);

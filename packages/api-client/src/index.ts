@@ -70,6 +70,8 @@ export type {
   StoreClosureDTO,
   CreateStoreClosureInput,
   StoreOpenStateDTO,
+  SlotDTO,
+  CreateSlotInput,
   CouponType,
   CouponDTO,
   CreateCouponInput,
