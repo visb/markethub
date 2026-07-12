@@ -429,6 +429,15 @@ describe("ApiClient — endpoints (rota + método + body)", () => {
     expect(init(4).method).toBe("PATCH");
   });
 
+  it("merchant: pausa/retoma loja (story 57)", async () => {
+    await client.merchantPauseStore("s1");
+    expect(url(0)).toBe(`${B}/merchant/stores/s1/pause`);
+    expect(init(0).method).toBe("POST");
+    await client.merchantResumeStore("s1");
+    expect(url(1)).toBe(`${B}/merchant/stores/s1/resume`);
+    expect(init(1).method).toBe("POST");
+  });
+
   it("merchant: integração ERP / api-keys / webhooks", async () => {
     await client.merchantErpConfig();
     expect(url(0)).toBe(`${B}/merchant/integration/erp`);

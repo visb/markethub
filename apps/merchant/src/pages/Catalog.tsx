@@ -8,6 +8,7 @@ import {
   useOffers,
   useProductUploadUrl,
   useStocks,
+  useToggleOfferAvailable,
   useUnlockOfferField,
   useUnlockStockField,
   useUpdateOffer,
@@ -199,7 +200,18 @@ function OfferRow({ offer, showStore }: { offer: MerchantOffer; showStore: boole
   const [editing, setEditing] = useState(false);
   const update = useUpdateOffer();
   const unlockOffer = useUnlockOfferField();
+  const toggleAvailable = useToggleOfferAvailable();
   const [error, setError] = useState<string | null>(null);
+
+  // Switch inline de disponibilidade (story 57): update otimista no hook; em erro
+  // o snapshot é restaurado e a mensagem aparece na linha.
+  const onToggleAvailable = () => {
+    setError(null);
+    toggleAvailable.mutate(
+      { id: offer.id, available: !offer.available },
+      { onError: (e) => setError(errMessage(e, "Falha ao atualizar disponibilidade.")) },
+    );
+  };
 
   const onSubmit = (patch: OfferPatch) => {
     setError(null);
@@ -240,7 +252,6 @@ function OfferRow({ offer, showStore }: { offer: MerchantOffer; showStore: boole
       <div>
         <strong>{offer.product.name}</strong>
         {offer.product.brand && <span className="muted"> · {offer.product.brand}</span>}
-        {!offer.available && <span className="badge-muted"> indisponível</span>}
         <div className="muted">
           {formatPrice(offer.priceCents)}
           {offer.promoPriceCents != null && <> · promo {formatPrice(offer.promoPriceCents)}</>}
@@ -267,6 +278,17 @@ function OfferRow({ offer, showStore }: { offer: MerchantOffer; showStore: boole
         {error && <p className="error">{error}</p>}
       </div>
       <div className="row-actions">
+        <label className="switch" title={offer.available ? "Disponível" : "Indisponível"}>
+          <input
+            type="checkbox"
+            role="switch"
+            aria-label={`Disponível: ${offer.product.name}`}
+            checked={offer.available}
+            disabled={toggleAvailable.isPending}
+            onChange={onToggleAvailable}
+          />
+          <span className="switch-label">{offer.available ? "Disponível" : "Indisponível"}</span>
+        </label>
         <button className="btn-ghost" type="button" onClick={() => setEditing(true)}>
           Editar
         </button>

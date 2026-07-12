@@ -25,6 +25,8 @@ function make() {
     storeClosures: jest.fn().mockResolvedValue([{ id: "c1" }]),
     addStoreClosure: jest.fn().mockResolvedValue({ id: "c1" }),
     removeStoreClosure: jest.fn().mockResolvedValue({ removed: true }),
+    pauseStore: jest.fn().mockResolvedValue({ id: "s1", pausedAt: "2026-07-12T10:00:00.000Z" }),
+    resumeStore: jest.fn().mockResolvedValue({ id: "s1", pausedAt: null }),
   };
   const products = {
     uploadUrl: jest.fn().mockResolvedValue({ url: "u", key: "k" }),
@@ -101,6 +103,24 @@ describe("MerchantController — horário + fechamentos (story 52)", () => {
     const { controller, merchant, user } = make();
     await controller.removeStoreClosure(user, "s1", "c1");
     expect(merchant.removeStoreClosure).toHaveBeenCalledWith(identity, "s1", "c1");
+  });
+});
+
+describe("MerchantController — pausa temporária (story 57)", () => {
+  const identity = { id: "u1", roles: ["merchant"] };
+
+  it("POST stores/:id/pause delega identidade + id", async () => {
+    const { controller, merchant, user } = make();
+    const out = await controller.pauseStore(user, "s1");
+    expect(merchant.pauseStore).toHaveBeenCalledWith(identity, "s1");
+    expect(out).toMatchObject({ pausedAt: "2026-07-12T10:00:00.000Z" });
+  });
+
+  it("POST stores/:id/resume delega identidade + id", async () => {
+    const { controller, merchant, user } = make();
+    const out = await controller.resumeStore(user, "s1");
+    expect(merchant.resumeStore).toHaveBeenCalledWith(identity, "s1");
+    expect(out).toMatchObject({ pausedAt: null });
   });
 });
 

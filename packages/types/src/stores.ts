@@ -56,4 +56,6 @@ export interface StoreSummaryDTO {
   doorFeeCents: number;
   allowsPickup: boolean;
   openNow: boolean;
+  /** Loja em pausa temporária (story 57): força `openNow=false` e distingue de "fechada". */
+  paused: boolean;
 }

@@ -611,3 +611,42 @@ body {
   border-radius: 8px;
   font: inherit;
 }
+
+/* ── Pausa temporária da loja (story 57) ── */
+.badge-paused {
+  color: #b91c1c;
+  font-size: 12px;
+  font-weight: 700;
+}
+.pause-section {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+}
+.pause-section h3 {
+  margin: 0 0 4px;
+}
+.pause-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+/* Switch inline de disponibilidade da oferta (story 57) */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+.switch input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+.switch-label {
+  font-size: 13px;
+  color: var(--muted);
+}

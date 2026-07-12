@@ -27,3 +27,13 @@ export function updateStore(
 ): Promise<MerchantStoreDetailDTO> {
   return api.merchantUpdateStore(id, patch);
 }
+
+/** Pausa a loja (bloqueia todo pedido novo — story 57). Idempotente no backend. */
+export function pauseStore(api: ApiClient, id: string): Promise<MerchantStoreDetailDTO> {
+  return api.merchantPauseStore(id);
+}
+
+/** Retoma a loja pausada (story 57). Idempotente no backend. */
+export function resumeStore(api: ApiClient, id: string): Promise<MerchantStoreDetailDTO> {
+  return api.merchantResumeStore(id);
+}

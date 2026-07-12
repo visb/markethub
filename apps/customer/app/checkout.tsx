@@ -32,7 +32,8 @@ export default function CheckoutScreen() {
   const [slots, setSlots] = useState<SlotView[]>([]);
   const [slotId, setSlotId] = useState<string | null>(null);
   const [cart, setCart] = useState<CartView | null>(null);
-  // Erro de checkout (ex.: loja fechada — story 52); `closed` habilita o CTA de agendar.
+  // Erro de checkout: `closed` (STORE_CLOSED — story 52) habilita o CTA de agendar;
+  // STORE_PAUSED (story 57) mostra só a mensagem, SEM CTA (pausa bloqueia tudo).
   const [checkoutError, setCheckoutError] = useState<{ message: string; closed: boolean } | null>(null);
 
   const load = useCallback(async () => {

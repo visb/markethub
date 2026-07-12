@@ -111,6 +111,21 @@ describe("ProductCard", () => {
     expect(fullText(tree)).toContain("Fechado");
   });
 
+  it("com header e loja pausada mostra 'Pausada' (não 'Fechado') — story 57", () => {
+    const tree = render(
+      <ProductCard
+        product={PRODUCT}
+        header={{ merchant: "Rede A", logoUrl: null, eta: "30 min", distanceKm: 2, deliveryFeeCents: 500 }}
+        closed
+        paused
+        onAdd={jest.fn()}
+      />,
+    );
+    const text = fullText(tree);
+    expect(text).toContain("Pausada");
+    expect(text).not.toContain("Fechado");
+  });
+
   it("com header e loja aberta NÃO mostra 'Fechado'", () => {
     const tree = render(
       <ProductCard

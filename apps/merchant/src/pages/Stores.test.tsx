@@ -20,6 +20,8 @@ vi.mock("@/api/hooks/useStores", () => ({
 // verificamos o CRUD da loja, então as stubamos para não puxar hooks/React Query.
 vi.mock("@/components/StoreHoursSection", () => ({ StoreHoursSection: () => null }));
 vi.mock("@/components/StoreClosuresSection", () => ({ StoreClosuresSection: () => null }));
+// Story 57: pausa tem teste próprio (PauseStoreControl.test); aqui só o CRUD.
+vi.mock("@/components/PauseStoreControl", () => ({ PauseStoreControl: () => null }));
 
 import { Stores } from "./Stores";
 
@@ -38,6 +40,7 @@ const store = (over: Partial<MerchantStoreDetailDTO> = {}): MerchantStoreDetailD
   longitude: -49.2,
   avgPrepMinutes: 15,
   active: true,
+  pausedAt: null,
   ...over,
 });
 
@@ -68,6 +71,15 @@ describe("Stores (story 08 CRUD)", () => {
     expect(screen.getByText("Loja Sul")).toBeInTheDocument();
     expect(screen.getByText("inativa")).toBeInTheDocument();
     expect(screen.getAllByText(/Rua A, 10, Curitiba, PR/).length).toBeGreaterThan(0);
+  });
+
+  it("marca 'pausada' na lista quando a loja tem pausedAt (story 57)", () => {
+    storesResult = {
+      data: [store({ pausedAt: "2026-07-12T10:00:00.000Z" })],
+      isLoading: false,
+    };
+    render(<Stores />);
+    expect(screen.getByText(/pausada/)).toBeInTheDocument();
   });
 
   it("owner vê botão Nova loja e ações de editar", () => {

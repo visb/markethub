@@ -140,6 +140,7 @@ export default function MarketplaceHome() {
                       deliveryFeeCents: item.deliveryFeeCents,
                     }}
                     closed={!item.openNow}
+                    paused={item.paused}
                     cartLabel={cart.labelFor(item.offerId, item.saleType)}
                     onAdd={() => cart.add(item.offerId, item.saleType)}
                     onInc={() => cart.inc(item.offerId, item.saleType)}

@@ -251,6 +251,18 @@ export class ApiClient {
     return this.request(`/merchant/stores/${id}`, { method: "PATCH", body: patch, auth: true });
   }
 
+  // ─── Merchant / pausa temporária da loja (story 57) — idempotente, owner-only ───
+
+  /** Pausa a loja (bloqueia todo pedido novo). Pausar loja já pausada = no-op. */
+  merchantPauseStore(storeId: string): Promise<MerchantStoreDetailDTO> {
+    return this.request(`/merchant/stores/${storeId}/pause`, { method: "POST", auth: true });
+  }
+
+  /** Retoma a loja (limpa a pausa). Retomar loja já operando = no-op. */
+  merchantResumeStore(storeId: string): Promise<MerchantStoreDetailDTO> {
+    return this.request(`/merchant/stores/${storeId}/resume`, { method: "POST", auth: true });
+  }
+
   // ─── Merchant / horário de funcionamento + fechamentos (story 52) ───
 
   /** Horário semanal da loja (owner-only). */

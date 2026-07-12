@@ -36,12 +36,14 @@ import {
   useOffers,
   useProductUploadUrl,
   useStocks,
+  useToggleOfferAvailable,
   useUnlockOfferField,
   useUnlockStockField,
   useUpdateOffer,
   useUpdateProduct,
   useUpdateStock,
 } from "./useCatalog";
+import { queryKeys } from "@/lib/queryKeys";
 
 const offer: MerchantOffer = {
   id: "o1",
@@ -115,6 +117,33 @@ describe("useCatalog hooks (story 11)", () => {
     expect(merchantUpdateOffer).toHaveBeenCalledWith("o1", { priceCents: 1200 });
     expect(spy).toHaveBeenCalledWith({ queryKey: ["catalog", "offers"] });
     expect(spy).toHaveBeenCalledWith({ queryKey: ["catalog", "stocks"] });
+  });
+
+  it("useToggleOfferAvailable faz update otimista na lista de ofertas (story 57)", async () => {
+    // uma query de ofertas em cache com a oferta disponível
+    const filters = { storeId: "s1" };
+    qc.setQueryData(queryKeys.catalog.offers(filters), [offer]);
+    merchantUpdateOffer.mockResolvedValueOnce({ ...offer, available: false });
+    const { result } = renderHook(() => useToggleOfferAvailable(), { wrapper });
+    result.current.mutate({ id: "o1", available: false });
+    // otimista: o cache reflete `available: false` antes da resposta
+    await waitFor(() => {
+      const cached = qc.getQueryData<MerchantOffer[]>(queryKeys.catalog.offers(filters));
+      expect(cached?.[0].available).toBe(false);
+    });
+    expect(merchantUpdateOffer).toHaveBeenCalledWith("o1", { available: false });
+  });
+
+  it("useToggleOfferAvailable faz rollback do cache em erro (story 57)", async () => {
+    const filters = { storeId: "s1" };
+    qc.setQueryData(queryKeys.catalog.offers(filters), [offer]);
+    merchantUpdateOffer.mockRejectedValueOnce(new Error("falhou"));
+    const { result } = renderHook(() => useToggleOfferAvailable(), { wrapper });
+    result.current.mutate({ id: "o1", available: false });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    // rollback: o snapshot original (available: true) é restaurado
+    const cached = qc.getQueryData<MerchantOffer[]>(queryKeys.catalog.offers(filters));
+    expect(cached?.[0].available).toBe(true);
   });
 
   it("useUnlockOfferField chama DELETE locks e invalida", async () => {

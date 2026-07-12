@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { MerchantOffer } from "@markethub/api-client";
 import { useAuth } from "@/auth/auth-context";
 import {
   createProduct,
@@ -57,6 +58,36 @@ export function useUpdateOffer() {
   return useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: OfferPatch }) => updateOffer(api, id, patch),
     onSuccess: invalidate,
+  });
+}
+
+/**
+ * Toggle inline de `available` da oferta (story 57) com update otimista + rollback.
+ * Vira o switch na hora em todas as listas de oferta em cache (match parcial pela
+ * key `offersAll`); em erro, restaura o snapshot anterior. `available` editado
+ * trava contra o sync ERP (mesma semântica de lock do PATCH de oferta).
+ */
+export function useToggleOfferAvailable() {
+  const { api } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, available }: { id: string; available: boolean }) =>
+      updateOffer(api, id, { available }),
+    onMutate: async ({ id, available }) => {
+      await qc.cancelQueries({ queryKey: queryKeys.catalog.offersAll });
+      const snapshots = qc.getQueriesData<MerchantOffer[]>({ queryKey: queryKeys.catalog.offersAll });
+      qc.setQueriesData<MerchantOffer[]>({ queryKey: queryKeys.catalog.offersAll }, (old) =>
+        old?.map((o) => (o.id === id ? { ...o, available } : o)),
+      );
+      return { snapshots };
+    },
+    onError: (_err, _vars, ctx) => {
+      ctx?.snapshots?.forEach(([key, data]) => qc.setQueryData(key, data));
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.catalog.offersAll });
+      void qc.invalidateQueries({ queryKey: queryKeys.catalog.stocksAll });
+    },
   });
 }
 

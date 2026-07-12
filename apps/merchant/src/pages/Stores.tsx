@@ -7,6 +7,7 @@ import { can } from "@/auth/permissions";
 import { StoreForm, type StoreFormValues, toStorePayload } from "@/components/StoreForm";
 import { StoreHoursSection } from "@/components/StoreHoursSection";
 import { StoreClosuresSection } from "@/components/StoreClosuresSection";
+import { PauseStoreControl } from "@/components/PauseStoreControl";
 
 type View = { mode: "list" } | { mode: "create" } | { mode: "edit"; store: MerchantStoreDetailDTO };
 
@@ -44,6 +45,7 @@ export function Stores() {
               <div>
                 <strong>{s.name}</strong>
                 {!s.active && <span className="badge-muted"> inativa</span>}
+                {s.pausedAt && <span className="badge-paused"> ⏸ pausada</span>}
                 <div className="muted">
                   {[s.street, s.number, s.city, s.state].filter(Boolean).join(", ") || "Sem endereço"}
                 </div>
@@ -112,6 +114,8 @@ function EditStore({ store, onDone }: { store: MerchantStoreDetailDTO; onDone: (
         submitting={mutation.isPending}
         error={error}
       />
+      {/* Pausa temporária (story 57) — mesma capability da edição da loja. */}
+      <PauseStoreControl store={store} />
       {/* Horário + fechamentos excepcionais (story 52) — mesma capability da edição. */}
       <StoreHoursSection storeId={store.id} />
       <StoreClosuresSection storeId={store.id} />

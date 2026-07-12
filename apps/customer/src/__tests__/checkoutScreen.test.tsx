@@ -143,6 +143,32 @@ describe("CheckoutScreen", () => {
     expect(JSON.stringify(tree.toJSON())).toContain("vaga(s)");
   });
 
+  it("loja pausada (STORE_PAUSED): mostra o erro SEM CTA de agendamento (story 57)", async () => {
+    mockRequest.mockImplementation((url: string) => {
+      if (url === "/addresses") return Promise.resolve(ADDR);
+      if (url === "/cart") return Promise.resolve(CART);
+      if (url.endsWith("/slots")) return Promise.resolve(SLOTS);
+      if (url === "/checkout") {
+        return Promise.reject(
+          new ApiClientError(400, {
+            code: "STORE_PAUSED",
+            message: "A loja Rede A está temporariamente pausada e não recebe pedidos no momento.",
+          }),
+        );
+      }
+      return Promise.resolve({});
+    });
+    const tree = await mount();
+    await act(async () => {
+      await proceed(tree).props.onPress();
+    });
+    const text = JSON.stringify(tree.toJSON());
+    expect(text).toContain("temporariamente pausada");
+    // pausa bloqueia tudo → sem CTA de agendar
+    expect(text).not.toContain("Agendar para um horário disponível");
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
   it("agendar: carrega slots; sem slot escolhido não cria pedido, com slot inclui o id", async () => {
     const tree = await mount();
     await act(async () => {

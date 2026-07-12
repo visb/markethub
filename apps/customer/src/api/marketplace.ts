@@ -228,6 +228,8 @@ export interface FeedItem extends ProductView {
   distanceKm: number | null;
   /** Loja aberta agora (story 52) — dirige o selo "Fechado" no card. */
   openNow: boolean;
+  /** Loja em pausa temporária (story 57) — selo "Pausada" no card (pausa força fechado). */
+  paused: boolean;
 }
 export interface FeedSection {
   category: { id: string; name: string; slug: string };
@@ -256,6 +258,8 @@ export interface StoreMeta {
   following: boolean;
   /** Loja aberta agora (story 52). */
   openNow: boolean;
+  /** Loja em pausa temporária (story 57): força `openNow=false` e badge "Pausada". */
+  paused: boolean;
   /** Faixa de hoje (minutos) ou null = hoje fechado (folga/feriado). */
   todayHours: { opensAt: number; closesAt: number } | null;
   /** Próxima abertura (dia da semana + minuto) p/ "abre às HH:MM"; null se sem horário. */

@@ -37,6 +37,7 @@ const SUMMARY: StoreSummaryDTO = {
   doorFeeCents: 1100,
   allowsPickup: true,
   openNow: true,
+  paused: false,
 };
 
 type HookResult = ReturnType<typeof useStoreSummary>;

@@ -33,6 +33,7 @@ const SUMMARY: StoreSummaryDTO = {
   doorFeeCents: 1100,
   allowsPickup: true,
   openNow: true,
+  paused: false,
 };
 
 /** Coleta todas as strings renderadas na árvore (para asserts de conteúdo). */

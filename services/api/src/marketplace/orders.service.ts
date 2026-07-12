@@ -67,12 +67,10 @@ export class OrdersService {
     const totalsByMerchant = new Map(view.totals.groups.map((g) => [g.merchantId, g]));
     const storeIds = view.groups.map((g) => g.storeId);
 
-    // Entrega/retirada imediata (sem slot agendado): a loja precisa estar aberta
-    // agora (story 52). Pedido agendado num slot futuro válido pula a checagem —
-    // o slot já garante uma janela de operação da loja.
-    if (!input.deliverySlotId) {
-      await this.assertStoresOpen(storeIds);
-    }
+    // Loja pausada (story 57) bloqueia TODO pedido novo — imediato E agendado.
+    // Loja fechada por horário (story 52) só bloqueia o imediato: o pedido agendado
+    // num slot futuro válido pula a checagem de abertura (o slot já garante janela).
+    await this.assertStoresAcceptOrders(storeIds, { immediate: !input.deliverySlotId });
 
     const order = await this.prisma.$transaction(async (tx) => {
       // reserva o slot (S5.3) atomicamente; a janela do slot define scheduledFrom/To
@@ -374,23 +372,45 @@ export class OrdersService {
   }
 
   /**
-   * Bloqueia checkout imediato quando alguma loja do carrinho está fechada agora
-   * (story 52). Considera horário semanal + fechamento excepcional do dia. Loja
-   * SEM horário configurado é tratada como disponível (comportamento pré-52 —
-   * `isStoreAvailable`). Em multi-loja, lista as fechadas na mensagem. Lança
-   * `STORE_CLOSED`.
+   * Regras de aceitação de pedido por loja no checkout (stories 52/57):
+   * - Pausa temporária (`pausedAt`) bloqueia SEMPRE (imediato e agendado) →
+   *   `STORE_PAUSED`. É emergência curta; nem o agendamento contorna.
+   * - Fechada por horário (semanal + fechamento excepcional do dia) só bloqueia o
+   *   pedido `immediate` → `STORE_CLOSED` (com CTA de agendar). Loja SEM horário
+   *   configurado é tratada como disponível (comportamento pré-52).
+   * Em multi-loja, lista as lojas bloqueadas na mensagem. A pausa tem precedência.
    */
-  private async assertStoresOpen(storeIds: string[], now: Date = new Date()) {
+  private async assertStoresAcceptOrders(
+    storeIds: string[],
+    opts: { immediate: boolean },
+    now: Date = new Date(),
+  ) {
     if (storeIds.length === 0) return;
     const stores = await this.prisma.store.findMany({
       where: { id: { in: storeIds } },
       select: {
         id: true,
         name: true,
+        pausedAt: true,
         hours: { select: { dayOfWeek: true, opensAt: true, closesAt: true } },
         closures: { select: { date: true } },
       },
     });
+
+    const paused = stores.filter((s) => s.pausedAt != null);
+    if (paused.length > 0) {
+      const names = paused.map((s) => s.name).join(", ");
+      throw new BadRequestException({
+        code: "STORE_PAUSED",
+        message:
+          paused.length === 1
+            ? `A loja ${names} está temporariamente pausada e não recebe pedidos no momento.`
+            : `As lojas ${names} estão temporariamente pausadas e não recebem pedidos no momento.`,
+        stores: paused.map((s) => ({ id: s.id, name: s.name })),
+      });
+    }
+
+    if (!opts.immediate) return;
     const closed = stores.filter(
       (s) => !isStoreAvailable(s.hours, s.closures.map((c) => c.date), now),
     );

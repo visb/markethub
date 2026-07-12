@@ -580,6 +580,7 @@ function makeHours(opts: {
         "store" in opts ? opts.store : { id: "s1", merchantId: "m1" },
       ),
       findMany: jest.fn().mockResolvedValue(stores),
+      update: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: "s1", merchantId: "m1", ...data })),
     },
     storeHours: {
       findMany: hoursFindMany,
@@ -598,7 +599,8 @@ function makeHours(opts: {
   } as never;
   // roles do owner: inclui merchant p/ resolveLevel = owner
   const geocoding = { geocode: jest.fn() } as never;
-  return { svc: new MerchantService(prisma, geocoding, {} as never), prisma, closureCreate, closureDelete };
+  const storeUpdate = (prisma as unknown as { store: { update: jest.Mock } }).store.update;
+  return { svc: new MerchantService(prisma, geocoding, {} as never), prisma, closureCreate, closureDelete, storeUpdate };
 }
 
 const hoursOwner = { id: "u1", roles: ["merchant"] };
@@ -699,6 +701,53 @@ describe("MerchantService — fechamentos excepcionais (story 52)", () => {
     const { svc } = makeHours({ closure: { id: "c1", storeId: "outra" } });
     await expect(svc.removeStoreClosure(hoursOwner, "s1", "c1")).rejects.toMatchObject({
       response: { code: "CLOSURE_NOT_FOUND" },
+    });
+  });
+});
+
+describe("MerchantService — pausa temporária (story 57)", () => {
+  it("pauseStore grava pausedAt quando a loja não está pausada", async () => {
+    const { svc, storeUpdate } = makeHours({ store: { id: "s1", merchantId: "m1", pausedAt: null } });
+    const out = await svc.pauseStore(hoursOwner, "s1");
+    expect(storeUpdate).toHaveBeenCalledTimes(1);
+    expect(storeUpdate.mock.calls[0][0].data.pausedAt).toBeInstanceOf(Date);
+    expect(out.pausedAt).toBeInstanceOf(Date);
+  });
+
+  it("pauseStore é idempotente: loja já pausada → no-op, preserva o pausedAt original", async () => {
+    const since = new Date("2026-07-12T10:00:00Z");
+    const { svc, storeUpdate } = makeHours({ store: { id: "s1", merchantId: "m1", pausedAt: since } });
+    const out = await svc.pauseStore(hoursOwner, "s1");
+    expect(storeUpdate).not.toHaveBeenCalled();
+    expect(out.pausedAt).toBe(since);
+  });
+
+  it("resumeStore limpa pausedAt quando a loja está pausada", async () => {
+    const since = new Date("2026-07-12T10:00:00Z");
+    const { svc, storeUpdate } = makeHours({ store: { id: "s1", merchantId: "m1", pausedAt: since } });
+    const out = await svc.resumeStore(hoursOwner, "s1");
+    expect(storeUpdate).toHaveBeenCalledWith({ where: { id: "s1" }, data: { pausedAt: null } });
+    expect(out.pausedAt).toBeNull();
+  });
+
+  it("resumeStore é idempotente: loja já operando → no-op", async () => {
+    const { svc, storeUpdate } = makeHours({ store: { id: "s1", merchantId: "m1", pausedAt: null } });
+    await svc.resumeStore(hoursOwner, "s1");
+    expect(storeUpdate).not.toHaveBeenCalled();
+  });
+
+  it("manager (não-owner) → FORBIDDEN NOT_AN_OWNER (mesma capability da edição)", async () => {
+    const { svc, storeUpdate } = makeHours({ owner: false });
+    await expect(svc.pauseStore(hoursManager, "s1")).rejects.toMatchObject({
+      response: { code: "NOT_AN_OWNER" },
+    });
+    expect(storeUpdate).not.toHaveBeenCalled();
+  });
+
+  it("loja inexistente → STORE_NOT_FOUND", async () => {
+    const { svc } = makeHours({ store: null });
+    await expect(svc.pauseStore(hoursOwner, "s1")).rejects.toMatchObject({
+      response: { code: "STORE_NOT_FOUND" },
     });
   });
 });

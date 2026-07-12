@@ -83,13 +83,13 @@ function makeDeps(opts: {
   order?: Record<string, unknown> | null;
   tasks?: { id: string; status: string }[];
   slotWindow?: { start: Date; end: Date };
-  /** Lojas devolvidas por store.findMany na checagem STORE_CLOSED (story 52). */
-  stores?: { id: string; name: string; hours: unknown[]; closures: unknown[] }[];
+  /** Lojas devolvidas por store.findMany nas checagens STORE_CLOSED/STORE_PAUSED (stories 52/57). */
+  stores?: { id: string; name: string; pausedAt?: Date | null; hours: unknown[]; closures: unknown[] }[];
 } = {}) {
   const view = opts.view ?? makeView();
   const openStores =
     opts.stores ??
-    view.groups.map((g) => ({ id: g.storeId, name: `Loja ${g.storeId}`, hours: ALWAYS_OPEN_HOURS, closures: [] }));
+    view.groups.map((g) => ({ id: g.storeId, name: `Loja ${g.storeId}`, pausedAt: null, hours: ALWAYS_OPEN_HOURS, closures: [] }));
 
   const tx = {
     order: {
@@ -332,19 +332,58 @@ describe("OrdersService.checkout", () => {
     }
   });
 
-  it("agendado com slot futuro válido passa (não consulta abertura)", async () => {
+  it("agendado com slot futuro válido passa mesmo com a loja fechada por horário (story 52)", async () => {
+    const now = new Date("2026-06-28T12:00:00Z"); // domingo 09:00 São Paulo
     const order = { id: "order1", userId: "u1", status: "created", groups: [] };
     const window = { start: new Date("2026-06-29T10:00:00Z"), end: new Date("2026-06-29T11:00:00Z") };
-    const { svc, tx, prisma } = makeDeps({
+    const { svc, tx } = makeDeps({
       address: validAddress,
       order,
       slotWindow: window,
-      stores: [{ id: "store1", name: "Europa Centro", hours: [], closures: [] }],
+      // aberta só na segunda → domingo fechada, mas o slot agendado ignora STORE_CLOSED
+      stores: [{ id: "store1", name: "Europa Centro", pausedAt: null, hours: [{ dayOfWeek: 1, opensAt: 480, closesAt: 1320 }], closures: [] }],
     });
-    await svc.checkout("u1", { ...deliveryInput, deliverySlotId: "slot1" });
-    // não consulta o estado de abertura quando há slot agendado
-    expect((prisma as never as { store: { findMany: jest.Mock } }).store.findMany).not.toHaveBeenCalled();
-    expect(tx.order.create).toHaveBeenCalled();
+    jest.useFakeTimers().setSystemTime(now);
+    try {
+      await svc.checkout("u1", { ...deliveryInput, deliverySlotId: "slot1" });
+      expect(tx.order.create).toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("loja pausada (story 57) → STORE_PAUSED no checkout imediato", async () => {
+    const order = { id: "order1", userId: "u1", status: "created", groups: [] };
+    const { svc, tx } = makeDeps({
+      address: validAddress,
+      order,
+      stores: [
+        { id: "store1", name: "Europa Centro", pausedAt: new Date("2026-06-28T10:00:00Z"), hours: ALWAYS_OPEN_HOURS, closures: [] },
+      ],
+    });
+    await expect(svc.checkout("u1", deliveryInput)).rejects.toMatchObject({
+      response: { code: "STORE_PAUSED", stores: [{ id: "store1", name: "Europa Centro" }] },
+    });
+    expect(tx.order.create).not.toHaveBeenCalled();
+  });
+
+  it("loja pausada (story 57) bloqueia até o pedido AGENDADO com slot → STORE_PAUSED", async () => {
+    const order = { id: "order1", userId: "u1", status: "created", groups: [] };
+    const window = { start: new Date("2026-06-29T10:00:00Z"), end: new Date("2026-06-29T11:00:00Z") };
+    const { svc, tx, scheduling } = makeDeps({
+      address: validAddress,
+      order,
+      slotWindow: window,
+      stores: [
+        { id: "store1", name: "Europa Centro", pausedAt: new Date("2026-06-28T10:00:00Z"), hours: ALWAYS_OPEN_HOURS, closures: [] },
+      ],
+    });
+    await expect(
+      svc.checkout("u1", { ...deliveryInput, deliverySlotId: "slot1" }),
+    ).rejects.toMatchObject({ response: { code: "STORE_PAUSED" } });
+    expect(tx.order.create).not.toHaveBeenCalled();
+    // a pausa é checada antes de reservar o slot
+    expect(scheduling.reserveInTx).not.toHaveBeenCalled();
   });
 
   it("multi-loja: lista apenas a(s) fechada(s) na mensagem", async () => {
