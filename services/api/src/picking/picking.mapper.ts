@@ -31,6 +31,9 @@ export function toPickItemDto(pi: PickItemWithRels) {
     id: pi.id,
     orderItemId: pi.orderItemId,
     nameSnapshot: oi.nameSnapshot,
+    // GTIN gravado no snapshot do item no fechamento do pedido — evita join com
+    // Product e expõe o código p/ o scanner do separador (story 63).
+    gtin: oi.gtinSnapshot ?? undefined,
     saleType: oi.saleType,
     status: pi.status,
     quantity: oi.quantity,
