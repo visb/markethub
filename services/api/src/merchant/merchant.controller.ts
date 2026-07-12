@@ -42,6 +42,10 @@ class CreateStoreDto {
   @IsOptional() @IsNumber() longitude?: number | null;
   @IsOptional() @IsInt() @Min(0) avgPrepMinutes?: number;
   @IsOptional() @IsBoolean() active?: boolean;
+  // Config de entrega por loja (story 58) — `null` = herda da rede.
+  @IsOptional() @IsInt() @Min(0) deliveryFeeCents?: number | null;
+  @IsOptional() @IsInt() @Min(0) minOrderCents?: number | null;
+  @IsOptional() @IsNumber() @Min(0) deliveryRadiusKm?: number | null;
 }
 
 class UpdateStoreDto {
@@ -57,6 +61,10 @@ class UpdateStoreDto {
   @IsOptional() @IsNumber() longitude?: number | null;
   @IsOptional() @IsInt() @Min(0) avgPrepMinutes?: number;
   @IsOptional() @IsBoolean() active?: boolean;
+  // Config de entrega por loja (story 58) — `null` explícito volta a herdar da rede.
+  @IsOptional() @IsInt() @Min(0) deliveryFeeCents?: number | null;
+  @IsOptional() @IsInt() @Min(0) minOrderCents?: number | null;
+  @IsOptional() @IsNumber() @Min(0) deliveryRadiusKm?: number | null;
 }
 
 /** Uma faixa abre–fecha de um dia (minutos desde a meia-noite) — story 52. */

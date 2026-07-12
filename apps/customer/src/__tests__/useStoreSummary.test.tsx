@@ -35,6 +35,8 @@ const SUMMARY: StoreSummaryDTO = {
   etaMinutes: 30,
   deliveryFeeCents: 700,
   doorFeeCents: 1100,
+  minOrderCents: null,
+  deliveryRadiusKm: null,
   allowsPickup: true,
   openNow: true,
   paused: false,

@@ -32,9 +32,11 @@ export default function CheckoutScreen() {
   const [slots, setSlots] = useState<SlotView[]>([]);
   const [slotId, setSlotId] = useState<string | null>(null);
   const [cart, setCart] = useState<CartView | null>(null);
-  // Erro de checkout: `closed` (STORE_CLOSED — story 52) habilita o CTA de agendar;
-  // STORE_PAUSED (story 57) mostra só a mensagem, SEM CTA (pausa bloqueia tudo).
-  const [checkoutError, setCheckoutError] = useState<{ message: string; closed: boolean } | null>(null);
+  // Erro de checkout + código p/ escolher o CTA:
+  // - STORE_CLOSED (story 52) → CTA "agendar";
+  // - OUT_OF_DELIVERY_AREA (story 58) → CTA "retirar na loja" (quando permitido);
+  // - MIN_ORDER_NOT_MET (story 58) / STORE_PAUSED (story 57) → só a mensagem.
+  const [checkoutError, setCheckoutError] = useState<{ message: string; code: string | null } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -80,9 +82,9 @@ export default function CheckoutScreen() {
       router.replace(`/payment/${order.id}`);
     } catch (e) {
       if (e instanceof ApiClientError) {
-        setCheckoutError({ message: e.body.message, closed: e.body.code === "STORE_CLOSED" });
+        setCheckoutError({ message: e.body.message, code: e.body.code });
       } else {
-        setCheckoutError({ message: "Não foi possível finalizar o pedido.", closed: false });
+        setCheckoutError({ message: "Não foi possível finalizar o pedido.", code: null });
       }
     } finally {
       setPlacing(false);
@@ -95,6 +97,12 @@ export default function CheckoutScreen() {
     setWhen("schedule");
   }
 
+  /** CTA de OUT_OF_DELIVERY_AREA: troca para retirada na loja (story 58). */
+  function switchToPickup() {
+    setCheckoutError(null);
+    setFulfillment("pickup");
+  }
+
   if (loading) {
     return (
       <SafeAreaView style={styles.flex} edges={["top"]}>
@@ -105,6 +113,8 @@ export default function CheckoutScreen() {
   }
 
   const addr = addresses.find((a) => a.id === selected);
+  // Retirada só é sugerida quando todas as lojas do carrinho a permitem (story 58).
+  const canPickup = cart?.groups.every((g) => g.allowsPickup) ?? false;
 
   return (
     <SafeAreaView style={styles.flex} edges={["top"]}>
@@ -234,10 +244,17 @@ export default function CheckoutScreen() {
               <Text variant="caption" style={{ color: colors.danger }}>
                 {checkoutError.message}
               </Text>
-              {checkoutError.closed && (
+              {checkoutError.code === "STORE_CLOSED" && (
                 <Pressable onPress={goToSchedule}>
                   <Text variant="caption" style={styles.scheduleCta}>
                     Agendar para um horário disponível
+                  </Text>
+                </Pressable>
+              )}
+              {checkoutError.code === "OUT_OF_DELIVERY_AREA" && canPickup && (
+                <Pressable onPress={switchToPickup}>
+                  <Text variant="caption" style={styles.scheduleCta}>
+                    Trocar para retirada na loja
                   </Text>
                 </Pressable>
               )}

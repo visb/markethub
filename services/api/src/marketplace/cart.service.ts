@@ -166,10 +166,14 @@ export class CartService {
         avgPrepMinutes: st.avgPrepMinutes,
       });
       const merchant = its[0]!.offer.store.merchant;
+      // Taxa efetiva do grupo (story 58): override da loja tem prioridade sobre a
+      // tarifa da rede; retirada na loja não cobra frete. Pedido mínimo é só da loja
+      // (a rede não tem mínimo): `null` = sem mínimo.
+      const effectiveDeliveryFeeCents = st.deliveryFeeCents ?? merchant.deliveryFeeCents;
+      const minOrderCents = st.minOrderCents;
       calcGroups.push({
         merchantId: mid,
-        // retirada na loja não cobra frete
-        deliveryFeeCents: opts.pickup ? 0 : merchant.deliveryFeeCents,
+        deliveryFeeCents: opts.pickup ? 0 : effectiveDeliveryFeeCents,
         prepFeeCents: merchant.prepFeeCents,
         platformFeeBps: merchant.platformFeeBps,
         items: its.map((it) => ({
@@ -184,6 +188,10 @@ export class CartService {
         merchant: merchant.name,
         merchantLogoUrl: merchant.logoUrl,
         storeId: its[0]!.offer.storeId,
+        // Config de entrega por loja exposta ao carrinho (story 58).
+        deliveryFeeCents: opts.pickup ? 0 : effectiveDeliveryFeeCents,
+        minOrderCents,
+        allowsPickup: st.allowsPickup,
         items: its.map((it) => ({
           id: it.id,
           offerId: it.offerId,
@@ -206,14 +214,23 @@ export class CartService {
     const totals = computeCart(calcGroups, { coupon, doorSurchargeCents });
     const etaByStore = await this.groupEta(cartId, groupStores);
 
+    const subtotalByMerchant = new Map(totals.groups.map((g) => [g.merchantId, g.subtotalCents]));
     return {
       couponCode,
       itemCount: items.length,
-      groups: viewGroups.map((g) => ({
-        ...g,
-        etaMinutes: etaByStore.get(g.storeId)?.etaMinutes ?? null,
-        distanceKm: etaByStore.get(g.storeId)?.distanceKm ?? null,
-      })),
+      groups: viewGroups.map((g) => {
+        // Progresso rumo ao pedido mínimo da loja (story 58): 0 quando não há
+        // mínimo ou já foi atingido.
+        const subtotal = subtotalByMerchant.get(g.merchantId) ?? 0;
+        const missingForMinCents =
+          g.minOrderCents != null ? Math.max(0, g.minOrderCents - subtotal) : 0;
+        return {
+          ...g,
+          etaMinutes: etaByStore.get(g.storeId)?.etaMinutes ?? null,
+          distanceKm: etaByStore.get(g.storeId)?.distanceKm ?? null,
+          missingForMinCents,
+        };
+      }),
       totals,
     };
   }

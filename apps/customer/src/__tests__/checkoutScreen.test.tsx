@@ -28,7 +28,7 @@ const ADDR: Address[] = [
 const CART: CartView = {
   couponCode: "PROMO",
   itemCount: 1,
-  groups: [{ merchantId: "m1", merchant: "Rede A", merchantLogoUrl: null, storeId: "s1", etaMinutes: 30, distanceKm: 2, items: [] }],
+  groups: [{ merchantId: "m1", merchant: "Rede A", merchantLogoUrl: null, storeId: "s1", etaMinutes: 30, distanceKm: 2, deliveryFeeCents: 800, minOrderCents: null, missingForMinCents: 0, allowsPickup: true, items: [] }],
   totals: { itemsCents: 5000, deliveryCents: 800, prepCents: 0, platformFeeCents: 200, discountCents: 500, doorSurchargeCents: 0, totalCents: 5500, groups: [] },
 };
 const SLOTS: SlotView[] = [
@@ -165,6 +165,64 @@ describe("CheckoutScreen", () => {
     const text = JSON.stringify(tree.toJSON());
     expect(text).toContain("temporariamente pausada");
     // pausa bloqueia tudo → sem CTA de agendar
+    expect(text).not.toContain("Agendar para um horário disponível");
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it("fora do raio (OUT_OF_DELIVERY_AREA): mostra o erro e o CTA de retirada (story 58)", async () => {
+    mockRequest.mockImplementation((url: string) => {
+      if (url === "/addresses") return Promise.resolve(ADDR);
+      if (url === "/cart") return Promise.resolve(CART);
+      if (url.endsWith("/slots")) return Promise.resolve(SLOTS);
+      if (url === "/checkout") {
+        return Promise.reject(
+          new ApiClientError(400, {
+            code: "OUT_OF_DELIVERY_AREA",
+            message: "A loja Rede A não entrega no endereço selecionado (fora do raio de cobertura).",
+          }),
+        );
+      }
+      return Promise.resolve({});
+    });
+    const tree = await mount();
+    await act(async () => {
+      await proceed(tree).props.onPress();
+    });
+    const text = JSON.stringify(tree.toJSON());
+    expect(text).toContain("fora do raio de cobertura");
+    expect(text).toContain("Trocar para retirada na loja");
+    expect(mockReplace).not.toHaveBeenCalled();
+    // CTA troca para retirada → o próximo checkout vai como pickup
+    act(() => radio(tree, "Trocar para retirada na loja").props.onPress());
+    mockRequest.mockImplementation(defaultRequest);
+    await act(async () => {
+      await proceed(tree).props.onPress();
+    });
+    expect(checkoutBody.last).toEqual({ fulfillment: "pickup", deliverySlotId: null });
+  });
+
+  it("pedido mínimo (MIN_ORDER_NOT_MET): mostra o erro sem CTA (story 58)", async () => {
+    mockRequest.mockImplementation((url: string) => {
+      if (url === "/addresses") return Promise.resolve(ADDR);
+      if (url === "/cart") return Promise.resolve(CART);
+      if (url.endsWith("/slots")) return Promise.resolve(SLOTS);
+      if (url === "/checkout") {
+        return Promise.reject(
+          new ApiClientError(400, {
+            code: "MIN_ORDER_NOT_MET",
+            message: "O pedido mínimo da loja Rede A não foi atingido.",
+          }),
+        );
+      }
+      return Promise.resolve({});
+    });
+    const tree = await mount();
+    await act(async () => {
+      await proceed(tree).props.onPress();
+    });
+    const text = JSON.stringify(tree.toJSON());
+    expect(text).toContain("O pedido mínimo da loja Rede A não foi atingido.");
+    expect(text).not.toContain("Trocar para retirada na loja");
     expect(text).not.toContain("Agendar para um horário disponível");
     expect(mockReplace).not.toHaveBeenCalled();
   });

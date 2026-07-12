@@ -16,8 +16,11 @@ function makeService(opts: {
   hasAdminLink?: boolean;
 }) {
   const stores = opts.stores ?? [];
-  const create = jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: "new", ...data }));
-  const update = jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: "s1", ...data }));
+  // Story 58: create/update/list incluem merchant.deliveryFeeCents (achatado em
+  // merchantDeliveryFeeCents por toStoreDetail) — o mock devolve o relation.
+  const NETWORK_FEE = { merchant: { deliveryFeeCents: 700 } };
+  const create = jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: "new", ...data, ...NETWORK_FEE }));
+  const update = jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: "s1", ...data, ...NETWORK_FEE }));
   const prisma = {
     storeStaff: {
       findMany: jest
@@ -27,7 +30,7 @@ function makeService(opts: {
     },
     store: {
       findUnique: jest.fn().mockResolvedValue(opts.store ?? null),
-      findMany: jest.fn().mockResolvedValue(stores),
+      findMany: jest.fn().mockResolvedValue(stores.map((s) => ({ ...s, ...NETWORK_FEE }))),
       create,
       update,
     },
@@ -223,6 +226,76 @@ describe("MerchantService — lojas (story 08)", () => {
       const { svc, update } = makeService({ stores: [ownerStore], store: existing });
       await svc.updateStore(owner, "s1", { active: false });
       expect(update.mock.calls[0][0].data).toEqual({ active: false });
+    });
+
+    // ── Story 58: config de entrega por loja ──
+
+    it("grava override de taxa/mínimo/raio da loja", async () => {
+      const { svc, update } = makeService({ stores: [ownerStore], store: existing });
+      await svc.updateStore(owner, "s1", { deliveryFeeCents: 250, minOrderCents: 3000, deliveryRadiusKm: 5 });
+      expect(update.mock.calls[0][0].data).toEqual({ deliveryFeeCents: 250, minOrderCents: 3000, deliveryRadiusKm: 5 });
+    });
+
+    it("null explícito volta a herdar (undefined ≠ null)", async () => {
+      const { svc, update } = makeService({ stores: [ownerStore], store: existing });
+      await svc.updateStore(owner, "s1", { deliveryFeeCents: null, minOrderCents: null, deliveryRadiusKm: null });
+      expect(update.mock.calls[0][0].data).toEqual({ deliveryFeeCents: null, minOrderCents: null, deliveryRadiusKm: null });
+    });
+
+    it("campo ausente (undefined) não entra no update", async () => {
+      const { svc, update } = makeService({ stores: [ownerStore], store: existing });
+      await svc.updateStore(owner, "s1", { deliveryFeeCents: 250 });
+      expect(update.mock.calls[0][0].data).toEqual({ deliveryFeeCents: 250 });
+    });
+
+    it("taxa negativa → BadRequest INVALID_DELIVERY_FEE (não atualiza)", async () => {
+      const { svc, update } = makeService({ stores: [ownerStore], store: existing });
+      await expect(svc.updateStore(owner, "s1", { deliveryFeeCents: -1 })).rejects.toMatchObject({
+        response: expect.objectContaining({ code: "INVALID_DELIVERY_FEE" }),
+      });
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it("raio negativo → BadRequest INVALID_DELIVERY_RADIUS (não atualiza)", async () => {
+      const { svc, update } = makeService({ stores: [ownerStore], store: existing });
+      await expect(svc.updateStore(owner, "s1", { deliveryRadiusKm: -3 })).rejects.toMatchObject({
+        response: expect.objectContaining({ code: "INVALID_DELIVERY_RADIUS" }),
+      });
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it("expõe merchantDeliveryFeeCents (placeholder da rede) no detalhe", async () => {
+      const { svc } = makeService({ stores: [ownerStore], store: existing });
+      const res = await svc.updateStore(owner, "s1", { name: "N" });
+      expect((res as { merchantDeliveryFeeCents: number }).merchantDeliveryFeeCents).toBe(700);
+    });
+  });
+
+  describe("createStore — config de entrega (story 58)", () => {
+    it("grava taxa/mínimo/raio informados", async () => {
+      const { svc, create } = makeService({ stores: [ownerStore] });
+      await svc.createStore(owner, { name: "N", deliveryFeeCents: 500, minOrderCents: 2000, deliveryRadiusKm: 8 });
+      const data = create.mock.calls[0][0].data;
+      expect(data.deliveryFeeCents).toBe(500);
+      expect(data.minOrderCents).toBe(2000);
+      expect(data.deliveryRadiusKm).toBe(8);
+    });
+
+    it("sem config → herda (null)", async () => {
+      const { svc, create } = makeService({ stores: [ownerStore] });
+      await svc.createStore(owner, { name: "N" });
+      const data = create.mock.calls[0][0].data;
+      expect(data.deliveryFeeCents).toBeNull();
+      expect(data.minOrderCents).toBeNull();
+      expect(data.deliveryRadiusKm).toBeNull();
+    });
+
+    it("mínimo negativo → BadRequest INVALID_MIN_ORDER (não cria)", async () => {
+      const { svc, create } = makeService({ stores: [ownerStore] });
+      await expect(svc.createStore(owner, { name: "N", minOrderCents: -5 })).rejects.toMatchObject({
+        response: expect.objectContaining({ code: "INVALID_MIN_ORDER" }),
+      });
+      expect(create).not.toHaveBeenCalled();
     });
   });
 });

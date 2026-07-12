@@ -29,6 +29,10 @@ export interface CreateStoreInput extends StoreAddressInput {
   active?: boolean;
   latitude?: number | null;
   longitude?: number | null;
+  // Config de entrega por loja (story 58); `null`/ausente = herda da rede.
+  deliveryFeeCents?: number | null;
+  minOrderCents?: number | null;
+  deliveryRadiusKm?: number | null;
 }
 
 export interface UpdateStoreInput extends StoreAddressInput {
@@ -38,6 +42,10 @@ export interface UpdateStoreInput extends StoreAddressInput {
   active?: boolean;
   latitude?: number | null;
   longitude?: number | null;
+  // Config de entrega por loja (story 58); `null` explícito = voltar a herdar.
+  deliveryFeeCents?: number | null;
+  minOrderCents?: number | null;
+  deliveryRadiusKm?: number | null;
 }
 
 const ADDRESS_FIELDS = ["street", "number", "district", "city", "state", "zipCode"] as const;
@@ -141,7 +149,39 @@ export class MerchantService {
       ? { merchantId: { in: [...new Set(scoped.map((s) => s.merchantId))] } }
       : { id: { in: scoped.map((s) => s.id) } };
 
-    return this.prisma.store.findMany({ where, orderBy: { name: "asc" } });
+    const stores = await this.prisma.store.findMany({
+      where,
+      orderBy: { name: "asc" },
+      include: { merchant: { select: { deliveryFeeCents: true } } },
+    });
+    return stores.map((s) => this.toStoreDetail(s));
+  }
+
+  /**
+   * Achata a loja p/ o app merchant expondo `merchantDeliveryFeeCents` (tarifa da
+   * rede) — usado como placeholder do campo de taxa quando a loja herda (story 58).
+   */
+  private toStoreDetail<T extends { merchant: { deliveryFeeCents: number } }>(store: T) {
+    const { merchant, ...rest } = store;
+    return { ...rest, merchantDeliveryFeeCents: merchant.deliveryFeeCents };
+  }
+
+  /**
+   * Valida um valor monetário/numérico opcional de config de entrega (story 58):
+   * `undefined` = campo ausente (ignora); `null` = voltar a herdar (aceito); número
+   * precisa ser >= 0. Negativo/NaN → BadRequest com o `code` informado.
+   */
+  private assertOptionalNonNegative(
+    value: number | null | undefined,
+    code: string,
+    message: string,
+    opts: { integer?: boolean } = {},
+  ) {
+    if (value === undefined || value === null) return;
+    const invalid = typeof value !== "number" || Number.isNaN(value) || value < 0 || (opts.integer && !Number.isInteger(value));
+    if (invalid) {
+      throw new BadRequestException({ code, message });
+    }
   }
 
   /**
@@ -214,7 +254,11 @@ export class MerchantService {
       }
     }
 
-    return this.prisma.store.create({
+    this.assertOptionalNonNegative(input.deliveryFeeCents, "INVALID_DELIVERY_FEE", "Taxa de entrega inválida", { integer: true });
+    this.assertOptionalNonNegative(input.minOrderCents, "INVALID_MIN_ORDER", "Pedido mínimo inválido", { integer: true });
+    this.assertOptionalNonNegative(input.deliveryRadiusKm, "INVALID_DELIVERY_RADIUS", "Raio de entrega inválido");
+
+    const store = await this.prisma.store.create({
       data: {
         merchantId,
         name: input.name,
@@ -229,8 +273,13 @@ export class MerchantService {
         longitude: longitude ?? null,
         avgPrepMinutes: input.avgPrepMinutes ?? 15,
         active: input.active ?? true,
+        deliveryFeeCents: input.deliveryFeeCents ?? null,
+        minOrderCents: input.minOrderCents ?? null,
+        deliveryRadiusKm: input.deliveryRadiusKm ?? null,
       },
+      include: { merchant: { select: { deliveryFeeCents: true } } },
     });
+    return this.toStoreDetail(store);
   }
 
   async updateStore(user: { id: string; roles: string[] }, storeId: string, patch: UpdateStoreInput) {
@@ -241,11 +290,20 @@ export class MerchantService {
     }
     await this.assertOwnsStore(user.id, store.merchantId);
 
+    this.assertOptionalNonNegative(patch.deliveryFeeCents, "INVALID_DELIVERY_FEE", "Taxa de entrega inválida", { integer: true });
+    this.assertOptionalNonNegative(patch.minOrderCents, "INVALID_MIN_ORDER", "Pedido mínimo inválido", { integer: true });
+    this.assertOptionalNonNegative(patch.deliveryRadiusKm, "INVALID_DELIVERY_RADIUS", "Raio de entrega inválido");
+
     const data: Prisma.StoreUpdateInput = {};
     if (patch.name !== undefined) data.name = patch.name;
     if (patch.externalId !== undefined) data.externalId = patch.externalId;
     if (patch.avgPrepMinutes !== undefined) data.avgPrepMinutes = patch.avgPrepMinutes;
     if (patch.active !== undefined) data.active = patch.active;
+    // Config de entrega por loja (story 58): `null` explícito volta a herdar da
+    // rede (undefined ≠ null — o padrão de PATCH parcial do repo).
+    if (patch.deliveryFeeCents !== undefined) data.deliveryFeeCents = patch.deliveryFeeCents;
+    if (patch.minOrderCents !== undefined) data.minOrderCents = patch.minOrderCents;
+    if (patch.deliveryRadiusKm !== undefined) data.deliveryRadiusKm = patch.deliveryRadiusKm;
     for (const f of ADDRESS_FIELDS) {
       if (patch[f] !== undefined) data[f] = patch[f];
     }
@@ -276,7 +334,12 @@ export class MerchantService {
       throw new BadRequestException({ code: "NO_FIELDS", message: "Nenhum campo para atualizar" });
     }
 
-    return this.prisma.store.update({ where: { id: storeId }, data });
+    const updated = await this.prisma.store.update({
+      where: { id: storeId },
+      data,
+      include: { merchant: { select: { deliveryFeeCents: true } } },
+    });
+    return this.toStoreDetail(updated);
   }
 
   /** Garante que a rede da loja pertence ao dono. */
