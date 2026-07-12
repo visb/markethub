@@ -27,7 +27,7 @@ Cuidados da rodada:
 | 54 | merchant — detalhe do pedido, cancelamento por grupo, alerta | — | done |
 | 55 | merchant — gestão de slots de agendamento | — | done |
 | 56 | reviews — resposta do lojista + vitrine pública | — | done |
-| 57 | merchant — pausar loja + toggle de disponibilidade | 52 | todo |
+| 57 | merchant — pausar loja + toggle de disponibilidade | 52 | done |
 | 58 | config de entrega por loja — taxa, mínimo, raio | — | todo |
 | 59 | driver — mapa da entrega + navegação externa | — | todo |
 | 60 | driver — ganhos (gorjetas) e histórico | — | todo |
@@ -53,3 +53,4 @@ Cuidados da rodada:
 [OK] 54 — testes: api 1190/1190, merchant 226/226, api-client 56/56 — merge: f13f355 — arquivada em done/ — 2026-07-11 — migration enum group_canceled não aplicada (Docker down; unit/mock). PENDENTE-MANUAL: `prisma:migrate deploy`. DÉBITO CONHECIDO: `@markethub/api-client test:coverage` perFile 98% vermelho — baseline da story 52 (métodos store-hours sem teste em client.test.ts, ~linhas 252-272/381-424); diff da 54 está 100% coberto (subiu p/ 91.77%). Drenar antes de fechar a rodada (candidato p/ story 72/cleanup).
 [OK] 55 — testes: api 1193/1193, api-client 57/57, merchant 268/268 — merge: 1c6a5e7 — arquivada em done/ — 2026-07-11 — sem migration (DeliverySlot já existia). Nota: `slots.manage` na matriz do front (permissions.ts); backend store/slots faz upsert (sem 409 real), gerador em lote trata 409→pulado defensivo client-side. Endpoints scheduling têm @Roles(merchant,admin) — gerente pode não passar no guard de rota (pré-existente, fora de escopo).
 [OK] 56 — testes: api 1217/1217, customer 244/244, merchant 281/281, api-client 58/58 — merge: 18c8dd1 — arquivada em done/ — 2026-07-12 — migration story56_review_reply autorada, NÃO aplicada (Postgres P1001 localhost:5433). PENDENTE-MANUAL: `prisma migrate deploy`. Débito api-client perFile não piorado (3 métodos novos 100%). Dep 56→68 satisfeita.
+[OK] 57 — testes: api 1250/1250, customer 247/247, merchant 293/293, api-client 59/59 — merge: 4c0a308 — arquivada em done/ — 2026-07-12 — migration story57_store_paused_at autorada, NÃO aplicada (Docker down). PENDENTE-MANUAL: `prisma migrate deploy`. Dep 52→57 satisfeita. STORE_PAUSED bloqueia imediato E agendado (vs STORE_CLOSED). Débito api-client perFile não piorado.
