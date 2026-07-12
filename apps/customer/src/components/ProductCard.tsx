@@ -22,6 +22,8 @@ interface ProductCardProps {
   cartLabel?: string | null;
   /** Loja fechada agora (story 52) → selo discreto "Fechado" no card. */
   closed?: boolean;
+  /** Loja em pausa temporária (story 57) → selo "Pausada" (tem precedência sobre "Fechado"). */
+  paused?: boolean;
   onAdd: () => void;
   onDec?: () => void;
   onInc?: () => void;
@@ -34,6 +36,7 @@ export function ProductCard({
   header,
   cartLabel,
   closed,
+  paused,
   onAdd,
   onDec,
   onInc,
@@ -63,7 +66,11 @@ export function ProductCard({
             <Text variant="caption" muted>
               {header.eta}
             </Text>
-            {closed ? (
+            {paused ? (
+              <View style={styles.closedChip}>
+                <Text style={styles.closedChipText}>Pausada</Text>
+              </View>
+            ) : closed ? (
               <View style={styles.closedChip}>
                 <Text style={styles.closedChipText}>Fechado</Text>
               </View>

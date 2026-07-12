@@ -430,6 +430,29 @@ export class MerchantService {
     return { removed: true };
   }
 
+  // ── Pausa temporária da loja (story 57) ──
+  // Mesma capability da edição de loja: owner-only (nível de rede). Idempotente —
+  // pausar/retomar repetido é no-op. Independente de `active` e do horário semanal.
+
+  /**
+   * Pausa a loja (emergência: rush, falta de picker, problema operacional). Grava
+   * `pausedAt = now` na primeira vez; pausar loja já pausada preserva o timestamp
+   * original ("pausada desde HH:MM" não reinicia). Bloqueia todo pedido novo,
+   * inclusive agendado (checkout → STORE_PAUSED).
+   */
+  async pauseStore(user: { id: string; roles: string[] }, storeId: string) {
+    const store = await this.assertOwnerOfStore(user, storeId);
+    if (store.pausedAt) return store; // idempotente: preserva o "desde" original
+    return this.prisma.store.update({ where: { id: storeId }, data: { pausedAt: new Date() } });
+  }
+
+  /** Retoma a loja (limpa `pausedAt`). Retomar loja já ativa é no-op idempotente. */
+  async resumeStore(user: { id: string; roles: string[] }, storeId: string) {
+    const store = await this.assertOwnerOfStore(user, storeId);
+    if (!store.pausedAt) return store; // idempotente: já operando
+    return this.prisma.store.update({ where: { id: storeId }, data: { pausedAt: null } });
+  }
+
   // ── Pedidos (story 12) ──
 
   /**

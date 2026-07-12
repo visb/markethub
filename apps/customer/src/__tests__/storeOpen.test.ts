@@ -39,4 +39,15 @@ describe("storeOpen (story 52)", () => {
   it("fechada sem próxima abertura → 'Fechado'", () => {
     expect(storeOpenLabel({ openNow: false, todayHours: null, nextOpen: null })).toBe("Fechado");
   });
+
+  it("pausada (story 57) → 'Pausada' com precedência sobre o horário", () => {
+    // mesmo com abertura futura (estaria "Fechado · abre..."), a pausa vence.
+    const label = storeOpenLabel({
+      openNow: false,
+      paused: true,
+      todayHours: null,
+      nextOpen: { dayOfWeek: 3, opensAt: 480 },
+    });
+    expect(label).toBe("Pausada");
+  });
 });

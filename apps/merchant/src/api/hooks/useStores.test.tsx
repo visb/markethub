@@ -6,16 +6,24 @@ import type { MerchantStoreDetailDTO } from "@markethub/api-client";
 const merchantStoresDetail = vi.fn();
 const merchantCreateStore = vi.fn();
 const merchantUpdateStore = vi.fn();
+const merchantPauseStore = vi.fn();
+const merchantResumeStore = vi.fn();
 let user: { id: string } | null = { id: "u1" };
 
 vi.mock("@/auth/auth-context", () => ({
   useAuth: () => ({
-    api: { merchantStoresDetail, merchantCreateStore, merchantUpdateStore },
+    api: {
+      merchantStoresDetail,
+      merchantCreateStore,
+      merchantUpdateStore,
+      merchantPauseStore,
+      merchantResumeStore,
+    },
     user,
   }),
 }));
 
-import { useCreateStore, useStores, useUpdateStore } from "./useStores";
+import { useCreateStore, useStores, useTogglePauseStore, useUpdateStore } from "./useStores";
 
 const store: MerchantStoreDetailDTO = {
   id: "s1",
@@ -32,6 +40,7 @@ const store: MerchantStoreDetailDTO = {
   longitude: null,
   avgPrepMinutes: 15,
   active: true,
+  pausedAt: null,
 };
 
 let qc: QueryClient;
@@ -45,6 +54,8 @@ describe("useStores hooks (story 08)", () => {
     merchantStoresDetail.mockReset();
     merchantCreateStore.mockReset();
     merchantUpdateStore.mockReset();
+    merchantPauseStore.mockReset();
+    merchantResumeStore.mockReset();
     user = { id: "u1" };
   });
 
@@ -80,5 +91,25 @@ describe("useStores hooks (story 08)", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(merchantUpdateStore).toHaveBeenCalledWith("s1", { active: false });
     expect(spy).toHaveBeenCalledWith({ queryKey: ["stores"] });
+  });
+
+  it("useTogglePauseStore(true) chama pause e invalida a lista (story 57)", async () => {
+    merchantPauseStore.mockResolvedValueOnce({ ...store, pausedAt: "2026-07-12T10:00:00.000Z" });
+    const spy = vi.spyOn(qc, "invalidateQueries");
+    const { result } = renderHook(() => useTogglePauseStore("s1"), { wrapper });
+    result.current.mutate(true);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(merchantPauseStore).toHaveBeenCalledWith("s1");
+    expect(merchantResumeStore).not.toHaveBeenCalled();
+    expect(spy).toHaveBeenCalledWith({ queryKey: ["stores"] });
+  });
+
+  it("useTogglePauseStore(false) chama resume (story 57)", async () => {
+    merchantResumeStore.mockResolvedValueOnce({ ...store, pausedAt: null });
+    const { result } = renderHook(() => useTogglePauseStore("s1"), { wrapper });
+    result.current.mutate(false);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(merchantResumeStore).toHaveBeenCalledWith("s1");
+    expect(merchantPauseStore).not.toHaveBeenCalled();
   });
 });

@@ -139,13 +139,8 @@ export default function StoreHome() {
             </View>
           )}
           {store && (
-            <View
-              style={[styles.openBadge, { borderColor: store.openNow ? colors.success : colors.textMuted }]}
-            >
-              <Text
-                variant="caption"
-                style={{ color: store.openNow ? colors.success : colors.textMuted, fontWeight: "700" }}
-              >
+            <View style={[styles.openBadge, { borderColor: storeBadgeColor(store) }]}>
+              <Text variant="caption" style={{ color: storeBadgeColor(store), fontWeight: "700" }}>
                 {storeOpenLabel(store)}
               </Text>
             </View>
@@ -212,6 +207,12 @@ export default function StoreHome() {
       <CartFab totalCents={cart.total} onPress={() => router.push("/cart")} />
     </SafeAreaView>
   );
+}
+
+/** Cor do badge de estado: pausada (danger) > aberta (success) > fechada (muted). */
+function storeBadgeColor(store: { openNow: boolean; paused: boolean }): string {
+  if (store.paused) return colors.danger;
+  return store.openNow ? colors.success : colors.textMuted;
 }
 
 const styles = StyleSheet.create({

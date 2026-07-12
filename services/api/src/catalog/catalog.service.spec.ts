@@ -353,10 +353,32 @@ describe("CatalogService.storeSections", () => {
     expect(res.store.following).toBe(true);
     expect(isFollowingMock).toHaveBeenCalledWith("u1", "s1");
   });
+
+  // Story 57: loja sem horário estaria "aberta"; a pausa força fechado + flag paused.
+  it("loja não pausada → paused false e openNow true (sem horário)", async () => {
+    const { prisma, m } = makeCatalog();
+    m.store.findUnique.mockResolvedValue(sectionStore({ pausedAt: null }));
+    const res = await new CatalogService(prisma, followsStub).storeSections("s1");
+    expect(res.store.paused).toBe(false);
+    expect(res.store.openNow).toBe(true);
+  });
+
+  it("loja pausada (story 57) → paused true e openNow false", async () => {
+    const { prisma, m } = makeCatalog();
+    m.store.findUnique.mockResolvedValue(sectionStore({ pausedAt: new Date("2026-07-12T10:00:00Z") }));
+    const res = await new CatalogService(prisma, followsStub).storeSections("s1");
+    expect(res.store.paused).toBe(true);
+    expect(res.store.openNow).toBe(false);
+  });
 });
 
 describe("CatalogService.feed", () => {
-  function feedOffer(storeId: string, lat: number | null, lng: number | null) {
+  function feedOffer(
+    storeId: string,
+    lat: number | null,
+    lng: number | null,
+    pausedAt: Date | null = null,
+  ) {
     return {
       id: `o-${storeId}`,
       priceCents: 200,
@@ -367,6 +389,7 @@ describe("CatalogService.feed", () => {
         latitude: lat,
         longitude: lng,
         avgPrepMinutes: 10,
+        pausedAt,
         merchant: { name: "Mercado", logoUrl: null, deliveryFeeCents: 0 },
         hours: [],
         closures: [],
@@ -381,6 +404,14 @@ describe("CatalogService.feed", () => {
       },
     };
   }
+
+  it("card de loja pausada (story 57) → paused true e openNow false", async () => {
+    const { prisma, m } = makeCatalog();
+    m.marketplaceCategory.findMany.mockResolvedValue([{ id: "cat", name: "C", slug: "c" }]);
+    m.offer.findMany.mockResolvedValue([feedOffer("s1", null, null, new Date("2026-07-12T10:00:00Z"))]);
+    const res = await new CatalogService(prisma, followsStub).feed();
+    expect(res[0].items[0]).toMatchObject({ storeId: "s1", paused: true, openNow: false });
+  });
 
   it("descarta categorias sem itens e mantém as com produtos", async () => {
     const { prisma, m } = makeCatalog();
@@ -537,6 +568,16 @@ describe("CatalogService.storeSummary (story 29)", () => {
     const prisma = makeSummaryPrisma(baseStore, { _avg: { rating: null }, _count: { _all: 0 } });
     // 2026-06-28 23:00Z → 20:00 São Paulo (== closesAt 1200, exclusivo) → fechado
     const out = await new CS(prisma, followsStub).storeSummary("s1", new Date("2026-06-28T23:00:00Z"));
+    expect(out.openNow).toBe(false);
+  });
+
+  it("loja pausada (story 57) → paused true e openNow false mesmo dentro da janela", async () => {
+    const prisma = makeSummaryPrisma(
+      { ...baseStore, pausedAt: new Date("2026-07-12T10:00:00Z") },
+      { _avg: { rating: null }, _count: { _all: 0 } },
+    );
+    const out = await new CS(prisma, followsStub).storeSummary("s1", sundayMorning);
+    expect(out.paused).toBe(true);
     expect(out.openNow).toBe(false);
   });
 

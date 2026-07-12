@@ -150,6 +150,18 @@ export class MerchantController {
     return this.merchant.updateStore({ id: user.id, roles: user.roles }, id, dto);
   }
 
+  // ── Pausa temporária da loja (story 57) — owner-only, idempotente ──
+
+  @Post("stores/:id/pause")
+  pauseStore(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.merchant.pauseStore({ id: user.id, roles: user.roles }, id);
+  }
+
+  @Post("stores/:id/resume")
+  resumeStore(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.merchant.resumeStore({ id: user.id, roles: user.roles }, id);
+  }
+
   // ── Horário de funcionamento + fechamentos (story 52) ──
 
   @Get("stores/:id/hours")

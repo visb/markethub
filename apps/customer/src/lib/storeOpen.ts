@@ -3,6 +3,8 @@
 
 export interface StoreOpenState {
   openNow: boolean;
+  /** Loja em pausa temporária (story 57): tem precedência sobre o horário no rótulo. */
+  paused?: boolean;
   todayHours: { opensAt: number; closesAt: number } | null;
   nextOpen: { dayOfWeek: number; opensAt: number } | null;
 }
@@ -18,12 +20,14 @@ export function minutesToHHMM(minutes: number): string {
 
 /**
  * Texto amigável do estado da loja:
+ * - pausada (story 57): "Pausada" — precede o horário (emergência temporária);
  * - aberta: "Aberto · fecha às HH:MM" (ou só "Aberto" sem horário de hoje);
  * - fechada com próxima abertura hoje: "Fechado · abre às HH:MM";
  * - fechada com abertura em outro dia: "Fechado · abre seg às HH:MM";
  * - fechada sem horário: "Fechado".
  */
 export function storeOpenLabel(state: StoreOpenState, todayDow?: number): string {
+  if (state.paused) return "Pausada";
   if (state.openNow) {
     return state.todayHours ? `Aberto · fecha às ${minutesToHHMM(state.todayHours.closesAt)}` : "Aberto";
   }

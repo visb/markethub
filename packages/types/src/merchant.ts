@@ -48,6 +48,8 @@ export const merchantStoreDetailSchema = z.object({
   longitude: z.number().nullable(),
   avgPrepMinutes: z.number(),
   active: z.boolean(),
+  /** Pausa temporária (story 57): ISO timestamp = "pausada desde"; null = operando. */
+  pausedAt: z.string().nullable(),
 });
 export type MerchantStoreDetailDTO = z.infer<typeof merchantStoreDetailSchema>;
 

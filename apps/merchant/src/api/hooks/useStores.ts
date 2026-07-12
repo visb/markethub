@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { MerchantStoreInput, MerchantStoreUpdateInput } from "@markethub/api-client";
 import { useAuth } from "@/auth/auth-context";
-import { createStore, listStores, updateStore } from "@/api/stores";
+import { createStore, listStores, pauseStore, resumeStore, updateStore } from "@/api/stores";
 import { queryKeys } from "@/lib/queryKeys";
 
 /** Server-state da lista detalhada de lojas (story 08). Só roda com usuário. */
@@ -32,6 +32,21 @@ export function useUpdateStore(id: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (patch: MerchantStoreUpdateInput) => updateStore(api, id, patch),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.stores.all });
+    },
+  });
+}
+
+/**
+ * Pausa/retoma a loja (story 57). `pause=true` pausa, `false` retoma; ambas
+ * idempotentes no backend. Invalida a lista p/ o badge "Pausada desde" refletir.
+ */
+export function useTogglePauseStore(id: string) {
+  const { api } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (pause: boolean) => (pause ? pauseStore(api, id) : resumeStore(api, id)),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.stores.all });
     },

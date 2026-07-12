@@ -238,6 +238,10 @@ model Store {
   // tempo médio de preparo do pedido (min) — compõe o ETA real (S6.7)
   avgPrepMinutes Int           @default(15)
   active        Boolean        @default(true)
+  // Pausa temporária de emergência (story 57): null = operando; timestamp = "pausada
+  // desde HH:MM". Independente de `active` (ativação administrativa) e do horário
+  // semanal. Pausa bloqueia TODO pedido novo (imediato e agendado).
+  pausedAt      DateTime?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   offers        Offer[]

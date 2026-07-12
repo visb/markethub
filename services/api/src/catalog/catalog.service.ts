@@ -257,6 +257,7 @@ export class CatalogService {
         longitude: true,
         avgPrepMinutes: true,
         merchantId: true,
+        pausedAt: true,
         merchant: { select: { name: true, logoUrl: true, deliveryFeeCents: true } },
         hours: { select: { dayOfWeek: true, opensAt: true, closesAt: true } },
         closures: { select: { date: true } },
@@ -293,6 +294,9 @@ export class CatalogService {
     const following = userId ? await this.storeFollows.isFollowing(userId, storeId) : false;
     const closures = store.closures.map((c) => c.date);
     const next = nextOpening(store.hours, closures, now);
+    // Pausa temporária (story 57) sobrepõe o horário: força fechado e sinaliza o
+    // motivo ("Pausada") p/ o customer distinguir de fechamento por horário.
+    const paused = store.pausedAt != null;
     return {
       store: {
         id: store.id,
@@ -304,8 +308,9 @@ export class CatalogService {
         distanceKm,
         etaMinutes: etaMinutes(store.avgPrepMinutes, distanceKm ?? 0),
         following,
-        // Estado de funcionamento p/ o badge da página da loja (story 52).
-        openNow: isStoreAvailable(store.hours, closures, now),
+        // Estado de funcionamento p/ o badge da página da loja (story 52/57).
+        openNow: paused ? false : isStoreAvailable(store.hours, closures, now),
+        paused,
         todayHours: todayHours(store.hours, closures, now),
         nextOpen: next ? { dayOfWeek: next.dayOfWeek, opensAt: next.opensAt } : null,
       },
@@ -338,6 +343,7 @@ export class CatalogService {
         allowsPickup: true,
         avgPrepMinutes: true,
         merchantId: true,
+        pausedAt: true,
         merchant: { select: { name: true, logoUrl: true, deliveryFeeCents: true } },
         hours: { select: { dayOfWeek: true, opensAt: true, closesAt: true } },
         closures: { select: { date: true } },
@@ -374,8 +380,10 @@ export class CatalogService {
       deliveryFeeCents: store.merchant.deliveryFeeCents,
       doorFeeCents: store.merchant.deliveryFeeCents + DOOR_SURCHARGE_CENTS,
       allowsPickup: store.allowsPickup,
-      // Fechamento excepcional do dia (story 52) sobrepõe o horário semanal.
-      openNow: isStoreAvailable(store.hours, store.closures.map((c) => c.date), now),
+      // Fechamento excepcional do dia (story 52) sobrepõe o horário semanal; pausa
+      // temporária (story 57) sobrepõe tudo → fechado + flag `paused`.
+      openNow: store.pausedAt != null ? false : isStoreAvailable(store.hours, store.closures.map((c) => c.date), now),
+      paused: store.pausedAt != null,
     };
   }
 
@@ -462,6 +470,7 @@ export class CatalogService {
             latitude: true,
             longitude: true,
             avgPrepMinutes: true,
+            pausedAt: true,
             merchant: { select: { name: true, logoUrl: true, deliveryFeeCents: true } },
             hours: { select: { dayOfWeek: true, opensAt: true, closesAt: true } },
             closures: { select: { date: true } },
@@ -553,6 +562,7 @@ type FeedRow = {
     latitude: number | null;
     longitude: number | null;
     avgPrepMinutes: number;
+    pausedAt: Date | null;
     merchant: { name: string; logoUrl: string | null; deliveryFeeCents: number };
     hours: { dayOfWeek: number; opensAt: number; closesAt: number }[];
     closures: { date: Date }[];
@@ -570,7 +580,8 @@ type FeedRow = {
 /**
  * Card do feed multi-mercado: produto + mercado + frete + tempo. Com geo, calcula
  * distância e ETA real (preparo da loja + deslocamento, S6.7); sem geo, ETA usa só
- * o preparo (sem distância). `openNow` (story 52) dirige o selo "Fechado" no card.
+ * o preparo (sem distância). `openNow` (story 52) dirige o selo "Fechado" no card;
+ * `paused` (story 57) o distingue como "Pausada" (pausa força fechado).
  */
 function toFeedView(row: FeedRow, geo?: GeoFilter, now: Date = new Date()) {
   const hasGeo = geo && row.store.latitude != null && row.store.longitude != null;
@@ -578,6 +589,7 @@ function toFeedView(row: FeedRow, geo?: GeoFilter, now: Date = new Date()) {
     ? round1(haversineKm(geo.lat, geo.lng, row.store.latitude!, row.store.longitude!))
     : null;
   const eta = etaMinutes(row.store.avgPrepMinutes, distanceKm ?? 0);
+  const paused = row.store.pausedAt != null;
   return {
     offerId: row.id,
     priceCents: row.priceCents,
@@ -589,7 +601,8 @@ function toFeedView(row: FeedRow, geo?: GeoFilter, now: Date = new Date()) {
     deliveryEta: `${eta} min`,
     etaMinutes: eta,
     distanceKm,
-    openNow: isStoreAvailable(row.store.hours, row.store.closures.map((c) => c.date), now),
+    openNow: paused ? false : isStoreAvailable(row.store.hours, row.store.closures.map((c) => c.date), now),
+    paused,
     ...row.product,
   };
 }

@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiClientError } from "@markethub/api-client";
 import type { MerchantContextDTO, MerchantOffer, MerchantStock } from "@markethub/api-client";
 
 let ctx: { data?: MerchantContextDTO };
@@ -8,6 +9,7 @@ let stocksResult: { data?: MerchantStock[]; isLoading: boolean };
 let lastOfferFilters: unknown;
 let lastStockStoreId: string | undefined;
 const updateOffer = vi.fn();
+const toggleAvailable = vi.fn();
 const unlockOffer = vi.fn();
 const updateStock = vi.fn();
 const unlockStock = vi.fn();
@@ -26,6 +28,7 @@ vi.mock("@/api/hooks/useCatalog", () => ({
     return stocksResult;
   },
   useUpdateOffer: () => ({ mutate: updateOffer, isPending: false }),
+  useToggleOfferAvailable: () => ({ mutate: toggleAvailable, isPending: false }),
   useUnlockOfferField: () => ({ mutate: unlockOffer, isPending: false }),
   useUpdateStock: () => ({ mutate: updateStock, isPending: false }),
   useUnlockStockField: () => ({ mutate: unlockStock, isPending: false }),
@@ -107,6 +110,24 @@ describe("Catalog (story 11)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
     await waitFor(() => expect(updateOffer).toHaveBeenCalledTimes(1));
     expect(updateOffer.mock.calls[0][0]).toMatchObject({ id: "o1", patch: { priceCents: 2000 } });
+  });
+
+  it("switch inline alterna a disponibilidade da oferta (story 57)", () => {
+    render(<Catalog />);
+    const sw = screen.getByRole("switch", { name: "Disponível: Arroz" });
+    expect(sw).toBeChecked();
+    fireEvent.click(sw);
+    expect(toggleAvailable).toHaveBeenCalledTimes(1);
+    expect(toggleAvailable.mock.calls[0][0]).toMatchObject({ id: "o1", available: false });
+  });
+
+  it("switch: erro na troca exibe a mensagem do backend (story 57)", () => {
+    toggleAvailable.mockImplementation((_v, opts) =>
+      opts.onError?.(new ApiClientError(403, { code: "STORE_NOT_MANAGED", message: "Sem permissão" })),
+    );
+    render(<Catalog />);
+    fireEvent.click(screen.getByRole("switch", { name: "Disponível: Arroz" }));
+    expect(screen.getByText("Sem permissão")).toBeInTheDocument();
   });
 
   it("mostra badge de campo travado e destrava via DELETE locks", () => {
