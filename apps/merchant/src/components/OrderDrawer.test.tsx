@@ -5,7 +5,9 @@ import type { MerchantContextDTO, MerchantOrderDetailDTO } from "@markethub/api-
 let ctx: { data?: MerchantContextDTO };
 let detailResult: { data?: MerchantOrderDetailDTO; isLoading: boolean; isError: boolean };
 const mutate = vi.fn();
+const retryMutate = vi.fn();
 let mutationState: { mutate: typeof mutate; isPending: boolean; error: unknown };
+let retryState: { mutate: typeof retryMutate; isPending: boolean; error: unknown };
 
 vi.mock("@/api/hooks/useMerchantContext", () => ({
   useMerchantContext: () => ctx,
@@ -13,6 +15,7 @@ vi.mock("@/api/hooks/useMerchantContext", () => ({
 vi.mock("@/api/hooks/useMerchantOrderDetail", () => ({
   useMerchantOrderDetail: () => detailResult,
   useCancelOrderGroup: () => mutationState,
+  useRetryDelivery: () => retryState,
 }));
 
 import { OrderDrawer } from "./OrderDrawer";
@@ -59,6 +62,7 @@ const detail = (over: Partial<MerchantOrderDetailDTO> = {}): MerchantOrderDetail
     pickedUpAt: null,
     deliveredAt: null,
   },
+  delivery: null,
   cancelable: true,
   ...over,
 });
@@ -68,7 +72,9 @@ describe("OrderDrawer", () => {
     ctx = { data: { role: "owner", merchantId: "m1", stores: [] } };
     detailResult = { data: detail(), isLoading: false, isError: false };
     mutate.mockReset();
+    retryMutate.mockReset();
     mutationState = { mutate, isPending: false, error: null };
+    retryState = { mutate: retryMutate, isPending: false, error: null };
   });
 
   it("renderiza itens, substituição, cliente e total", () => {
@@ -108,5 +114,48 @@ describe("OrderDrawer", () => {
     render(<OrderDrawer groupId="g1" onClose={onClose} />);
     fireEvent.click(screen.getByLabelText("Fechar"));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  // ── Falha na entrega (story 61) ──
+
+  it("entrega failed: mostra o motivo/hora e o botão Reenviar dispara o retry", () => {
+    detailResult = {
+      data: detail({
+        status: "on_the_way",
+        delivery: {
+          id: "d1",
+          status: "failed",
+          failReason: "customer_absent",
+          failedAt: "2026-06-22T11:00:00.000Z",
+        },
+      }),
+      isLoading: false,
+      isError: false,
+    };
+    render(<OrderDrawer groupId="g1" onClose={() => {}} />);
+    expect(screen.getByText("Falha na entrega")).toBeInTheDocument();
+    expect(screen.getByText(/Cliente ausente/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Reenviar entrega"));
+    expect(retryMutate).toHaveBeenCalledWith("d1");
+  });
+
+  it("sem falha: não mostra a seção de falha nem o Reenviar", () => {
+    render(<OrderDrawer groupId="g1" onClose={() => {}} />);
+    expect(screen.queryByText("Falha na entrega")).not.toBeInTheDocument();
+    expect(screen.queryByText("Reenviar entrega")).not.toBeInTheDocument();
+  });
+
+  it("entrega failed sem capability: mostra o motivo mas não o Reenviar", () => {
+    ctx = { data: undefined };
+    detailResult = {
+      data: detail({
+        delivery: { id: "d1", status: "failed", failReason: "other", failedAt: null },
+      }),
+      isLoading: false,
+      isError: false,
+    };
+    render(<OrderDrawer groupId="g1" onClose={() => {}} />);
+    expect(screen.getByText("Falha na entrega")).toBeInTheDocument();
+    expect(screen.queryByText("Reenviar entrega")).not.toBeInTheDocument();
   });
 });

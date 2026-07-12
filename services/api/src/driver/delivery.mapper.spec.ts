@@ -21,6 +21,9 @@ function makeDelivery(over: {
     assignedAt: null,
     pickedUpAt: null,
     deliveredAt: null,
+    failReason: null,
+    failNote: null,
+    failedAt: null,
     createdAt: new Date("2026-07-11T12:00:00.000Z"),
     storeId: "st1",
     orderGroup: {

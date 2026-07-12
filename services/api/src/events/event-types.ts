@@ -43,6 +43,19 @@ export interface OrderGroupCanceledPayload {
   reason: string;
 }
 
+/**
+ * Entrega reportada como falha pelo entregador (story 61) — cliente ausente,
+ * endereço errado, recusa etc. Payload mínimo para os handlers (push ao cliente +
+ * realtime ao merchant) resolverem o resto por id. `reason` é o motivo cru
+ * (DeliveryFailReason) para compor a mensagem legível.
+ */
+export interface DeliveryFailedPayload {
+  orderId: string;
+  groupId: string;
+  deliveryId: string;
+  reason: "customer_absent" | "wrong_address" | "refused" | "other";
+}
+
 /** Mapa tipo → payload. */
 export interface DomainEventMap {
   "order.created": OrderCreatedPayload;
@@ -50,6 +63,7 @@ export interface DomainEventMap {
   "picking.done": PickingDonePayload;
   "order.canceled": OrderCanceledPayload;
   "order.group_canceled": OrderGroupCanceledPayload;
+  "delivery.failed": DeliveryFailedPayload;
 }
 
 export type DomainEventType = keyof DomainEventMap;

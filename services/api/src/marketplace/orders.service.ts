@@ -315,17 +315,23 @@ export class OrdersService {
       include: {
         order: { select: { id: true, discountCents: true, deliverySlotId: true } },
         pickTask: { select: { id: true, status: true } },
+        delivery: { select: { status: true } },
       },
     });
     if (!group || !actor.storeIds.includes(group.storeId)) {
       throw new NotFoundException({ code: "ORDER_GROUP_NOT_FOUND", message: "Sub-pedido não encontrado" });
     }
 
+    // Exceção da story 61: entrega com falha (`failed`) LIBERA o cancelamento
+    // mesmo com a separação avançada / grupo `on_the_way` — a loja decide entre
+    // reenviar e cancelar. Estoque NÃO volta (fica como está). Fora esse caso, a
+    // invariante da story 54 (só antes de a separação começar) vale.
+    const deliveryFailed = group.delivery?.status === "failed";
     const cancelable =
       group.status === "created" || group.status === "paid" || group.status === "preparing";
     const taskOk =
       !group.pickTask || group.pickTask.status === "queued" || group.pickTask.status === "assigned";
-    if (!cancelable || !taskOk) {
+    if (!deliveryFailed && (!cancelable || !taskOk)) {
       throw new BadRequestException({
         code: "CANNOT_CANCEL_GROUP",
         message: "Só é possível cancelar o sub-pedido antes da separação começar",

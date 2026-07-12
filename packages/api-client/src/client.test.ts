@@ -591,6 +591,11 @@ describe("ApiClient — endpoints (rota + método + body)", () => {
     await client.driverConfirmDelivery("d1", "DC");
     expect(url(7)).toBe(`${B}/driver/deliveries/d1/deliver`);
     expect(JSON.parse(init(7).body!)).toEqual({ deliveryCode: "DC" });
+    // Falha na entrega (story 61): motivo + observação opcional.
+    await client.driverFailDelivery("d1", { reason: "customer_absent", note: "portão fechado" });
+    expect(url(8)).toBe(`${B}/driver/deliveries/d1/fail`);
+    expect(init(8).method).toBe("POST");
+    expect(JSON.parse(init(8).body!)).toEqual({ reason: "customer_absent", note: "portão fechado" });
     // Rastreio ao vivo (story 51): publica a posição (ingest throttled).
     await client.driverPublishLocation("d1", {
       lat: -23.5,
@@ -598,9 +603,9 @@ describe("ApiClient — endpoints (rota + método + body)", () => {
       heading: 90,
       recordedAt: "2026-07-11T12:00:00.000Z",
     });
-    expect(url(8)).toBe(`${B}/driver/deliveries/d1/location`);
-    expect(init(8).method).toBe("POST");
-    expect(JSON.parse(init(8).body!)).toEqual({
+    expect(url(9)).toBe(`${B}/driver/deliveries/d1/location`);
+    expect(init(9).method).toBe("POST");
+    expect(JSON.parse(init(9).body!)).toEqual({
       lat: -23.5,
       lng: -46.6,
       heading: 90,
@@ -621,9 +626,13 @@ describe("ApiClient — endpoints (rota + método + body)", () => {
     await client.unassignDelivery("d1");
     expect(url(4)).toBe(`${B}/store/deliveries/d1/unassign`);
     expect(init(4).method).toBe("POST");
+    // Reenvio de entrega com falha (story 61).
+    await client.storeDeliveryRetry("d1");
+    expect(url(5)).toBe(`${B}/store/deliveries/d1/retry`);
+    expect(init(5).method).toBe("POST");
     await client.storeHandover("og1", "9999");
-    expect(url(5)).toBe(`${B}/store/order-groups/og1/handover`);
-    expect(JSON.parse(init(5).body!)).toEqual({ code: "9999" });
+    expect(url(6)).toBe(`${B}/store/order-groups/og1/handover`);
+    expect(JSON.parse(init(6).body!)).toEqual({ code: "9999" });
   });
 
   it("merchant: slots de agendamento (listar/criar/remover — story 55)", async () => {

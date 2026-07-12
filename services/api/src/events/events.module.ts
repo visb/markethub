@@ -19,6 +19,8 @@ import {
   OrderGroupCanceledEmitirEstornoProcessor,
   OrderGroupCanceledNotificarProcessor,
 } from "./handlers/order-group-canceled.processor";
+import { DeliveryFailedHandlers } from "./handlers/delivery-failed.handlers";
+import { DeliveryFailedNotificarProcessor } from "./handlers/delivery-failed.processor";
 import { OrderCreatedHandlers } from "./handlers/order-created.handlers";
 import {
   OrderCreatedGerarCobrancaPixProcessor,
@@ -86,6 +88,8 @@ import { HANDLER_QUEUE_NAMES, HANDLER_QUEUES } from "./subscriptions";
     OrderGroupCanceledHandlers,
     OrderGroupCanceledEmitirEstornoProcessor,
     OrderGroupCanceledNotificarProcessor,
+    DeliveryFailedHandlers,
+    DeliveryFailedNotificarProcessor,
     {
       provide: HANDLER_QUEUES,
       useFactory: (...queues: Queue[]) =>

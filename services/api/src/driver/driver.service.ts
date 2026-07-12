@@ -4,7 +4,8 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import type { DeliveryStatus } from "@prisma/client";
+import type { DeliveryFailReason, DeliveryStatus } from "@prisma/client";
+import { OutboxPublisher } from "../events";
 import { HandoffService } from "../picking/handoff.service";
 import { OrderTrackingService } from "../picking/order-tracking.service";
 import { PrismaService } from "../prisma/prisma.service";
@@ -44,6 +45,7 @@ export class DriverService {
     private readonly prisma: PrismaService,
     private readonly handoff: HandoffService,
     private readonly tracking: OrderTrackingService,
+    private readonly outbox: OutboxPublisher,
   ) {}
 
   /** Lojas em que o usuário atua como entregador (para o app escolher a fila). */
@@ -168,6 +170,42 @@ export class DriverService {
     await this.prisma.delivery.update({
       where: { id: deliveryId },
       data: { status: "delivered", deliveredAt: new Date() },
+    });
+    return this.detail(deliveryId);
+  }
+
+  /**
+   * Reporta falha na entrega (story 61). Só o entregador DONO e só após a coleta
+   * (`picked_up`) — antes de coletar ele simplesmente não aceita/desatribui. Na
+   * MESMA TX: Delivery → `failed` (grava a ÚLTIMA falha: motivo + observação) e
+   * evento `delivery.failed` no outbox (push ao cliente + realtime ao merchant
+   * são handlers do evento — padrão story 48). O OrderGroup NÃO ganha estado novo
+   * (painéis derivam da Delivery). A loja decide depois: reenviar (retry) ou
+   * cancelar o sub-pedido (story 54). Idempotente quando já está `failed`.
+   */
+  async fail(userId: string, deliveryId: string, reason: DeliveryFailReason, note?: string) {
+    const delivery = await this.ownedDelivery(userId, deliveryId);
+    if (delivery.status === "failed") return this.detail(deliveryId); // idempotente
+    if (delivery.status !== "picked_up") {
+      throw new BadRequestException({
+        code: "DELIVERY_NOT_PICKED_UP",
+        message: "Só é possível reportar falha após a coleta",
+      });
+    }
+    const group = await this.prisma.orderGroup.findUniqueOrThrow({
+      where: { id: delivery.orderGroupId },
+      select: { orderId: true },
+    });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.delivery.update({
+        where: { id: deliveryId },
+        data: { status: "failed", failReason: reason, failNote: note ?? null, failedAt: new Date() },
+      });
+      await this.outbox.publish(tx, {
+        type: "delivery.failed",
+        payload: { orderId: group.orderId, groupId: delivery.orderGroupId, deliveryId, reason },
+        aggregateId: group.orderId,
+      });
     });
     return this.detail(deliveryId);
   }

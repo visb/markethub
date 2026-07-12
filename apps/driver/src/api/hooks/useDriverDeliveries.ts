@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { DeliveryDTO } from "@markethub/api-client";
+import type { DeliveryDTO, FailDeliveryInput } from "@markethub/api-client";
 import { useAuth } from "@/auth-context";
 import { deliveries } from "@/api/deliveries";
 import { queryKeys } from "@/lib/queryKeys";
@@ -86,6 +86,23 @@ export function useConfirmDelivery(id: string) {
     mutationFn: (deliveryCode: string) => deliveries(client).confirmDelivery(id, deliveryCode),
     onSuccess: (updated) => {
       queryClient.setQueryData(queryKeys.deliveries.detail(id), updated);
+    },
+  });
+}
+
+/**
+ * Reporta falha na entrega (story 61): motivo + observação opcional. Escreve a
+ * entrega atualizada (status `failed`) no cache do detalhe e invalida as filas —
+ * ela sai das listas de "em aberto" do entregador.
+ */
+export function useFailDelivery(id: string) {
+  const { client } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation<DeliveryDTO, unknown, FailDeliveryInput>({
+    mutationFn: (input: FailDeliveryInput) => deliveries(client).fail(id, input),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(queryKeys.deliveries.detail(id), updated);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.deliveries.root });
     },
   });
 }

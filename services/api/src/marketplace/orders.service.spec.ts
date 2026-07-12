@@ -730,6 +730,7 @@ describe("OrdersService.cancelGroup (story 54 — cancelamento por sub-pedido)",
   function setup(opts: {
     groupStatus?: string;
     pickTask?: { id: string; status: string } | null;
+    delivery?: { status: string } | null;
     storeId?: string;
     discountCents?: number;
     deliverySlotId?: string | null;
@@ -742,6 +743,7 @@ describe("OrdersService.cancelGroup (story 54 — cancelamento por sub-pedido)",
       orderId: "order1",
       order: { id: "order1", discountCents: opts.discountCents ?? 0, deliverySlotId: opts.deliverySlotId ?? null },
       pickTask: opts.pickTask ?? null,
+      delivery: opts.delivery ?? null,
     };
     const siblings = opts.siblings ?? makeGroups();
 
@@ -859,6 +861,35 @@ describe("OrdersService.cancelGroup (story 54 — cancelamento por sub-pedido)",
     const { svc } = setup({ pickTask: { id: "t1", status: "assigned" } });
     const res = await svc.cancelGroup("g1", { storeIds: ["store1"] });
     expect(res).toMatchObject({ status: "canceled" });
+  });
+
+  // ── Exceção da story 61: entrega falha libera o cancelamento ──
+
+  it("entrega failed LIBERA cancelar mesmo com grupo on_the_way + PickTask avançada", async () => {
+    const { svc, tx, outbox } = setup({
+      groupStatus: "on_the_way",
+      pickTask: { id: "t1", status: "ready_for_pickup" },
+      delivery: { status: "failed" },
+    });
+    const res = await svc.cancelGroup("g1", { storeIds: ["store1"] });
+    expect(res).toMatchObject({ id: "g1", status: "canceled" });
+    expect(tx.orderGroup.update).toHaveBeenCalledWith({ where: { id: "g1" }, data: { status: "canceled" } });
+    expect(outbox.publish).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ type: "order.group_canceled" }),
+    );
+  });
+
+  it("entrega NÃO failed com grupo on_the_way → segue bloqueado (CANNOT_CANCEL_GROUP)", async () => {
+    const { svc, outbox } = setup({
+      groupStatus: "on_the_way",
+      pickTask: { id: "t1", status: "ready_for_pickup" },
+      delivery: { status: "picked_up" },
+    });
+    await expect(svc.cancelGroup("g1", { storeIds: ["store1"] })).rejects.toMatchObject({
+      response: { code: "CANNOT_CANCEL_GROUP" },
+    });
+    expect(outbox.publish).not.toHaveBeenCalled();
   });
 
   it("grupo de loja fora do escopo do ator → 404 (não vaza existência)", async () => {

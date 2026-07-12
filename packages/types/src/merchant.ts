@@ -244,6 +244,19 @@ export type OrderGroupStatus = z.infer<typeof orderGroupStatusSchema>;
  * o board por status: nº/loja/itens/total/horário/status/pickupCode. Sem itens
  * linha a linha (detalhe é story futura).
  */
+/**
+ * Situação da entrega do sub-pedido derivada pelo board/drawer do merchant
+ * (story 61). O status do OrderGroup NÃO ganha estado novo — a exibição (falha:
+ * motivo + hora, ações reenviar/cancelar) deriva da Delivery. `null` em retirada.
+ */
+export const merchantDeliveryStatusSchema = z.object({
+  id: z.string(),
+  status: z.enum(["unassigned", "assigned", "picked_up", "delivered", "failed", "canceled"]),
+  failReason: z.enum(["customer_absent", "wrong_address", "refused", "other"]).nullable(),
+  failedAt: z.string().nullable(),
+});
+export type MerchantDeliveryStatusDTO = z.infer<typeof merchantDeliveryStatusSchema>;
+
 export const merchantOrderSchema = z.object({
   id: z.string(),
   orderId: z.string(),
@@ -255,6 +268,8 @@ export const merchantOrderSchema = z.object({
   totalCents: z.number(),
   pickupCode: z.string().nullable(),
   createdAt: z.string(),
+  /** Entrega do grupo (null em retirada) — story 61 destaca falha no board. */
+  delivery: merchantDeliveryStatusSchema.nullable(),
 });
 export type MerchantOrderDTO = z.infer<typeof merchantOrderSchema>;
 
@@ -333,6 +348,8 @@ export const merchantOrderDetailSchema = z.object({
   customer: z.object({ name: z.string(), phone: z.string().nullable() }),
   items: z.array(merchantOrderItemSchema),
   timeline: merchantOrderTimelineSchema,
+  /** Entrega do grupo (null em retirada) — story 61 habilita reenviar/cancelar. */
+  delivery: merchantDeliveryStatusSchema.nullable(),
   cancelable: z.boolean(),
 });
 export type MerchantOrderDetailDTO = z.infer<typeof merchantOrderDetailSchema>;

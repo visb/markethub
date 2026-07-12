@@ -1,8 +1,29 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
-import type { Prisma } from "@prisma/client";
+import type { DeliveryFailReason, DeliveryStatus, Prisma } from "@prisma/client";
 import { GEOCODING_PROVIDER, type GeocodingProvider } from "../geocoding";
 import { OrdersService } from "../marketplace";
 import { PrismaService } from "../prisma/prisma.service";
+
+/**
+ * Situação da entrega do sub-pedido exposta ao board/drawer do merchant (story
+ * 61). O board deriva a EXIBIÇÃO da Delivery (o status do grupo não ganha estado
+ * novo): destaca a falha (motivo + hora) e habilita reenviar/cancelar. `null`
+ * quando o grupo é retirada (sem Delivery).
+ */
+function toDeliveryStatusDto(
+  delivery:
+    | { id: string; status: DeliveryStatus; failReason: DeliveryFailReason | null; failedAt: Date | null }
+    | null
+    | undefined,
+) {
+  if (!delivery) return null;
+  return {
+    id: delivery.id,
+    status: delivery.status,
+    failReason: delivery.failReason ?? null,
+    failedAt: delivery.failedAt?.toISOString() ?? null,
+  };
+}
 
 export interface OfferFilters {
   storeId?: string;
@@ -573,6 +594,7 @@ export class MerchantService {
       include: {
         store: { select: { name: true } },
         order: { select: { createdAt: true } },
+        delivery: { select: { id: true, status: true, failReason: true, failedAt: true } },
         _count: { select: { items: true } },
       },
     });
@@ -588,6 +610,7 @@ export class MerchantService {
       totalCents: g.subtotalCents + g.deliveryCents + g.prepCents + g.platformFeeCents,
       pickupCode: g.pickupCode,
       createdAt: g.order.createdAt.toISOString(),
+      delivery: toDeliveryStatusDto(g.delivery),
     }));
   }
 
@@ -604,7 +627,16 @@ export class MerchantService {
       include: {
         store: { select: { name: true } },
         pickTask: { select: { status: true, startedAt: true, packedAt: true, readyAt: true } },
-        delivery: { select: { pickedUpAt: true, deliveredAt: true } },
+        delivery: {
+          select: {
+            id: true,
+            status: true,
+            failReason: true,
+            failedAt: true,
+            pickedUpAt: true,
+            deliveredAt: true,
+          },
+        },
         order: {
           select: {
             createdAt: true,
@@ -640,9 +672,13 @@ export class MerchantService {
       throw new NotFoundException({ code: "ORDER_GROUP_NOT_FOUND", message: "Sub-pedido não encontrado" });
     }
 
+    // Exceção da story 61: entrega com falha libera o cancelamento mesmo com a
+    // separação avançada (espelha orders.service.cancelGroup).
+    const deliveryFailed = group.delivery?.status === "failed";
     const cancelable =
-      (group.status === "created" || group.status === "paid" || group.status === "preparing") &&
-      (!group.pickTask || group.pickTask.status === "queued" || group.pickTask.status === "assigned");
+      deliveryFailed ||
+      ((group.status === "created" || group.status === "paid" || group.status === "preparing") &&
+        (!group.pickTask || group.pickTask.status === "queued" || group.pickTask.status === "assigned"));
 
     return {
       id: group.id,
@@ -693,6 +729,7 @@ export class MerchantService {
         pickedUpAt: group.delivery?.pickedUpAt?.toISOString() ?? null,
         deliveredAt: group.delivery?.deliveredAt?.toISOString() ?? null,
       },
+      delivery: toDeliveryStatusDto(group.delivery),
       cancelable,
     };
   }

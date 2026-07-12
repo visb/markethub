@@ -885,27 +885,41 @@ enum DeliveryStatus {
   assigned // atribuída a um entregador, ainda não coletada
   picked_up // entregador coletou na loja (a caminho)
   delivered // entregue ao cliente
+  failed // entregador não conseguiu entregar (cliente ausente, endereço errado…) — loja decide (story 61)
   canceled // cancelada
+}
+
+// Motivo da falha de entrega reportada pelo entregador (story 61).
+enum DeliveryFailReason {
+  customer_absent // cliente ausente
+  wrong_address // endereço errado/não localizado
+  refused // cliente recusou o pedido
+  other // outro (detalhe em failNote)
 }
 
 // Entrega de uma OrderGroup feita por um entregador da própria loja.
 model Delivery {
-  id           String         @id @default(cuid())
-  orderGroup   OrderGroup     @relation(fields: [orderGroupId], references: [id], onDelete: Cascade)
-  orderGroupId String         @unique
+  id           String              @id @default(cuid())
+  orderGroup   OrderGroup          @relation(fields: [orderGroupId], references: [id], onDelete: Cascade)
+  orderGroupId String              @unique
   storeId      String // denormalizado p/ fila por loja
-  driver       User?          @relation("DriverDeliveries", fields: [driverId], references: [id])
+  driver       User?               @relation("DriverDeliveries", fields: [driverId], references: [id])
   driverId     String?
   // Veículo usado nesta entrega (story 14): histórico de qual veículo da frota fez a
   // entrega. Opcional; só é preenchido a partir da story 15 (seleção pelo entregador).
-  vehicle      Vehicle?       @relation(fields: [vehicleId], references: [id])
+  vehicle      Vehicle?            @relation(fields: [vehicleId], references: [id])
   vehicleId    String?
-  status       DeliveryStatus @default(unassigned)
+  status       DeliveryStatus      @default(unassigned)
   assignedAt   DateTime?
   pickedUpAt   DateTime?
   deliveredAt  DateTime?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  // Falha na entrega (story 61): só a ÚLTIMA falha é guardada (histórico fora de escopo).
+  // Preservados no retry (failed → unassigned) para a loja saber o que aconteceu.
+  failReason   DeliveryFailReason?
+  failNote     String?
+  failedAt     DateTime?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
 
   @@index([storeId, status])
   @@index([driverId, status])

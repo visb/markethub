@@ -14,6 +14,7 @@ function setup() {
     driverAcceptDelivery: jest.fn().mockResolvedValue({ id: "d1" }),
     driverConfirmPickup: jest.fn().mockResolvedValue({ id: "d1" }),
     driverConfirmDelivery: jest.fn().mockResolvedValue({ id: "d1" }),
+    driverFailDelivery: jest.fn().mockResolvedValue({ id: "d1", status: "failed" }),
   };
   const api = deliveries(client as unknown as ApiClient);
   return { client, api };
@@ -66,5 +67,14 @@ describe("driver deliveries api module", () => {
     const { client, api } = setup();
     await api.confirmDelivery("d1", "DC1");
     expect(client.driverConfirmDelivery).toHaveBeenCalledWith("d1", "DC1");
+  });
+
+  it("fail delega driverFailDelivery com id + motivo/observação (story 61)", async () => {
+    const { client, api } = setup();
+    await api.fail("d1", { reason: "customer_absent", note: "portão fechado" });
+    expect(client.driverFailDelivery).toHaveBeenCalledWith("d1", {
+      reason: "customer_absent",
+      note: "portão fechado",
+    });
   });
 });

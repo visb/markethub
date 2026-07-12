@@ -10,6 +10,7 @@ import {
   useDeliveryDetail,
   useDriverDeliveries,
   useDriverStores,
+  useFailDelivery,
 } from "../api/hooks/useDriverDeliveries";
 import { queryKeys } from "../lib/queryKeys";
 
@@ -26,6 +27,7 @@ const mockAvailable = jest.fn();
 const mockAccept = jest.fn();
 const mockConfirmPickup = jest.fn();
 const mockConfirmDelivery = jest.fn();
+const mockFail = jest.fn();
 
 const fakeClient = {} as ApiClient;
 
@@ -37,6 +39,7 @@ jest.mock("../api/deliveries", () => ({
     accept: (...a: unknown[]) => mockAccept(...a),
     confirmPickup: (...a: unknown[]) => mockConfirmPickup(...a),
     confirmDelivery: (...a: unknown[]) => mockConfirmDelivery(...a),
+    fail: (...a: unknown[]) => mockFail(...a),
   }),
 }));
 
@@ -107,6 +110,7 @@ beforeEach(() => {
   mockAccept.mockReset().mockResolvedValue(d1);
   mockConfirmPickup.mockReset().mockResolvedValue({ ...d1, status: "picked_up" });
   mockConfirmDelivery.mockReset().mockResolvedValue({ ...d1, status: "delivered" });
+  mockFail.mockReset().mockResolvedValue({ ...d1, status: "failed" });
 });
 
 afterEach(() => {
@@ -231,6 +235,27 @@ describe("useConfirmPickup / useConfirmDelivery", () => {
     expect(mockConfirmDelivery).toHaveBeenCalledWith("d1", "DC1");
     const cached = client.getQueryData<DeliveryDTO>(queryKeys.deliveries.detail("d1"));
     expect(cached?.status).toBe("delivered");
+    unmount();
+  });
+});
+
+describe("useFailDelivery (story 61)", () => {
+  it("reporta falha, grava failed no cache do detalhe e invalida as filas", async () => {
+    const client = stableClient();
+    const invalidateSpy = jest.fn();
+    const realInvalidate = client.invalidateQueries.bind(client);
+    jest.spyOn(client, "invalidateQueries").mockImplementation((args) => {
+      invalidateSpy(args);
+      return realInvalidate(args);
+    });
+    const { result, unmount } = renderHook(() => useFailDelivery("d1"), client);
+    await act(async () => {
+      await result.current!.mutateAsync({ reason: "customer_absent", note: "portão fechado" });
+    });
+    expect(mockFail).toHaveBeenCalledWith("d1", { reason: "customer_absent", note: "portão fechado" });
+    const cached = client.getQueryData<DeliveryDTO>(queryKeys.deliveries.detail("d1"));
+    expect(cached?.status).toBe("failed");
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.deliveries.root });
     unmount();
   });
 });
