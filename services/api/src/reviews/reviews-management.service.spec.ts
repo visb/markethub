@@ -46,8 +46,11 @@ describe("ReviewsManagementService.storeReviews", () => {
     expect(res.count).toBe(12);
     expect(res.items[0]).toMatchObject({ rating: 4, comment: "bom", authorName: "Ana" });
     const p = prisma as unknown as { review: { aggregate: jest.Mock } };
+    // moderação (story 68): vitrine e média só contam reviews visíveis
     expect(p.review.aggregate).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { axis: "merchant", targetMerchantId: "m1" } }),
+      expect.objectContaining({
+        where: { axis: "merchant", targetMerchantId: "m1", hiddenAt: null },
+      }),
     );
   });
 

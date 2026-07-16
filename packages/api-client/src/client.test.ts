@@ -571,6 +571,23 @@ describe("ApiClient — endpoints (rota + método + body)", () => {
     expect(url(6)).toBe(`${B}/merchant/reports/pickers`);
   });
 
+  it("admin: moderação de avaliações (story 68)", async () => {
+    await client.adminReviews();
+    expect(url(0)).toBe(`${B}/admin/reviews/list`);
+    expect(init(0).headers.Authorization).toBe("Bearer acc");
+    await client.adminReviews({ rating: 2, hidden: true, merchantId: "m1", q: "ruim" });
+    expect(url(1)).toBe(`${B}/admin/reviews/list?rating=2&hidden=true&merchantId=m1&q=ruim`);
+    await client.adminReviews({ hidden: false });
+    expect(url(2)).toBe(`${B}/admin/reviews/list?hidden=false`);
+    await client.adminHideReview("r1", "spam");
+    expect(url(3)).toBe(`${B}/admin/reviews/r1/hide`);
+    expect(init(3).method).toBe("POST");
+    expect(JSON.parse(init(3).body!)).toEqual({ reason: "spam" });
+    await client.adminUnhideReview("r1");
+    expect(url(4)).toBe(`${B}/admin/reviews/r1/unhide`);
+    expect(init(4).method).toBe("POST");
+  });
+
   it("avaliações: vitrine pública + gestão + resposta (story 56)", async () => {
     await client.storeReviews("m1");
     expect(url(0)).toBe(`${B}/merchants/m1/reviews?axis=merchant&page=1`);

@@ -78,3 +78,41 @@ export interface MerchantReviewsFilter {
 export interface ReplyReviewInput {
   text: string;
 }
+
+// ── Moderação de avaliações pelo admin (story 68) ──
+
+/** Item da listagem plana de moderação no admin: review + alvo + estado. */
+export interface AdminReviewDTO {
+  id: string;
+  orderId: string;
+  axis: ReviewAxisDTO;
+  rating: number; // 1..5
+  comment: string | null;
+  /** Nome do autor (admin vê o nome completo; "Cliente" quando ausente). */
+  authorName: string;
+  createdAt: string;
+  /** Resposta do lojista (story 56), se houver. */
+  replyText: string | null;
+  repliedAt: string | null;
+  /** Merchant alvo (eixo merchant/delivery) — null no eixo platform. */
+  merchantId: string | null;
+  merchantName: string | null;
+  /** Soft-hide reversível (story 68): oculta sai da vitrine e das médias. */
+  hidden: boolean;
+  hiddenAt: string | null;
+  hiddenReason: string | null;
+  hiddenByName: string | null;
+}
+
+/** Filtros da listagem de moderação. `hidden` undefined = todas. */
+export interface AdminReviewsFilter {
+  rating?: number;
+  hidden?: boolean;
+  merchantId?: string;
+  q?: string;
+}
+
+/** Corpo do soft-hide — motivo obrigatório (trilha de por quê). */
+export interface HideReviewInput {
+  reason: string;
+}

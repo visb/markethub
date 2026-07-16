@@ -964,6 +964,11 @@ model Review {
   // resposta do lojista (story 56): 1 resposta por review, editável (update sobrescreve; sem histórico)
   replyText        String?
   repliedAt        DateTime?
+  // moderação admin (story 68): soft-hide reversível — NUNCA deletar. Oculta sai
+  // da vitrine pública e das médias/agregados; autor não é notificado.
+  hiddenAt         DateTime?
+  hiddenById       String? // weak ref p/ User (admin que ocultou) — sem FK, preserva histórico
+  hiddenReason     String?
   createdAt        DateTime   @default(now())
 
   // platform/delivery: 1 por pedido; merchant: 1 por mercado do pedido

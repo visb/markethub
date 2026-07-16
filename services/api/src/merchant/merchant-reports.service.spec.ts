@@ -219,5 +219,7 @@ describe("MerchantReportsService.reviews (story 13)", () => {
     ]);
     const or = groupBy.mock.calls[0][0].where.OR;
     expect(or[1]).toEqual({ axis: "merchant", targetMerchantId: { in: ["m1", "m2"] } });
+    // moderação (story 68): oculta pelo admin sai das médias do relatório
+    expect(groupBy.mock.calls[0][0].where.hiddenAt).toBeNull();
   });
 });

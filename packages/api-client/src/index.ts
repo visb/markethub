@@ -96,4 +96,7 @@ export type {
   MerchantReviewDTO,
   MerchantReviewsFilter,
   ReplyReviewInput,
+  AdminReviewDTO,
+  AdminReviewsFilter,
+  HideReviewInput,
 } from "@markethub/types";

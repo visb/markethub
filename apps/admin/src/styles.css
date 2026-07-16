@@ -374,3 +374,23 @@ body {
   border-color: #c0182a;
   color: #c0182a;
 }
+
+/* Moderação de avaliações (story 68) */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.modal {
+  width: min(480px, 92vw);
+}
+.review-hidden td {
+  opacity: 0.55;
+}
+.review-comment-hidden {
+  text-decoration: line-through;
+}

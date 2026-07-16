@@ -44,6 +44,7 @@ vi.mock("@/pages/merchants/StoreDetail", () => ({
   StoreDetail: () => <div>PAGE:StoreDetail</div>,
 }));
 vi.mock("@/pages/Coupons", () => ({ Coupons: () => <div>PAGE:Coupons</div> }));
+vi.mock("@/pages/Reviews", () => ({ Reviews: () => <div>PAGE:Reviews</div> }));
 
 function renderAppAt(path: string) {
   window.history.pushState({}, "", path);
@@ -77,6 +78,11 @@ describe("App router", () => {
   it("admin acessa uma tela global (AdminOnly)", () => {
     renderAppAt("/merchants");
     expect(screen.getByText("PAGE:MerchantsList")).toBeInTheDocument();
+  });
+
+  it("admin acessa a moderação de avaliações em /reviews (story 68)", () => {
+    renderAppAt("/reviews");
+    expect(screen.getByText("PAGE:Reviews")).toBeInTheDocument();
   });
 
   it("manager é barrado nas telas globais e cai na área da loja", () => {

@@ -36,6 +36,8 @@ import type {
   StoreReviewsPageDTO,
   MerchantReviewDTO,
   MerchantReviewsFilter,
+  AdminReviewDTO,
+  AdminReviewsFilter,
   DriverVehicleDTO,
   MerchantOrderDTO,
   MerchantOrderDetailDTO,
@@ -472,6 +474,33 @@ export class ApiClient {
       body: { text },
       auth: true,
     });
+  }
+
+  // ─── Admin / moderação de avaliações (story 68) ─────────────
+
+  /** Listagem plana de avaliações p/ moderação, com filtros opcionais. */
+  adminReviews(filter: AdminReviewsFilter = {}): Promise<AdminReviewDTO[]> {
+    const qs = new URLSearchParams();
+    if (filter.rating) qs.set("rating", String(filter.rating));
+    if (filter.hidden !== undefined) qs.set("hidden", String(filter.hidden));
+    if (filter.merchantId) qs.set("merchantId", filter.merchantId);
+    if (filter.q) qs.set("q", filter.q);
+    const suffix = qs.toString();
+    return this.request(`/admin/reviews/list${suffix ? `?${suffix}` : ""}`, { auth: true });
+  }
+
+  /** Oculta (soft-hide reversível) uma avaliação — motivo obrigatório. */
+  adminHideReview(id: string, reason: string): Promise<AdminReviewDTO> {
+    return this.request(`/admin/reviews/${id}/hide`, {
+      method: "POST",
+      body: { reason },
+      auth: true,
+    });
+  }
+
+  /** Reexibe uma avaliação oculta (idempotente). */
+  adminUnhideReview(id: string): Promise<AdminReviewDTO> {
+    return this.request(`/admin/reviews/${id}/unhide`, { method: "POST", auth: true });
   }
 
   // ─── Admin / cupons (globais + por rede — story 53) ─────────────
