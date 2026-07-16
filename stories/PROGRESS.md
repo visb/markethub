@@ -36,7 +36,7 @@ Cuidados da rodada:
 | 63 | picker — scanner de código de barras (GTIN) | — | done |
 | 64 | substituição — push ao cliente + feedback ao picker | 50 | done |
 | 65 | picker — métricas próprias + visão por colaborador | — | done |
-| 66 | admin — dashboard real (KPIs + alertas) | — | todo |
+| 66 | admin — dashboard real (KPIs + alertas) | — | done |
 | 67 | admin — detalhe profundo do pedido, timeline, suporte | — | todo |
 | 68 | admin — moderação de avaliações | 56 | todo |
 | 69 | admin — suspensão de merchant propagada | — | todo |
@@ -62,3 +62,4 @@ Cuidados da rodada:
 [OK] 63 — testes: api 1330/1330, picker 138/138 — merge: 0531d23 — arquivada em done/ — 2026-07-12 — sem migration (reusa OrderItem.gtinSnapshot já no include). expo-camera ~16.0.18 (repinado p/ Expo SDK 52; latest vinha ^57). CameraView mockado nos testes. matcher puro em lib/scanMatcher. "Desfazer" via commit adiado ~3.5s client-side (sem endpoint reset). PENDENTE-MANUAL: bipar EAN real em device físico com câmera. api-client não tocado.
 [OK] 64 — testes: api 1333/1333, picker 146/146, api-client 63/63 — commit: 0b668cf — merge na main + arquivada — 2026-07-16 — sem migration; approve/reject/timeout convergem em resolve() (emit cobre os 3); dep 50→64 satisfeita. Retomou parcial da sessão anterior.
 [OK] 65 — testes: api 1352/1352, picker 156/156, merchant 316/316, types 16/16, api-client 64/64 — commit: 1854308 — merge na main + arquivada — 2026-07-16 — sem migration; computePickerMetrics no picking, reusado pelo merchant via barrel. DÉBITO PRÉ-EXISTENTE confirmado: packages/types test:coverage vermelho na main (68.85%<80; coupons/picking-events/slots/store-hours/delivery-events sem teste) — drenar antes de fechar a rodada.
+[OK] 66 — testes: api 1367/1367, admin 147/147 — commit: ff2a685 — merge na main + arquivada — 2026-07-16 — sem migration; tipagem local no admin (padrão vizinhas, sem rebuild packages); janela SP offset fixo -03:00; thresholds em constantes exportadas.
