@@ -13,6 +13,7 @@ import {
   usePickStart,
   usePickSubstitute,
   usePickTask,
+  usePickTaskRealtime,
   usePickUpdateItem,
   useStoreHandover,
   useSubstituteSearch,
@@ -25,12 +26,25 @@ const ITEM_STATUS: Record<string, { label: string; color: string }> = {
   substituted: { label: "Substituído", color: colors.warning },
 };
 
+// Feedback da decisão da substituição ao separador (story 64). O picker não
+// propõe mais às cegas: enquanto pendente vê "aguardando cliente"; ao resolver
+// (cliente ou timeout) o badge vira aprovada (verde) ou recusada (vermelho),
+// atualizado em realtime via evento substitution.resolved.
+const SUB_STATUS: Record<string, { label: string; color: string }> = {
+  pending: { label: "Substituição: aguardando cliente", color: colors.warning },
+  approved: { label: "Substituição aprovada", color: colors.success },
+  rejected: { label: "Substituição recusada/removida", color: colors.danger },
+};
+
 export default function TaskScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
 
   const taskQuery = usePickTask(id);
   const task = taskQuery.data ?? null;
+
+  // Realtime: evento substitution.resolved na store room → refetch da task.
+  usePickTaskRealtime(id, task?.storeId);
 
   // ── mutations da tela (cada uma invalida a query da task) ──
   const startMut = usePickStart(id);
@@ -248,6 +262,19 @@ export default function TaskScreen() {
             <Text muted variant="caption">
               Pedido: {qtyLabel}
             </Text>
+            {item.substitution && (
+              <View style={styles.subBadge}>
+                <Text
+                  variant="caption"
+                  style={{ color: SUB_STATUS[item.substitution.approvalStatus].color, fontWeight: "700" }}
+                >
+                  {SUB_STATUS[item.substitution.approvalStatus].label}
+                </Text>
+                <Text muted variant="caption" numberOfLines={1}>
+                  → {item.substitution.nameSnapshot}
+                </Text>
+              </View>
+            )}
             {task.status === "picking" && item.status === "pending" && (
               <View style={styles.actions}>
                 <Action label="Separar" onPress={() => pickItem(item)} disabled={busy} />
@@ -439,6 +466,7 @@ const styles = StyleSheet.create({
   badge: { backgroundColor: colors.primaryLight, borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 2 },
   item: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm },
   itemTop: { flexDirection: "row", alignItems: "center" },
+  subBadge: { marginTop: spacing.xs, gap: 2 },
   actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
   action: {
     borderWidth: 1,

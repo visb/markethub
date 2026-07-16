@@ -60,14 +60,19 @@ export class PickingEvents {
     id: string;
     pickItemId: string;
     orderGroupId: string;
+    storeId: string;
     approvalStatus: "approved" | "rejected";
   }): void {
-    this.gateway.emitToGroup(sub.orderGroupId, "substitution.resolved", {
+    const payload = {
       substitutionId: sub.id,
       orderGroupId: sub.orderGroupId,
       pickItemId: sub.pickItemId,
       approvalStatus: sub.approvalStatus,
-    });
+    };
+    // group room: cliente dono (rastreio). store room: separador que propôs —
+    // feedback da decisão em vez de propor às cegas (story 64).
+    this.gateway.emitToGroup(sub.orderGroupId, "substitution.resolved", payload);
+    this.gateway.emitToStore(sub.storeId, "substitution.resolved", payload);
   }
 
   readyForPickup(payload: {

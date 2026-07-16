@@ -1,13 +1,15 @@
 import React from "react";
 import renderer, { act } from "react-test-renderer";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { ApiClient } from "@markethub/api-client";
+import type { ApiClient, RealtimeClient } from "@markethub/api-client";
+import { SUBSTITUTION_RESOLVED_EVENT } from "@markethub/api-client";
 import {
   usePickCompletePicking,
   usePickReady,
   usePickStart,
   usePickSubstitute,
   usePickTask,
+  usePickTaskRealtime,
   usePickUpdateItem,
   useStoreHandover,
   useSubstituteSearch,
@@ -31,6 +33,33 @@ const mockStoreHandover = jest.fn();
 
 const fakeClient = {} as ApiClient;
 
+/** Realtime fake: registra handlers e permite disparar eventos no teste. */
+function makeRealtime() {
+  const handlers = new Map<string, (p: unknown) => void>();
+  let connected = false;
+  const rt = {
+    connect: jest.fn(() => {
+      connected = true;
+      handlers.get("connect")?.(undefined);
+    }),
+    disconnect: jest.fn(() => {
+      connected = false;
+    }),
+    on: jest.fn((event: string, h: (p: unknown) => void) => handlers.set(event, h)),
+    emit: jest.fn(),
+    subscribeOrder: jest.fn(),
+    subscribeStore: jest.fn(),
+    get connected() {
+      return connected;
+    },
+  } as unknown as RealtimeClient;
+  return Object.assign(rt, {
+    __emit: (event: string, p: unknown) => handlers.get(event)?.(p),
+  });
+}
+
+let mockRealtime: ReturnType<typeof makeRealtime>;
+
 jest.mock("../api/picking", () => ({
   picking: () => ({
     task: (...a: unknown[]) => mockTask(...a),
@@ -45,7 +74,7 @@ jest.mock("../api/picking", () => ({
 }));
 
 jest.mock("@/auth-context", () => ({
-  useAuth: () => ({ client: fakeClient }),
+  useAuth: () => ({ client: fakeClient, realtime: mockRealtime }),
 }));
 
 // ── harness ──
@@ -112,6 +141,7 @@ beforeEach(() => {
   mockCompletePicking.mockReset().mockResolvedValue({});
   mockReady.mockReset().mockResolvedValue({});
   mockStoreHandover.mockReset().mockResolvedValue({});
+  mockRealtime = makeRealtime();
 });
 
 afterEach(() => {
@@ -134,6 +164,64 @@ describe("usePickTask", () => {
     expect(mockTask).not.toHaveBeenCalled();
     expect(result.current?.data).toBeUndefined();
     unmount();
+  });
+});
+
+describe("usePickTaskRealtime (story 64)", () => {
+  it("conecta e assina a store room da tarefa", async () => {
+    const { unmount } = renderHook(() => usePickTaskRealtime("task_1", "store_1"));
+    await waitFor(() => (mockRealtime.connect as jest.Mock).mock.calls.length > 0);
+    expect(mockRealtime.connect).toHaveBeenCalled();
+    expect(mockRealtime.subscribeStore).toHaveBeenCalledWith("store_1");
+    unmount();
+  });
+
+  it("evento substitution.resolved invalida a task (refetch de reconciliação)", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    activeClient = client;
+    const invalidateSpy = jest.fn();
+    const realInvalidate = client.invalidateQueries.bind(client);
+    jest.spyOn(client, "invalidateQueries").mockImplementation((args) => {
+      invalidateSpy(args);
+      return realInvalidate(args);
+    });
+    function Probe() {
+      usePickTaskRealtime("task_1", "store_1");
+      return null;
+    }
+    let tree: renderer.ReactTestRenderer;
+    act(() => {
+      tree = renderer.create(
+        <QueryClientProvider client={client}>
+          <Probe />
+        </QueryClientProvider>,
+      );
+    });
+    await waitFor(() => (mockRealtime.connect as jest.Mock).mock.calls.length > 0);
+    invalidateSpy.mockClear();
+    act(() => {
+      mockRealtime.__emit(SUBSTITUTION_RESOLVED_EVENT, {
+        pickItemId: "i1",
+        approvalStatus: "approved",
+      });
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.pick.task("task_1") });
+    act(() => tree!.unmount());
+  });
+
+  it("sem storeId: não conecta nem assina", async () => {
+    const { unmount } = renderHook(() => usePickTaskRealtime("task_1", null));
+    await flush();
+    expect(mockRealtime.connect).not.toHaveBeenCalled();
+    expect(mockRealtime.subscribeStore).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it("cleanup ao desmontar: desconecta o socket", async () => {
+    const { unmount } = renderHook(() => usePickTaskRealtime("task_1", "store_1"));
+    await waitFor(() => (mockRealtime.connect as jest.Mock).mock.calls.length > 0);
+    unmount();
+    expect(mockRealtime.disconnect).toHaveBeenCalled();
   });
 });
 

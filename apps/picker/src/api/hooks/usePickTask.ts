@@ -1,5 +1,6 @@
+import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { PickItemActionInput } from "@markethub/api-client";
+import { SUBSTITUTION_RESOLVED_EVENT, type PickItemActionInput } from "@markethub/api-client";
 import { useAuth } from "@/auth-context";
 import { picking } from "@/api/picking";
 import { queryKeys } from "@/lib/queryKeys";
@@ -15,6 +16,42 @@ export function usePickTask(id: string) {
     queryFn: () => picking(client).task(id),
     enabled: !!id,
   });
+}
+
+/**
+ * Feedback da decisão de substituição em tempo real (story 64). O backend emite
+ * `substitution.resolved` na `store room` quando o cliente aprova/recusa ou a
+ * política de timeout resolve. Aqui, ao receber o evento, invalida a task para
+ * re-buscar o snapshot de reconciliação — o badge do item passa de "aguardando
+ * cliente" a aprovada/recusada sem o separador dar refresh manual.
+ *
+ * Reaproveita o socket compartilhado do auth-context (mesmo do usePickQueue):
+ * (re)conecta, entra na store room e re-sincroniza na reconexão.
+ */
+export function usePickTaskRealtime(taskId: string, storeId: string | null | undefined) {
+  const { realtime } = useAuth();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!taskId || !storeId) return;
+
+    const resync = () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.pick.task(taskId) });
+    };
+    const onConnect = () => {
+      realtime.subscribeStore(storeId);
+      resync(); // cobre eventos perdidos enquanto offline
+    };
+
+    realtime.on(SUBSTITUTION_RESOLVED_EVENT, resync);
+    realtime.on("connect", onConnect);
+    realtime.connect();
+    if (realtime.connected) onConnect();
+
+    return () => {
+      realtime.disconnect();
+    };
+  }, [taskId, storeId, realtime, queryClient]);
 }
 
 /**

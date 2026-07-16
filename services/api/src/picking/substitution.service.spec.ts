@@ -42,7 +42,7 @@ function makeService(opts: {
   const prisma = {
     pickTask: {
       findUnique: jest.fn().mockResolvedValue("task" in opts ? opts.task : { ...TASK }),
-      findUniqueOrThrow: jest.fn().mockResolvedValue({ orderGroupId: "g1" }),
+      findUniqueOrThrow: jest.fn().mockResolvedValue({ orderGroupId: "g1", storeId: "s1" }),
     },
     pickItem: {
       findFirst: jest.fn().mockResolvedValue("item" in opts ? opts.item : { ...ITEM }),
@@ -143,9 +143,28 @@ describe("SubstitutionService.propose", () => {
     expect((events as { substitutionProposed: jest.Mock }).substitutionProposed).toHaveBeenCalled();
     expect((push as { sendToUser: jest.Mock }).sendToUser).toHaveBeenCalledWith(
       "owner1",
-      expect.objectContaining({ data: { orderId: "o1", route: "/track/o1" } }),
+      expect.objectContaining({
+        title: "Substituição no seu pedido",
+        body: expect.stringContaining("Arroz Premium 5kg"),
+        data: { orderId: "o1", route: "/track/o1" },
+      }),
     );
     expect(sub).toEqual({ id: "sub1" });
+  });
+
+  it("re-proposta (upsert.update volta a pending): re-notifica o cliente com push", async () => {
+    // upsert resolve na 1ª e na 2ª chamada — cada propose dispara um novo push.
+    const { svc, push } = makeService();
+    await svc.propose("u1", "t1", "i1", "of1");
+    await svc.propose("u1", "t1", "i1", "of2");
+    const send = (push as { sendToUser: jest.Mock }).sendToUser;
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send.mock.calls[1][1]).toEqual(
+      expect.objectContaining({
+        title: "Substituição no seu pedido",
+        data: { orderId: "o1", route: "/track/o1" },
+      }),
+    );
   });
 
   it("usa promoPriceCents quando há promoção (substituto mais barato → diff negativo)", async () => {
@@ -271,7 +290,7 @@ describe("SubstitutionService.approve / reject — resolve", () => {
     );
     expect((session as { recalcTotals: jest.Mock }).recalcTotals).toHaveBeenCalledWith("g1");
     expect((events as { substitutionResolved: jest.Mock }).substitutionResolved).toHaveBeenCalledWith(
-      expect.objectContaining({ approvalStatus: "approved" }),
+      expect.objectContaining({ approvalStatus: "approved", storeId: "s1", orderGroupId: "g1" }),
     );
     expect((tracking as { emitForGroup: jest.Mock }).emitForGroup).toHaveBeenCalledWith("g1");
   });

@@ -53,6 +53,7 @@ jest.mock("@/hooks/useDebouncedValue", () => ({
 jest.mock("@/api/hooks/usePickTask", () => ({
   SUBSTITUTE_MIN_QUERY: 2,
   usePickTask: () => mockState.task,
+  usePickTaskRealtime: jest.fn(),
   usePickStart: () => ({ mutate: mockStartMutate, isPending: mockState.pending, error: mockState.error }),
   usePickUpdateItem: () => ({ mutate: mockUpdateItemMutate, isPending: false, error: null }),
   usePickSubstitute: () => ({ mutate: mockSubstituteMutate, isPending: false, error: null }),
@@ -276,6 +277,50 @@ describe("TaskScreen — substituição na UI", () => {
     const subBtn = pressableWith(tree, "Substituir");
     act(() => subBtn!.props.onPress());
     expect(JSON.stringify(tree.toJSON())).toContain("letras para buscar");
+  });
+});
+
+describe("TaskScreen — badge de status da substituição (story 64)", () => {
+  const sub = (approvalStatus: "pending" | "approved" | "rejected") => ({
+    id: "sub1",
+    nameSnapshot: "Arroz Premium 5kg",
+    unitPriceCents: 1200,
+    priceDiffCents: 200,
+    approvalStatus,
+  });
+
+  it("pendente: mostra 'aguardando cliente' + nome do substituto", () => {
+    mockState.task = {
+      data: mkTask({ items: [mkItem({ substitution: sub("pending") })] }),
+      isLoading: false,
+      isError: false,
+    };
+    const json = JSON.stringify(render().toJSON());
+    expect(json).toContain("aguardando cliente");
+    expect(json).toContain("Arroz Premium 5kg");
+  });
+
+  it("aprovada: mostra o badge de substituição aprovada", () => {
+    mockState.task = {
+      data: mkTask({ items: [mkItem({ status: "substituted", substitution: sub("approved") })] }),
+      isLoading: false,
+      isError: false,
+    };
+    expect(JSON.stringify(render().toJSON())).toContain("Substituição aprovada");
+  });
+
+  it("recusada: mostra o badge de substituição recusada/removida", () => {
+    mockState.task = {
+      data: mkTask({ items: [mkItem({ status: "refused", substitution: sub("rejected") })] }),
+      isLoading: false,
+      isError: false,
+    };
+    expect(JSON.stringify(render().toJSON())).toContain("recusada/removida");
+  });
+
+  it("sem substituição: não renderiza badge de substituição", () => {
+    mockState.task = { data: mkTask(), isLoading: false, isError: false };
+    expect(JSON.stringify(render().toJSON())).not.toContain("Substituição:");
   });
 });
 
