@@ -38,7 +38,7 @@ Cuidados da rodada:
 | 65 | picker — métricas próprias + visão por colaborador | — | done |
 | 66 | admin — dashboard real (KPIs + alertas) | — | done |
 | 67 | admin — detalhe profundo do pedido, timeline, suporte | — | done |
-| 68 | admin — moderação de avaliações | 56 | todo |
+| 68 | admin — moderação de avaliações | 56 | done |
 | 69 | admin — suspensão de merchant propagada | — | todo |
 | 70 | customer — conta/perfil (editar dados + senha) | — | todo |
 | 71 | customer — livro de endereços | — | todo |
@@ -64,3 +64,4 @@ Cuidados da rodada:
 [OK] 65 — testes: api 1352/1352, picker 156/156, merchant 316/316, types 16/16, api-client 64/64 — commit: 1854308 — merge na main + arquivada — 2026-07-16 — sem migration; computePickerMetrics no picking, reusado pelo merchant via barrel. DÉBITO PRÉ-EXISTENTE confirmado: packages/types test:coverage vermelho na main (68.85%<80; coupons/picking-events/slots/store-hours/delivery-events sem teste) — drenar antes de fechar a rodada.
 [OK] 66 — testes: api 1367/1367, admin 147/147 — commit: ff2a685 — merge na main + arquivada — 2026-07-16 — sem migration; tipagem local no admin (padrão vizinhas, sem rebuild packages); janela SP offset fixo -03:00; thresholds em constantes exportadas.
 [OK] 67 — testes: api 1412/1412, admin 166/166 — commit: 2b1f2bc — merge na main + arquivada — 2026-07-16 — 1ª tentativa cortada por limite de sessão; retomado via SendMessage → concluiu. Migration story67_manual_refund autorada, NÃO aplicada (Docker down). PENDENTE-MANUAL: `prisma migrate deploy`. Refund manual durável via evento order.refund_requested (outbox, idempotente por componentId); adminCancel via barrel (matriz admin→fulfillment).
+[OK] 68 — testes: api 1429/1429, admin 183/183, api-client 65/65, types 16/16 — commit: 0717809 — merge na main + arquivada — 2026-07-16 — 1ª tentativa cortada por limite; retomado via SendMessage → concluiu. Migration story68_review_moderation autorada, NÃO aplicada. PENDENTE-MANUAL: `prisma migrate deploy`. Dep 56→68 satisfeita. Filtro VISIBLE_REVIEWS em ponto único (3 superfícies).
