@@ -1,24 +1,14 @@
-import { useCallback, useEffect, useState } from "react";
-import { useAuth } from "@/auth/auth-context";
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { useAdminOrders } from "@/api/hooks/useAdminOrders";
+import { useDebouncedValue } from "@/lib/useDebounce";
 
-interface OrderRow {
-  id: string;
-  status: string;
-  totalCents: number;
-  createdAt: string;
-  customer: string;
-  paymentStatus: string | null;
-  refundCents: number;
-  stores: string[];
-  fulfillments: string[];
-}
-interface OrdersResponse {
-  items: OrderRow[];
-  total: number;
-  page: number;
-  pageSize: number;
-  statusCounts: Record<string, number>;
-}
+/**
+ * Pedidos do admin (story 67): migrado ao padrão React Query (legado
+ * useState/useEffect migra ao ser tocado — CLAUDE.md), com busca do suporte
+ * (id exato, nome ou e-mail do cliente, com debounce) e link para o detalhe
+ * profundo (`orders/:id`).
+ */
 
 const STATUSES = [
   "created",
@@ -34,24 +24,32 @@ const STATUSES = [
 const brl = (c: number) => `R$ ${(c / 100).toFixed(2).replace(".", ",")}`;
 
 export function Orders() {
-  const { api } = useAuth();
-  const [data, setData] = useState<OrdersResponse | null>(null);
   const [status, setStatus] = useState<string>("");
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const q = useDebouncedValue(search.trim());
 
-  const load = useCallback(() => {
-    const q = new URLSearchParams({ page: String(page), pageSize: "20" });
-    if (status) q.set("status", status);
-    void api.request<OrdersResponse>(`/admin/dashboard/orders?${q}`, { auth: true }).then(setData);
-  }, [api, status, page]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const { data } = useAdminOrders({ status: status || undefined, q: q || undefined, page });
 
   return (
     <div>
       <h1>Pedidos</h1>
+
+      <div className="toolbar" style={{ marginBottom: 12 }}>
+        <input
+          className="input"
+          type="search"
+          placeholder="Buscar por id do pedido, nome ou e-mail do cliente…"
+          aria-label="Buscar pedidos"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
+          style={{ minWidth: 320 }}
+        />
+      </div>
+
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
         <FilterChip label="Todos" active={status === ""} onClick={() => { setStatus(""); setPage(1); }} />
         {STATUSES.map((s) => (
@@ -80,7 +78,9 @@ export function Orders() {
         <tbody>
           {data?.items.map((o) => (
             <tr key={o.id}>
-              <td>#{o.id.slice(0, 6)}</td>
+              <td>
+                <Link to={`/orders/${o.id}`}>#{o.id.slice(0, 6)}</Link>
+              </td>
               <td>{o.customer}</td>
               <td>{o.stores.join(", ")}</td>
               <td><span className={`badge badge-${o.status}`}>{o.status}</span></td>
@@ -92,6 +92,7 @@ export function Orders() {
           ))}
         </tbody>
       </table>
+      {data && data.items.length === 0 && <p className="muted">Nenhum pedido encontrado.</p>}
 
       {data && data.total > data.pageSize && (
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12 }}>

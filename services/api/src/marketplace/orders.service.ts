@@ -292,6 +292,62 @@ export class OrdersService {
   }
 
   /**
+   * Cancelamento pelo SUPORTE/admin (story 67) — ultrapassa a invariante do
+   * cliente: permitido em QUALQUER status não-terminal (≠ delivered/canceled),
+   * inclusive com separação avançada e pedido `on_the_way`. Order inteiro.
+   * Exceção registrada em BUSINESS_RULES.md; consumido pelo admin via barrel
+   * (só o marketplace muta o agregado e emite o evento).
+   *
+   * Na MESMA TX: PickTasks ainda na fila (queued/assigned) são removidas — as
+   * avançadas ficam (histórico de separação); Deliveries não-terminais viram
+   * `canceled`; grupos não-terminais → `canceled`; Order → `canceled`; evento
+   * `order.canceled` no outbox (com `canceledBy: "admin"` + motivo). Os
+   * handlers da story 48 cobrem slot, estorno TOTAL durável e notificações.
+   * Estoque NÃO volta (itens já separados ficam como estão — padrão story 61).
+   */
+  async adminCancel(id: string, reason?: string | null) {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      select: { id: true, status: true, deliverySlotId: true },
+    });
+    if (!order) {
+      throw new NotFoundException({ code: "ORDER_NOT_FOUND", message: "Pedido não encontrado" });
+    }
+    if (order.status === "delivered" || order.status === "canceled") {
+      throw new BadRequestException({
+        code: "CANNOT_CANCEL",
+        message: "Pedido em status terminal não pode ser cancelado",
+      });
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.pickTask.deleteMany({
+        where: { orderGroup: { orderId: id }, status: { in: ["queued", "assigned"] } },
+      });
+      await tx.delivery.updateMany({
+        where: { orderGroup: { orderId: id }, status: { notIn: ["delivered", "canceled"] } },
+        data: { status: "canceled" },
+      });
+      await tx.orderGroup.updateMany({
+        where: { orderId: id, status: { notIn: ["delivered", "canceled"] } },
+        data: { status: "canceled" },
+      });
+      const canceled = await tx.order.update({ where: { id }, data: { status: "canceled" } });
+      await this.outbox.publish(tx, {
+        type: "order.canceled",
+        payload: {
+          orderId: id,
+          deliverySlotId: order.deliverySlotId ?? null,
+          canceledBy: "admin",
+          reason: reason ?? null,
+        },
+        aggregateId: id,
+      });
+      return canceled;
+    });
+  }
+
+  /**
    * Cancela UM sub-pedido (OrderGroup) — story 54. O marketplace é dono do
    * agregado; a loja/marketplace cancela só o grupo dela, os demais grupos do
    * pedido seguem. Espelha a invariante de Order (cancelamento): grupo cancela se

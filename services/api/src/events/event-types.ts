@@ -20,13 +20,17 @@ export interface PickingDonePayload {
 }
 
 /**
- * Pedido cancelado pelo cliente (story 48). Além do orderId, carrega o
- * deliverySlotId reservado (se houver) — o handler `liberar-slot` não precisa
- * reler o pedido para saber qual vaga devolver.
+ * Pedido cancelado pelo cliente (story 48) ou pelo suporte/admin (story 67).
+ * Além do orderId, carrega o deliverySlotId reservado (se houver) — o handler
+ * `liberar-slot` não precisa reler o pedido para saber qual vaga devolver.
+ * `canceledBy`/`reason` são trilha do cancelamento admin (visíveis na timeline);
+ * ausentes no fluxo do cliente (story 48) — os handlers não dependem deles.
  */
 export interface OrderCanceledPayload {
   orderId: string;
   deliverySlotId: string | null;
+  canceledBy?: "customer" | "admin";
+  reason?: string | null;
 }
 
 /**
@@ -56,6 +60,23 @@ export interface DeliveryFailedPayload {
   reason: "customer_absent" | "wrong_address" | "refused" | "other";
 }
 
+/**
+ * Reembolso manual solicitado pelo suporte/admin (story 67). O valor já foi
+ * validado contra o teto (pago − reembolsado) na emissão; o handler dispara o
+ * estorno PARCIAL durável no gateway (mesmo mecanismo 48/54). `componentId` é a
+ * identidade do RefundComponent a criar — a presença dele marca "processado"
+ * (idempotência sob reentrega, além da trava ProcessedEvent). `note` fica só no
+ * payload (trilha na timeline; audit log genérico fora de escopo).
+ */
+export interface OrderRefundRequestedPayload {
+  orderId: string;
+  groupId: string;
+  amountCents: number;
+  componentId: string;
+  createdById: string | null;
+  note?: string | null;
+}
+
 /** Mapa tipo → payload. */
 export interface DomainEventMap {
   "order.created": OrderCreatedPayload;
@@ -64,6 +85,7 @@ export interface DomainEventMap {
   "order.canceled": OrderCanceledPayload;
   "order.group_canceled": OrderGroupCanceledPayload;
   "delivery.failed": DeliveryFailedPayload;
+  "order.refund_requested": OrderRefundRequestedPayload;
 }
 
 export type DomainEventType = keyof DomainEventMap;

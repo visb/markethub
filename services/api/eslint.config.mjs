@@ -47,8 +47,10 @@ const ALLOWED_DEPENDENCIES = {
   // Handlers de evento/relay (events/) despacham PARA os contextos e a
   // integration usa os connectors do catálogo — o support é o "hub" do bus.
   support: ["*"],
-  // Dashboard admin agrega avaliações (leitura).
-  admin: ["engagement"],
+  // Dashboard admin agrega avaliações (leitura). Story 67: o suporte delega o
+  // cancelamento admin do pedido ao dono do agregado (marketplace/fulfillment)
+  // via barrel público (OrdersService.adminCancel) — mesma direção do merchant.
+  admin: ["engagement", "fulfillment"],
   // Catálogo marca lojas seguidas na vitrine (leitura).
   catalog: ["engagement"],
   // Gorjetas (tips) cobram via PaymentProvider.

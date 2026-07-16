@@ -54,6 +54,14 @@ Convenção: enums em `services/api/prisma/schema.prisma`; regras em services do
 - Cancelar libera o slot de entrega reservado.
 - *Pointer:* `src/marketplace/orders.service.ts` (`cancel`).
 
+### Cancelamento pelo suporte/admin (story 67)
+
+- **Exceção à invariante do cliente:** o admin (suporte) cancela o Order **inteiro** em **qualquer status não-terminal** (≠ `delivered`/`canceled`), inclusive com separação avançada e pedido `on_the_way`. Status terminal → `CANNOT_CANCEL`.
+- Efeitos atômicos (mesma TX): PickTasks ainda na fila (`queued`/`assigned`) removidas — as avançadas **ficam** (histórico da separação); Deliveries não-terminais → `canceled`; grupos não-terminais → `canceled` (grupo `delivered` fica como está); Order → `canceled`; evento `order.canceled` no outbox com trilha (`canceledBy: "admin"` + `reason` opcional, visível na timeline).
+- Estorno **TOTAL** durável via handlers da story 48 (slot liberado, estorno, notificações). **Estoque NÃO volta** (padrão story 61).
+- O admin delega ao marketplace (dono do agregado) via barrel — só o marketplace muta Order/OrderGroup e emite o evento.
+- *Pointer:* `src/marketplace/orders.service.ts` (`adminCancel`), `src/admin/admin-order-support.service.ts`.
+
 ### Cancelamento por sub-pedido (OrderGroup — story 54)
 
 - A loja/marketplace cancela **um** sub-pedido (grupo de uma loja); os demais grupos do pedido seguem. Invariante espelha a de Order: o grupo cancela se `status ∈ {created, paid, preparing}` **e** a PickTask do grupo (se houver) ainda não passou de `assigned`. Caso contrário `CANNOT_CANCEL_GROUP`. **Exceção (story 61):** grupo com `Delivery` em `failed` pode cancelar mesmo já avançado (ver "Falha na entrega + decisão da loja"); estoque não volta.
@@ -121,12 +129,19 @@ Convenção: enums em `services/api/prisma/schema.prisma`; regras em services do
 
 - **Um Refund por Order** (`Order.refund` 1:1), consolidando faltas de todos os grupos. `amountCents = max(0, pago − total ajustado)`. Breakdown por grupo em `RefundComponent`.
 - **RefundStatus**: `pending → processed | failed`.
-- **RefundReason**: `weight_shortfall` | `refused` | `group_canceled` (sub-pedido cancelado — total do grupo com cupom rateado; estorno **parcial** acumulado no mesmo Refund, ver "Cancelamento por sub-pedido").
+- **RefundReason**: `weight_shortfall` | `refused` | `group_canceled` (sub-pedido cancelado — total do grupo com cupom rateado; estorno **parcial** acumulado no mesmo Refund, ver "Cancelamento por sub-pedido") | `manual` (reembolso manual do suporte, story 67 — ver abaixo).
 - Falta cobrável por item (`itemShortfall`, cálculo puro testável):
   - `refused`: valor **integral** da linha.
   - `picked` com separação **menor** que o pedido (peso ou unidade): diferença até `min(separado, pedido)`. **Over-delivery não gera falta** (não cobra a mais).
   - `pending`/`substituted`: sem falta (substituição aprovada à parte).
 - *Pointer:* `src/payment/refund.pricing.ts` (+ `refund.pricing.spec.ts`), `refund.service.ts`.
+
+### Reembolso manual pelo suporte/admin (story 67)
+
+- O admin reembolsa **valor arbitrário por grupo** (`POST admin/dashboard/orders/:id/refund`), limitado ao **teto = pago − já reembolsado** (Refund não-`failed`; um Refund `failed` não conta — nada saiu do gateway). Acima do teto → `REFUND_EXCEEDS_PAID`; valor ≤ 0 / não-inteiro → `INVALID_REFUND_AMOUNT`; pedido não pago → `ORDER_NOT_PAID`.
+- Vira `RefundComponent` com `reason = manual` e **`createdById` = admin** (trilha mínima; audit log genérico fora de escopo) acumulado no Refund 1:1 do pedido. **Vários reembolsos manuais do mesmo grupo são permitidos** (acúmulo até o teto).
+- Estorno **parcial durável** — mesmo mecanismo 48/54: a validação emite `order.refund_requested` no outbox (mesma TX); o handler estorna no gateway com retry isolado. Idempotência da reentrega pela presença do `RefundComponent` com o `componentId` do payload (a marca é **por evento**, não por grupo). A nota (`note`) vive só no payload do evento (aparece na timeline).
+- *Pointer:* `src/admin/admin-order-support.service.ts` (`manualRefund`), `src/events/handlers/order-refund-requested.handlers.ts`, `src/payment/refund.service.ts` (`issueManualRefund`).
 
 ---
 

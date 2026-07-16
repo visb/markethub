@@ -14,4 +14,11 @@ export const queryKeys = {
   adminDashboard: {
     summary: ["admin-dashboard", "summary"] as const,
   },
+  adminOrders: {
+    all: ["admin-orders"] as const,
+    list: (filter: { status?: string; q?: string; page?: number }) =>
+      ["admin-orders", "list", filter.status ?? "", filter.q ?? "", filter.page ?? 1] as const,
+    detail: (id: string) => ["admin-orders", "detail", id] as const,
+    timeline: (id: string) => ["admin-orders", "timeline", id] as const,
+  },
 } as const;

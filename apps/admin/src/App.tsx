@@ -6,6 +6,7 @@ import { Layout } from "@/components/Layout";
 import { Login } from "@/pages/Login";
 import { Dashboard } from "@/pages/Dashboard";
 import { Orders } from "@/pages/Orders";
+import { OrderDetail as OrderSupportDetail } from "@/pages/OrderDetail";
 import { Operations } from "@/pages/Operations";
 import { Finance } from "@/pages/Finance";
 import { CatalogQuality } from "@/pages/CatalogQuality";
@@ -67,6 +68,7 @@ export function App() {
                   <Route path="categories" element={<MarketplaceCategories />} />
                   <Route path="users" element={<Users />} />
                   <Route path="orders" element={<Orders />} />
+                  <Route path="orders/:id" element={<OrderSupportDetail />} />
                   <Route path="operations" element={<Operations />} />
                   <Route path="finance" element={<Finance />} />
                   <Route path="erp" element={<ErpRuns />} />
