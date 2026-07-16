@@ -11,4 +11,7 @@ export const queryKeys = {
   merchantOptions: {
     all: ["merchant-options"] as const,
   },
+  adminDashboard: {
+    summary: ["admin-dashboard", "summary"] as const,
+  },
 } as const;
