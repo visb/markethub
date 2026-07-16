@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import type { MerchantReportQuery } from "@markethub/api-client";
 import { useAuth } from "@/auth/auth-context";
-import { operationsReport, reviewsReport, salesReport, topProductsReport } from "@/api/reports";
+import { operationsReport, pickersReport, reviewsReport, salesReport, topProductsReport } from "@/api/reports";
 import { queryKeys } from "@/lib/queryKeys";
 
 /**
@@ -41,6 +41,16 @@ export function useReviewsReport(filters: MerchantReportQuery, options?: { enabl
   return useQuery({
     queryKey: queryKeys.reports.reviews(filters),
     queryFn: () => reviewsReport(api, filters),
+    enabled: (options?.enabled ?? true) && Boolean(user),
+  });
+}
+
+/** Separação por colaborador (story 65) — respeita o mesmo filtro período/loja. */
+export function usePickersReport(filters: MerchantReportQuery, options?: { enabled?: boolean }) {
+  const { api, user } = useAuth();
+  return useQuery({
+    queryKey: queryKeys.reports.pickers(filters),
+    queryFn: () => pickersReport(api, filters),
     enabled: (options?.enabled ?? true) && Boolean(user),
   });
 }

@@ -10,6 +10,7 @@ let salesData: unknown;
 let opsData: unknown;
 let topData: unknown;
 let reviewsData: unknown;
+let pickersData: unknown;
 
 vi.mock("@/api/hooks/useMerchantContext", () => ({
   useMerchantContext: () => ctx,
@@ -25,6 +26,7 @@ vi.mock("@/api/hooks/useReports", () => ({
   },
   useTopProductsReport: () => ({ data: topData, isLoading: false }),
   useReviewsReport: () => ({ data: reviewsData, isLoading: false }),
+  usePickersReport: () => ({ data: pickersData, isLoading: false }),
 }));
 
 import { Reports } from "./Reports";
@@ -62,6 +64,29 @@ describe("Reports page (story 13)", () => {
     reviewsData = {
       period: { from: "x", to: "y" },
       axes: [{ axis: "merchant", average: 4.5, count: 3 }],
+    };
+    pickersData = {
+      period: { from: "x", to: "y" },
+      rows: [
+        {
+          pickerId: "u1",
+          name: "Ana",
+          tasksCompleted: 4,
+          itemsPicked: 36,
+          itemsPerHour: 18.5,
+          substitutionRate: 0.105,
+          refusalRate: 0,
+        },
+        {
+          pickerId: "u2",
+          name: "Beto",
+          tasksCompleted: 1,
+          itemsPicked: 5,
+          itemsPerHour: null,
+          substitutionRate: null,
+          refusalRate: null,
+        },
+      ],
     };
   });
 
@@ -103,5 +128,25 @@ describe("Reports page (story 13)", () => {
     topData = { period: { from: "x", to: "y" }, items: [] };
     render(<Reports />);
     expect(screen.getByText("Sem vendas no período.")).toBeInTheDocument();
+  });
+
+  it("separação por colaborador: tabela com métricas e traço p/ sem dado (story 65)", () => {
+    render(<Reports />);
+    expect(screen.getByText("Separação por colaborador")).toBeInTheDocument();
+    expect(screen.getByText("Ana")).toBeInTheDocument();
+    expect(screen.getByText("36")).toBeInTheDocument(); // itens
+    expect(screen.getByText("18,5")).toBeInTheDocument(); // itens/h
+    expect(screen.getByText("10,5%")).toBeInTheDocument(); // taxa de substituição
+    expect(screen.getByText("0,0%")).toBeInTheDocument(); // recusa 0
+    // Beto sem timestamps/itens: itens/h e taxas viram traço
+    const betoRow = screen.getByText("Beto").closest("tr")!;
+    expect(betoRow.textContent).toContain("—");
+    expect(betoRow.textContent).not.toContain("NaN");
+  });
+
+  it("separação por colaborador vazia mostra estado vazio (story 65)", () => {
+    pickersData = { period: { from: "x", to: "y" }, rows: [] };
+    render(<Reports />);
+    expect(screen.getByText("Sem separações no período.")).toBeInTheDocument();
   });
 });

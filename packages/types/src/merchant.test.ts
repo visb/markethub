@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   createVehicleInputSchema,
   merchantRoleSchema,
+  pickersReportSchema,
   staffRoleSchema,
   vehicleSchema,
   vehicleTypeSchema,
@@ -81,5 +82,52 @@ describe("createVehicleInputSchema", () => {
       }).success,
     ).toBe(true);
     expect(createVehicleInputSchema.safeParse({ type: "van" }).success).toBe(false);
+  });
+});
+
+describe("pickersReportSchema (story 65)", () => {
+  it("aceita linhas com métricas numéricas ou null (sem dado)", () => {
+    const ok = pickersReportSchema.safeParse({
+      period: { from: "2026-07-01T00:00:00.000Z", to: "2026-07-16T00:00:00.000Z" },
+      rows: [
+        {
+          pickerId: "u1",
+          name: "Ana",
+          tasksCompleted: 3,
+          itemsPicked: 27,
+          itemsPerHour: 18.5,
+          substitutionRate: 0.1,
+          refusalRate: 0,
+        },
+        {
+          pickerId: "u2",
+          name: "Beto",
+          tasksCompleted: 0,
+          itemsPicked: 0,
+          itemsPerHour: null,
+          substitutionRate: null,
+          refusalRate: null,
+        },
+      ],
+    });
+    expect(ok.success).toBe(true);
+  });
+
+  it("rejeita taxa não numérica (NaN serializado como string)", () => {
+    const bad = pickersReportSchema.safeParse({
+      period: { from: "a", to: "b" },
+      rows: [
+        {
+          pickerId: "u1",
+          name: "Ana",
+          tasksCompleted: 1,
+          itemsPicked: 1,
+          itemsPerHour: 1,
+          substitutionRate: "NaN",
+          refusalRate: 0,
+        },
+      ],
+    });
+    expect(bad.success).toBe(false);
   });
 });

@@ -72,9 +72,17 @@ export default function HomeScreen() {
           title="Entregas da loja"
           variant="outline"
           onPress={() => router.push(`/deliveries?storeId=${storeId}`)}
-          style={{ marginBottom: spacing.md }}
+          style={{ marginBottom: spacing.sm }}
         />
       )}
+
+      <Button
+        title="Meu desempenho"
+        variant="outline"
+        onPress={() => router.push("/metrics")}
+        style={{ marginBottom: spacing.md }}
+      />
+
 
       {(error || storesError) && (
         <Text style={{ color: colors.danger, marginBottom: spacing.sm }}>{error ?? storesError}</Text>

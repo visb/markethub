@@ -5,6 +5,8 @@ import { IntegrationModule } from "../integration/integration.module";
 import { HandoffService } from "./handoff.service";
 import { OrderEvents } from "./order.events";
 import { OrderTrackingService } from "./order-tracking.service";
+import { PickerMetricsController } from "./picker-metrics.controller";
+import { PickerMetricsService } from "./picker-metrics.service";
 import { PickingController } from "./picking.controller";
 import { PickingEvents } from "./picking.events";
 import { PickingGateway } from "./picking.gateway";
@@ -16,8 +18,9 @@ import { SubstitutionService } from "./substitution.service";
 
 @Module({
   imports: [JwtModule.register({}), IntegrationModule, OutboxModule],
-  controllers: [PickingController, SubstitutionController],
+  controllers: [PickingController, PickerMetricsController, SubstitutionController],
   providers: [
+    PickerMetricsService,
     PickingService,
     PickingSessionService,
     SubstitutionService,

@@ -1,4 +1,11 @@
-import type { ApiClient, PickItemActionInput, PickStore, PickTaskDTO } from "@markethub/api-client";
+import type {
+  ApiClient,
+  PickItemActionInput,
+  PickStore,
+  PickTaskDTO,
+  PickerMetricsDTO,
+  PickerMetricsPeriodDTO,
+} from "@markethub/api-client";
 
 /**
  * Módulo de API tipado do separador (CLAUDE.md: toda chamada HTTP entra aqui,
@@ -40,6 +47,8 @@ export function picking(client: ApiClient) {
     /** Confirma a entrega na retirada em loja, validando o código do cliente. */
     storeHandover: (orderGroupId: string, code: string): Promise<unknown> =>
       client.storeHandover(orderGroupId, code),
+    /** Métricas próprias do separador no período — "Meu desempenho" (story 65). */
+    metrics: (period: PickerMetricsPeriodDTO): Promise<PickerMetricsDTO> => client.pickerMetrics(period),
     /** Busca ofertas da mesma loja p/ propor substituto (autocomplete). */
     searchOffers: async (storeId: string, q: string): Promise<SubOffer[]> => {
       const r = await client.request<{ items: SubOffer[] }>(

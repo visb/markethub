@@ -65,5 +65,8 @@ export const queryKeys = {
       ["reports", "top-products", filters] as const,
     reviews: (filters: { from?: string; to?: string; storeId?: string } = {}) =>
       ["reports", "reviews", filters] as const,
+    /** Separação por colaborador (story 65). */
+    pickers: (filters: { from?: string; to?: string; storeId?: string } = {}) =>
+      ["reports", "pickers", filters] as const,
   },
 } as const;

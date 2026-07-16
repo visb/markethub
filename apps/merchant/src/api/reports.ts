@@ -2,6 +2,7 @@ import type {
   ApiClient,
   MerchantReportQuery,
   OperationsReportDTO,
+  PickersReportDTO,
   ReviewsReportDTO,
   SalesReportDTO,
   TopProductsReportDTO,
@@ -25,4 +26,9 @@ export function topProductsReport(api: ApiClient, params: MerchantReportQuery = 
 
 export function reviewsReport(api: ApiClient, params: MerchantReportQuery = {}): Promise<ReviewsReportDTO> {
   return api.merchantReviewsReport(params);
+}
+
+/** Separação por colaborador — métricas de picking por picker (story 65). */
+export function pickersReport(api: ApiClient, params: MerchantReportQuery = {}): Promise<PickersReportDTO> {
+  return api.merchantPickersReport(params);
 }

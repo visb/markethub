@@ -44,6 +44,9 @@ import type {
   OperationsReportDTO,
   TopProductsReportDTO,
   ReviewsReportDTO,
+  PickersReportDTO,
+  PickerMetricsDTO,
+  PickerMetricsPeriodDTO,
   PickTaskDTO,
   RefreshInput,
   RegisterInput,
@@ -216,6 +219,11 @@ export class ApiClient {
 
   pickCompletePicking(id: string): Promise<PickTaskDTO> {
     return this.request(`/pick-tasks/${id}/complete-picking`, { method: "POST", auth: true });
+  }
+
+  /** Métricas próprias do separador no período (story 65). */
+  pickerMetrics(period: PickerMetricsPeriodDTO = "today"): Promise<PickerMetricsDTO> {
+    return this.request(`/picking/metrics/me?period=${period}`, { auth: true });
   }
 
   pickReady(id: string): Promise<PickTaskDTO> {
@@ -576,6 +584,11 @@ export class ApiClient {
   /** Avaliações agregadas por eixo no período. */
   merchantReviewsReport(params: MerchantReportQuery = {}): Promise<ReviewsReportDTO> {
     return this.request(`/merchant/reports/reviews${this.reportQuery(params)}`, { auth: true });
+  }
+
+  /** Separação por colaborador: métricas de picking por picker no período (story 65). */
+  merchantPickersReport(params: MerchantReportQuery = {}): Promise<PickersReportDTO> {
+    return this.request(`/merchant/reports/pickers${this.reportQuery(params)}`, { auth: true });
   }
 
   merchantUploadUrl(filename: string, contentType: string): Promise<PresignedUpload> {

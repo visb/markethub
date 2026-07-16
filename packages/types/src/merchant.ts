@@ -428,3 +428,28 @@ export const reviewsReportSchema = z.object({
   axes: z.array(reviewsReportAxisSchema),
 });
 export type ReviewsReportDTO = z.infer<typeof reviewsReportSchema>;
+
+// ── Separação por colaborador (story 65) ──
+
+/**
+ * Linha por colaborador do relatório de separação: mesmas métricas do app do
+ * picker. Taxas em fração 0..1; `itemsPerHour`/taxas são `null` quando não há
+ * dado para calcular (nunca NaN).
+ */
+export const pickersReportRowSchema = z.object({
+  pickerId: z.string(),
+  name: z.string(),
+  tasksCompleted: z.number(),
+  itemsPicked: z.number(),
+  itemsPerHour: z.number().nullable(),
+  substitutionRate: z.number().nullable(),
+  refusalRate: z.number().nullable(),
+});
+export type PickersReportRowDTO = z.infer<typeof pickersReportRowSchema>;
+
+/** Relatório "Separação por colaborador" no período/loja do filtro. */
+export const pickersReportSchema = z.object({
+  period: reportPeriodSchema,
+  rows: z.array(pickersReportRowSchema),
+});
+export type PickersReportDTO = z.infer<typeof pickersReportSchema>;
