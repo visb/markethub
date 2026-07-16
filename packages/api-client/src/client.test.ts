@@ -447,6 +447,13 @@ describe("ApiClient — endpoints (rota + método + body)", () => {
     expect(JSON.parse(init(2).body!)).toEqual({ pickupCode: "1234" });
   });
 
+  it("pickerMetrics: GET /picking/metrics/me com o período (default today) — story 65", async () => {
+    await client.pickerMetrics();
+    expect(url(0)).toBe(`${B}/picking/metrics/me?period=today`);
+    await client.pickerMetrics("7d");
+    expect(url(1)).toBe(`${B}/picking/metrics/me?period=7d`);
+  });
+
   it("merchant: lojas e contexto", async () => {
     await client.merchantContext();
     expect(url(0)).toBe(`${B}/merchant/context`);
@@ -558,6 +565,10 @@ describe("ApiClient — endpoints (rota + método + body)", () => {
     expect(url(3)).toBe(`${B}/merchant/reports/top-products?limit=10`);
     await client.merchantReviewsReport();
     expect(url(4)).toBe(`${B}/merchant/reports/reviews`);
+    await client.merchantPickersReport({ from: "2026-07-01", storeId: "s1" });
+    expect(url(5)).toBe(`${B}/merchant/reports/pickers?from=2026-07-01&storeId=s1`);
+    await client.merchantPickersReport();
+    expect(url(6)).toBe(`${B}/merchant/reports/pickers`);
   });
 
   it("avaliações: vitrine pública + gestão + resposta (story 56)", async () => {

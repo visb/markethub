@@ -3,6 +3,7 @@ import type { MerchantReportQuery } from "@markethub/api-client";
 import { useMerchantContext } from "@/api/hooks/useMerchantContext";
 import {
   useOperationsReport,
+  usePickersReport,
   useReviewsReport,
   useSalesReport,
   useTopProductsReport,
@@ -22,6 +23,11 @@ const AXIS_LABEL: Record<string, string> = {
 
 function formatBRL(cents: number): string {
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+/** Taxa em fração 0..1 → percentual; null (sem dado) → traço. */
+function formatPct(rate: number | null): string {
+  return rate == null ? "—" : `${(rate * 100).toFixed(1).replace(".", ",")}%`;
 }
 
 /**
@@ -56,6 +62,7 @@ export function Reports() {
   const operations = useOperationsReport(filters, { enabled });
   const topProducts = useTopProductsReport(filters, { enabled });
   const reviews = useReviewsReport(filters, { enabled });
+  const pickers = usePickersReport(filters, { enabled });
 
   return (
     <section>
@@ -162,6 +169,41 @@ export function Reports() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Separação por colaborador (story 65) */}
+      <div className="report-section">
+        <h2>Separação por colaborador</h2>
+        {pickers.isLoading && <p className="muted">Carregando…</p>}
+        {pickers.data &&
+          (pickers.data.rows.length === 0 ? (
+            <p className="muted">Sem separações no período.</p>
+          ) : (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Colaborador</th>
+                  <th>Tarefas</th>
+                  <th>Itens</th>
+                  <th>Itens/h</th>
+                  <th>Subst.</th>
+                  <th>Recusa</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pickers.data.rows.map((r) => (
+                  <tr key={r.pickerId}>
+                    <td>{r.name}</td>
+                    <td>{r.tasksCompleted}</td>
+                    <td>{r.itemsPicked}</td>
+                    <td>{r.itemsPerHour == null ? "—" : String(r.itemsPerHour).replace(".", ",")}</td>
+                    <td>{formatPct(r.substitutionRate)}</td>
+                    <td>{formatPct(r.refusalRate)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ))}
       </div>
 
       {/* Top produtos */}

@@ -1,5 +1,7 @@
 import { ForbiddenException, Injectable } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
+import { computePickerMetrics } from "../picking";
+import type { CompletedPickTaskShape } from "../picking";
 import { PrismaService } from "../prisma/prisma.service";
 import { MerchantService } from "./merchant.service";
 
@@ -157,6 +159,41 @@ export class MerchantReportsService {
       .slice(0, take);
 
     return { period: { from: from.toISOString(), to: to.toISOString() }, items };
+  }
+
+  /**
+   * Separação por colaborador (story 65): tasks concluídas (`readyAt` no
+   * período) nas lojas do escopo, agrupadas por picker, com as MESMAS métricas
+   * do app do separador (`computePickerMetrics`, barrel do fulfillment).
+   */
+  async pickers(user: { id: string; roles: string[] }, filter: ReportFilter) {
+    const { storeIds } = await this.resolveScope(user, filter.storeId);
+    const { from, to } = this.resolvePeriod(filter);
+
+    const tasks = await this.prisma.pickTask.findMany({
+      where: { storeId: { in: storeIds }, pickerId: { not: null }, readyAt: { gte: from, lte: to } },
+      select: {
+        pickerId: true,
+        startedAt: true,
+        packedAt: true,
+        picker: { select: { name: true } },
+        items: { select: { status: true } },
+      },
+    });
+
+    const byPicker = new Map<string, { name: string; tasks: CompletedPickTaskShape[] }>();
+    for (const task of tasks) {
+      const id = task.pickerId as string;
+      const entry = byPicker.get(id) ?? { name: task.picker?.name ?? "—", tasks: [] };
+      entry.tasks.push(task);
+      byPicker.set(id, entry);
+    }
+
+    const rows = [...byPicker.entries()]
+      .map(([pickerId, entry]) => ({ pickerId, name: entry.name, ...computePickerMetrics(entry.tasks) }))
+      .sort((a, b) => b.tasksCompleted - a.tasksCompleted || a.name.localeCompare(b.name));
+
+    return { period: { from: from.toISOString(), to: to.toISOString() }, rows };
   }
 
   /** Avaliações por eixo no período. merchant é escopado às redes do usuário. */

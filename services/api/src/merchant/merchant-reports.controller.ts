@@ -48,6 +48,16 @@ export class MerchantReportsController {
     );
   }
 
+  @Get("pickers")
+  pickers(
+    @CurrentUser() user: AuthUser,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+    @Query("storeId") storeId?: string,
+  ) {
+    return this.reports.pickers({ id: user.id, roles: user.roles }, { from, to, storeId });
+  }
+
   @Get("reviews")
   reviews(
     @CurrentUser() user: AuthUser,

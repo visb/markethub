@@ -12,6 +12,8 @@ export const queryKeys = {
     task: (id: string) => ["pick", "task", id] as const,
     /** Busca de ofertas da loja p/ propor substituto (autocomplete). */
     search: (storeId: string, q: string) => ["pick", "search", storeId, q] as const,
+    /** Métricas próprias do separador por período (story 65). */
+    metrics: (period: string) => ["pick", "metrics", period] as const,
   },
   /** Despacho de entregas da loja (story 61: destaque de falha + reenviar/cancelar). */
   deliveries: {

@@ -18,6 +18,7 @@ function setup() {
     pickSubstitute: jest.fn().mockResolvedValue({}),
     pickCompletePicking: jest.fn().mockResolvedValue({ id: "t1", status: "packed" }),
     pickReady: jest.fn().mockResolvedValue({ id: "t1", status: "ready_for_pickup" }),
+    pickerMetrics: jest.fn().mockResolvedValue({ period: "7d", tasksCompleted: 2 }),
     storeHandover: jest.fn().mockResolvedValue({}),
     request: jest.fn().mockResolvedValue({ items: [{ offerId: "o1", name: "Arroz", priceCents: 100, promoPriceCents: null }] }),
   };
@@ -79,6 +80,12 @@ describe("picking api module", () => {
     const { client, api } = setup();
     await api.ready("t1");
     expect(client.pickReady).toHaveBeenCalledWith("t1");
+  });
+
+  it("metrics delega pickerMetrics com o período (story 65)", async () => {
+    const { client, api } = setup();
+    await expect(api.metrics("7d")).resolves.toEqual({ period: "7d", tasksCompleted: 2 });
+    expect(client.pickerMetrics).toHaveBeenCalledWith("7d");
   });
 
   it("storeHandover delega com orderGroupId + código", async () => {

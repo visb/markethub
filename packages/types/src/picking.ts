@@ -38,6 +38,31 @@ export interface PickItemDTO {
   substitution?: SubstitutionDTO;
 }
 
+// ── Métricas do separador (story 65) ──
+
+/** Janelas fixas das métricas do separador — mesma convenção da story 60 (ganhos do driver). */
+export type PickerMetricsPeriodDTO = 'today' | '7d' | '30d';
+
+/**
+ * Métricas próprias do separador no período (tarefas com `readyAt` na janela).
+ * Taxas em fração 0..1 (substituted/refused ÷ total de itens das tasks
+ * concluídas); `null` quando não há dado para calcular (zero itens / nenhuma
+ * task com startedAt+packedAt) — nunca NaN.
+ */
+export interface PickerMetricsDTO {
+  period: PickerMetricsPeriodDTO;
+  /** Tarefas concluídas (readyAt no período). */
+  tasksCompleted: number;
+  /** Itens efetivamente separados (status picked) nas tasks concluídas. */
+  itemsPicked: number;
+  /** Itens separados ÷ horas ativas (soma de packedAt − startedAt); null sem tempo ativo. */
+  itemsPerHour: number | null;
+  /** Fração de itens substituídos (0..1); null com zero itens. */
+  substitutionRate: number | null;
+  /** Fração de itens recusados (0..1); null com zero itens. */
+  refusalRate: number | null;
+}
+
 export interface PickTaskDTO {
   id: string;
   orderGroupId: string;

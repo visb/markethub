@@ -5,6 +5,7 @@
  * ficam fora; DI do módulo via picking.module direto.
  */
 export * from "./order.events";
+export * from "./picker-metrics.service";
 export * from "./order-tracking.service";
 export * from "./picking.events";
 export * from "./picking.service";

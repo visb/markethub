@@ -15,7 +15,7 @@ function makeService(overrides: {
   scope?: { storeIds: string[]; merchantIds: string[] };
   order?: { findMany?: jest.Mock };
   orderGroup?: { groupBy?: jest.Mock; count?: jest.Mock };
-  pickTask?: { groupBy?: jest.Mock };
+  pickTask?: { groupBy?: jest.Mock; findMany?: jest.Mock };
   delivery?: { groupBy?: jest.Mock };
   orderItem?: { groupBy?: jest.Mock };
   review?: { groupBy?: jest.Mock };
@@ -27,7 +27,10 @@ function makeService(overrides: {
       groupBy: overrides.orderGroup?.groupBy ?? jest.fn().mockResolvedValue([]),
       count: overrides.orderGroup?.count ?? jest.fn().mockResolvedValue(0),
     },
-    pickTask: { groupBy: overrides.pickTask?.groupBy ?? jest.fn().mockResolvedValue([]) },
+    pickTask: {
+      groupBy: overrides.pickTask?.groupBy ?? jest.fn().mockResolvedValue([]),
+      findMany: overrides.pickTask?.findMany ?? jest.fn().mockResolvedValue([]),
+    },
     delivery: { groupBy: overrides.delivery?.groupBy ?? jest.fn().mockResolvedValue([]) },
     orderItem: { groupBy: overrides.orderItem?.groupBy ?? jest.fn().mockResolvedValue([]) },
     review: { groupBy: overrides.review?.groupBy ?? jest.fn().mockResolvedValue([]) },
@@ -129,6 +132,76 @@ describe("MerchantReportsService.topProducts (story 13)", () => {
     // não estoura — apenas não falha; retorno vazio
     const res = await svc.topProducts(owner, {}, 0);
     expect(res.items).toEqual([]);
+  });
+});
+
+describe("MerchantReportsService.pickers (story 65)", () => {
+  const T0 = new Date("2026-07-15T10:00:00.000Z");
+  const HOUR = 60 * 60 * 1000;
+
+  function row(over: {
+    pickerId: string;
+    name?: string | null;
+    startedAt?: Date | null;
+    packedAt?: Date | null;
+    statuses?: string[];
+  }) {
+    return {
+      pickerId: over.pickerId,
+      picker: over.name === null ? null : { name: over.name ?? "Alguém" },
+      startedAt: over.startedAt ?? null,
+      packedAt: over.packedAt ?? null,
+      items: (over.statuses ?? []).map((status) => ({ status })),
+    };
+  }
+
+  it("agrupa por colaborador com as mesmas métricas do picker e ordena por tarefas", async () => {
+    const findMany = jest.fn().mockResolvedValue([
+      row({ pickerId: "u1", name: "Ana", startedAt: T0, packedAt: new Date(T0.getTime() + HOUR), statuses: ["picked", "picked", "substituted", "refused"] }),
+      row({ pickerId: "u2", name: "Beto", statuses: ["picked"] }), // sem timestamps → itens/h null
+      row({ pickerId: "u1", name: "Ana", startedAt: T0, packedAt: new Date(T0.getTime() + HOUR), statuses: ["picked", "picked"] }),
+    ]);
+    const { svc } = makeService({ pickTask: { findMany } });
+    const res = await svc.pickers(owner, {});
+
+    expect(res.rows).toHaveLength(2);
+    expect(res.rows[0]).toEqual({
+      pickerId: "u1",
+      name: "Ana",
+      tasksCompleted: 2,
+      itemsPicked: 4,
+      itemsPerHour: 2, // 4 itens em 2h ativas
+      substitutionRate: 0.1667, // 1/6
+      refusalRate: 0.1667,
+    });
+    expect(res.rows[1]).toMatchObject({ pickerId: "u2", tasksCompleted: 1, itemsPerHour: null });
+  });
+
+  it("escopa por loja e filtra por readyAt no período (só task com picker)", async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const { svc } = makeService({ pickTask: { findMany } });
+    const res = await svc.pickers(owner, { from: "2026-07-01T00:00:00.000Z", to: "2026-07-15T00:00:00.000Z" });
+
+    const where = findMany.mock.calls[0][0].where;
+    expect(where.storeId.in).toEqual(["s1", "s2"]);
+    expect(where.pickerId).toEqual({ not: null });
+    expect(where.readyAt).toEqual({
+      gte: new Date("2026-07-01T00:00:00.000Z"),
+      lte: new Date("2026-07-15T00:00:00.000Z"),
+    });
+    expect(res.rows).toEqual([]);
+  });
+
+  it("colaborador sem nome cai no fallback '—'", async () => {
+    const findMany = jest.fn().mockResolvedValue([row({ pickerId: "u9", name: null, statuses: ["picked"] })]);
+    const { svc } = makeService({ pickTask: { findMany } });
+    const res = await svc.pickers(owner, {});
+    expect(res.rows[0].name).toBe("—");
+  });
+
+  it("loja fora do escopo → FORBIDDEN", async () => {
+    const { svc } = makeService({ scope: { storeIds: ["s1"], merchantIds: ["m1"] } });
+    await expect(svc.pickers(manager, { storeId: "outra" })).rejects.toBeInstanceOf(ForbiddenException);
   });
 });
 
