@@ -105,8 +105,8 @@ export class SubstitutionService {
     });
     if (group) {
       await this.push.sendToUser(group.order.userId, {
-        title: "Substituição pendente",
-        body: `Um item foi substituído por ${offer.product.name}. Aprove ou recuse.`,
+        title: "Substituição no seu pedido",
+        body: `${offer.product.name} substitui um item indisponível. Aprove ou recuse.`,
         data: { orderId: group.orderId, route: `/track/${group.orderId}` },
       });
     }
@@ -180,12 +180,10 @@ export class SubstitutionService {
       return sub;
     }
 
-    const orderGroupId = (
-      await this.prisma.pickTask.findUniqueOrThrow({
-        where: { id: sub.pickItem.pickTaskId },
-        select: { orderGroupId: true },
-      })
-    ).orderGroupId;
+    const { orderGroupId, storeId } = await this.prisma.pickTask.findUniqueOrThrow({
+      where: { id: sub.pickItem.pickTaskId },
+      select: { orderGroupId: true, storeId: true },
+    });
 
     await this.prisma.$transaction([
       this.prisma.substitution.update({
@@ -204,6 +202,7 @@ export class SubstitutionService {
       id: sub.id,
       pickItemId: sub.pickItemId,
       orderGroupId,
+      storeId,
       approvalStatus: decision,
     });
     // snapshot ao dono no canal order: após resolver a substituição. Best-effort.

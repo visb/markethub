@@ -23,6 +23,14 @@ export const PICK_TASK_UPDATED_EVENT = "pick_task.updated" as const;
 export type PickTaskUpdatedEvent = typeof PICK_TASK_UPDATED_EVENT;
 
 /**
+ * Nome do evento de resolução de substituição (story 64). Emitido na `group room`
+ * (cliente dono) e na `store room` (separador que propôs) quando o cliente
+ * aprova/recusa ou a política de timeout resolve — o picker sai do "às cegas".
+ */
+export const SUBSTITUTION_RESOLVED_EVENT = "substitution.resolved" as const;
+export type SubstitutionResolvedEvent = typeof SUBSTITUTION_RESOLVED_EVENT;
+
+/**
  * Eventos de pedido (OrderGroup) emitidos na `store room` para o app merchant
  * acompanhar pedidos em tempo real (story 12). `order.created` ao surgir o grupo
  * na loja; `order.status_changed` a cada transição de status do OrderGroup. São
