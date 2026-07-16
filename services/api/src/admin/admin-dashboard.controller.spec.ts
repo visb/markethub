@@ -1,5 +1,6 @@
 import { AdminDashboardController } from "./admin-dashboard.controller";
 import type { AdminDashboardService } from "./admin-dashboard.service";
+import type { AdminDashboardSummaryService } from "./admin-dashboard-summary.service";
 import type { ReviewsAggregateService } from "../reviews";
 
 /**
@@ -18,10 +19,24 @@ function makeController() {
   const reviews = {
     platform: jest.fn().mockResolvedValue({ axis: "platform", average: 4, count: 1 }),
   } as unknown as ReviewsAggregateService;
-  return { ctrl: new AdminDashboardController(dashboard, reviews), dashboard, reviews };
+  const summaryService = {
+    summary: jest.fn().mockResolvedValue({ kpis: {}, queues: {}, alerts: [] }),
+  } as unknown as AdminDashboardSummaryService;
+  return {
+    ctrl: new AdminDashboardController(dashboard, reviews, summaryService),
+    dashboard,
+    reviews,
+    summaryService,
+  };
 }
 
 describe("AdminDashboardController", () => {
+  it("summary (GET raiz — story 66) delega ao agregador", () => {
+    const { ctrl, summaryService } = makeController();
+    ctrl.summary();
+    expect(summaryService.summary).toHaveBeenCalled();
+  });
+
   it("orders converte filtros e paginação", () => {
     const { ctrl, dashboard } = makeController();
     ctrl.orders("delivered", "s1", "2026-01-01", "2026-02-01", "2", "30");

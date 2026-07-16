@@ -3,6 +3,7 @@ import { ReviewsModule } from "../reviews/reviews.module";
 import { StorageModule } from "../storage/storage.module";
 import { AdminDashboardController } from "./admin-dashboard.controller";
 import { AdminDashboardService } from "./admin-dashboard.service";
+import { AdminDashboardSummaryService } from "./admin-dashboard-summary.service";
 import { AdminCouponsController } from "./admin-coupons.controller";
 import { AdminCouponsService } from "./admin-coupons.service";
 import {
@@ -23,6 +24,11 @@ import { AdminMerchantsService } from "./admin-merchants.service";
     AdminStoreDetailController,
     AdminCouponsController,
   ],
-  providers: [AdminDashboardService, AdminMerchantsService, AdminCouponsService],
+  providers: [
+    AdminDashboardService,
+    AdminDashboardSummaryService,
+    AdminMerchantsService,
+    AdminCouponsService,
+  ],
 })
 export class AdminModule {}

@@ -3,6 +3,7 @@ import type { OrderStatus } from "@prisma/client";
 import { Roles } from "../auth";
 import { ReviewsAggregateService } from "../reviews";
 import { AdminDashboardService } from "./admin-dashboard.service";
+import { AdminDashboardSummaryService } from "./admin-dashboard-summary.service";
 
 const toDate = (s?: string) => (s ? new Date(s) : undefined);
 
@@ -13,7 +14,14 @@ export class AdminDashboardController {
   constructor(
     private readonly dashboard: AdminDashboardService,
     private readonly reviews: ReviewsAggregateService,
+    private readonly summaryService: AdminDashboardSummaryService,
   ) {}
+
+  /** Agregador da home do admin (story 66): KPIs + filas + alertas numa chamada. */
+  @Get()
+  summary() {
+    return this.summaryService.summary();
+  }
 
   @Get("orders")
   orders(
