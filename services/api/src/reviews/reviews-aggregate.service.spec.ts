@@ -30,7 +30,8 @@ describe("ReviewsAggregateService.platform", () => {
     const prisma = makePrisma({ review: { aggregate } });
     const out = await new ReviewsAggregateService(prisma).platform();
     expect(out).toEqual({ axis: "platform", average: 4.33, count: 3 });
-    expect(aggregate.mock.calls[0][0].where).toEqual({ axis: "platform" });
+    // moderação (story 68): review oculta não conta em nenhuma média
+    expect(aggregate.mock.calls[0][0].where).toEqual({ axis: "platform", hiddenAt: null });
   });
 
   it("média 0 quando não há avaliações", async () => {
@@ -54,10 +55,12 @@ describe("ReviewsAggregateService.merchant", () => {
     expect(aggregate.mock.calls[0][0].where).toEqual({
       axis: "merchant",
       targetMerchantId: "m1",
+      hiddenAt: null,
     });
     expect(aggregate.mock.calls[1][0].where).toEqual({
       axis: "delivery",
       targetMerchantId: "m1",
+      hiddenAt: null,
     });
   });
 });
@@ -82,6 +85,7 @@ describe("ReviewsAggregateService.driver", () => {
     expect(reviewAgg.mock.calls[0][0].where).toEqual({
       axis: "delivery",
       targetDriverId: "d1",
+      hiddenAt: null,
     });
   });
 });

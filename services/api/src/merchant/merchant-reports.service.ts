@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { computePickerMetrics } from "../picking";
 import type { CompletedPickTaskShape } from "../picking";
 import { PrismaService } from "../prisma/prisma.service";
+import { VISIBLE_REVIEWS } from "../reviews";
 import { MerchantService } from "./merchant.service";
 
 /** Janela padrão dos relatórios quando o usuário não informa período. */
@@ -205,6 +206,8 @@ export class MerchantReportsService {
       by: ["axis"],
       where: {
         createdAt: { gte: from, lte: to },
+        // moderação (story 68): oculta pelo admin sai das médias do relatório
+        ...VISIBLE_REVIEWS,
         OR: [
           { axis: { in: ["platform", "delivery"] } },
           { axis: "merchant", targetMerchantId: { in: merchantIds } },

@@ -22,6 +22,7 @@ import { MerchantsList } from "@/pages/merchants/MerchantsList";
 import { MerchantDetail } from "@/pages/merchants/MerchantDetail";
 import { StoreDetail } from "@/pages/merchants/StoreDetail";
 import { Coupons } from "@/pages/Coupons";
+import { Reviews } from "@/pages/Reviews";
 
 /** React Query só p/ o server-state novo (cupons — story 53); legado segue como está. */
 const queryClient = new QueryClient({
@@ -62,6 +63,7 @@ export function App() {
                   <Route path="merchants/:merchantId" element={<MerchantDetail />} />
                   <Route path="stores/:storeId" element={<StoreDetail />} />
                   <Route path="coupons" element={<Coupons />} />
+                  <Route path="reviews" element={<Reviews />} />
                   <Route path="catalog" element={<Catalog />} />
                   <Route path="catalog/:id" element={<ProductDetail />} />
                   <Route path="catalog-quality" element={<CatalogQuality />} />

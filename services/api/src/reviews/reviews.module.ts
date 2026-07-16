@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { PaymentProviderModule } from "../payment/payment-provider.module";
 import { ReviewsAggregateService } from "./reviews-aggregate.service";
 import { ReviewsManagementService } from "./reviews-management.service";
+import { ReviewsModerationService } from "./reviews-moderation.service";
 import { ReviewsController } from "./reviews.controller";
 import { ReviewsService } from "./reviews.service";
 import { StoreReviewsController } from "./store-reviews.controller";
@@ -15,7 +16,13 @@ import { TipsService } from "./tips.service";
 @Module({
   imports: [PaymentProviderModule],
   controllers: [ReviewsController, StoreReviewsController],
-  providers: [ReviewsService, TipsService, ReviewsAggregateService, ReviewsManagementService],
-  exports: [ReviewsAggregateService, ReviewsManagementService],
+  providers: [
+    ReviewsService,
+    TipsService,
+    ReviewsAggregateService,
+    ReviewsManagementService,
+    ReviewsModerationService,
+  ],
+  exports: [ReviewsAggregateService, ReviewsManagementService, ReviewsModerationService],
 })
 export class ReviewsModule {}

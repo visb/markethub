@@ -15,12 +15,14 @@ import {
 import { AdminMerchantsService } from "./admin-merchants.service";
 import { AdminOrdersController } from "./admin-orders.controller";
 import { AdminOrderSupportService } from "./admin-order-support.service";
+import { AdminReviewsController } from "./admin-reviews.controller";
 
 /**
  * Admin (S5.4 + navegação Mercado→Loja): dashboard de pedidos/operação/financeiro
  * e drill-down por mercado/loja com ofertas, estoque e funcionários. Story 67:
  * suporte ao pedido (timeline, cancelamento admin delegado ao marketplace e
- * reembolso manual via evento durável).
+ * reembolso manual via evento durável). Story 68: moderação de avaliações
+ * (soft-hide) delegada ao contexto engagement.
  */
 @Module({
   imports: [EventsModule, MarketplaceModule, ReviewsModule, StorageModule],
@@ -30,6 +32,7 @@ import { AdminOrderSupportService } from "./admin-order-support.service";
     AdminStoreDetailController,
     AdminCouponsController,
     AdminOrdersController,
+    AdminReviewsController,
   ],
   providers: [
     AdminDashboardService,

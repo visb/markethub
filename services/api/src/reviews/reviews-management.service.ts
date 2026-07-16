@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import type { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { VISIBLE_REVIEWS } from "./review-visibility";
 
 /** Página padrão da vitrine pública de avaliações da loja. */
 const STORE_PAGE_SIZE = 10;
@@ -56,7 +57,12 @@ export class ReviewsManagementService {
    * comentários. Review sem comentário também conta na média e aparece na lista.
    */
   async storeReviews(merchantId: string, page = 1) {
-    const where: Prisma.ReviewWhereInput = { axis: "merchant", targetMerchantId: merchantId };
+    // moderação (story 68): review oculta pelo admin sai da vitrine E da média
+    const where: Prisma.ReviewWhereInput = {
+      axis: "merchant",
+      targetMerchantId: merchantId,
+      ...VISIBLE_REVIEWS,
+    };
     const take = STORE_PAGE_SIZE;
     const safePage = page > 0 ? page : 1;
     const skip = (safePage - 1) * take;

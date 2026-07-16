@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import type { ReviewAxis } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { VISIBLE_REVIEWS } from "./review-visibility";
 
 /**
  * Agregações de avaliação e gorjeta (S5.2) — consumidas pelo dashboard admin
@@ -52,8 +53,9 @@ export class ReviewsAggregateService {
     targetMerchantId?: string;
     targetDriverId?: string;
   }) {
+    // moderação (story 68): review oculta pelo admin não conta em NENHUMA média
     const agg = await this.prisma.review.aggregate({
-      where,
+      where: { ...where, ...VISIBLE_REVIEWS },
       _avg: { rating: true },
       _count: { _all: true },
     });

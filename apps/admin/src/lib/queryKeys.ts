@@ -21,4 +21,16 @@ export const queryKeys = {
     detail: (id: string) => ["admin-orders", "detail", id] as const,
     timeline: (id: string) => ["admin-orders", "timeline", id] as const,
   },
+  adminReviews: {
+    all: ["admin-reviews"] as const,
+    list: (filter: { rating?: number; hidden?: boolean; merchantId?: string; q?: string }) =>
+      [
+        "admin-reviews",
+        "list",
+        filter.rating ?? 0,
+        filter.hidden ?? "all",
+        filter.merchantId ?? "",
+        filter.q ?? "",
+      ] as const,
+  },
 } as const;
