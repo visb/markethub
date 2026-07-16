@@ -127,6 +127,29 @@ describe("AdminDashboardService.orders", () => {
     expect(findMany.mock.calls[0][0].skip).toBe(0);
     expect(findMany.mock.calls[0][0].take).toBe(100);
   });
+
+  it("busca `q` (story 67): id exato OU nome/e-mail contains insensitive", async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const prisma = makePrisma({
+      order: { findMany, count: jest.fn().mockResolvedValue(0), groupBy: jest.fn().mockResolvedValue([]) },
+    });
+    await new AdminDashboardService(prisma).orders({ q: "ana@ex.com" });
+    const where = findMany.mock.calls[0][0].where;
+    expect(where.OR).toEqual([
+      { id: "ana@ex.com" },
+      { user: { is: { name: { contains: "ana@ex.com", mode: "insensitive" } } } },
+      { user: { is: { email: { contains: "ana@ex.com", mode: "insensitive" } } } },
+    ]);
+  });
+
+  it("sem `q` não monta OR de busca", async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const prisma = makePrisma({
+      order: { findMany, count: jest.fn().mockResolvedValue(0), groupBy: jest.fn().mockResolvedValue([]) },
+    });
+    await new AdminDashboardService(prisma).orders({});
+    expect(findMany.mock.calls[0][0].where.OR).toBeUndefined();
+  });
 });
 
 describe("AdminDashboardService.orderDetail", () => {

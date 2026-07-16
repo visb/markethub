@@ -530,3 +530,169 @@ describe("RefundService.issueGroupCancelRefund", () => {
     expect(txRefundCreate).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * Story 67: estorno PARCIAL manual do suporte/admin (handler do evento
+ * `order.refund_requested`). Component `manual` com createdById acumulado no
+ * Refund 1:1; idempotente pelo componentId do payload (vários reembolsos manuais
+ * do MESMO grupo são permitidos — a marca é por evento, não por grupo).
+ */
+describe("RefundService.issueManualRefund", () => {
+  function makeSvc(opts: { order?: Record<string, unknown> | null; refundThrows?: boolean } = {}) {
+    const txRefundCreate = jest.fn().mockResolvedValue({ id: "ref1" });
+    const txRefundUpdate = jest.fn().mockResolvedValue({});
+    const tx = { refund: { create: txRefundCreate, update: txRefundUpdate } };
+    const prisma = {
+      order: { findUnique: jest.fn().mockResolvedValue("order" in opts ? opts.order : null) },
+      $transaction: jest.fn(async (cb: (t: typeof tx) => unknown) => cb(tx)),
+    } as never;
+    const providerRefund = opts.refundThrows
+      ? jest.fn().mockRejectedValue(new Error("gateway down"))
+      : jest.fn().mockResolvedValue({ refundId: "prov_ref9" });
+    const provider = { name: "mock", refund: providerRefund } as never;
+    const svc = new RefundService(prisma, provider);
+    return { svc, txRefundCreate, txRefundUpdate, providerRefund };
+  }
+
+  const paid = { status: "paid", amountCents: 10000, provider: "mock", providerChargeId: "ch1" };
+  const input = (over: Partial<{ amountCents: number; componentId: string }> = {}) => ({
+    orderId: "o1",
+    groupId: "g1",
+    amountCents: over.amountCents ?? 2500,
+    componentId: over.componentId ?? "comp1",
+    createdById: "admin1",
+  });
+
+  it("sem Refund ainda: estorna no gateway e cria o Refund com component manual + createdById", async () => {
+    const { svc, txRefundCreate, providerRefund } = makeSvc({
+      order: { id: "o1", payment: paid, refund: null },
+    });
+    await svc.issueManualRefund(input());
+    expect(providerRefund).toHaveBeenCalledWith({ chargeId: "ch1", amountCents: 2500, reason: "manual" });
+    expect(txRefundCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          orderId: "o1",
+          amountCents: 2500,
+          status: "processed",
+          reason: "manual",
+          components: {
+            create: {
+              id: "comp1",
+              orderGroupId: "g1",
+              amountCents: 2500,
+              reason: "manual",
+              createdById: "admin1",
+            },
+          },
+        }),
+      }),
+    );
+  });
+
+  it("Refund já existe: acumula amountCents + novo component manual (mesmo grupo pode repetir)", async () => {
+    const { svc, txRefundUpdate } = makeSvc({
+      order: {
+        id: "o1",
+        payment: paid,
+        refund: {
+          id: "ref1",
+          status: "processed",
+          amountCents: 3000,
+          components: [{ id: "compA", orderGroupId: "g1", reason: "manual" }],
+        },
+      },
+    });
+    await svc.issueManualRefund(input({ componentId: "compB", amountCents: 1000 }));
+    expect(txRefundUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "ref1" },
+        data: expect.objectContaining({
+          amountCents: { increment: 1000 },
+          status: "processed",
+          components: {
+            create: {
+              id: "compB",
+              orderGroupId: "g1",
+              amountCents: 1000,
+              reason: "manual",
+              createdById: "admin1",
+            },
+          },
+        }),
+      }),
+    );
+  });
+
+  it("idempotente: component com o componentId já existe → no-op (sem tocar o gateway)", async () => {
+    const { svc, providerRefund, txRefundUpdate } = makeSvc({
+      order: {
+        id: "o1",
+        payment: paid,
+        refund: {
+          id: "ref1",
+          status: "processed",
+          amountCents: 2500,
+          components: [{ id: "comp1", orderGroupId: "g1", reason: "manual" }],
+        },
+      },
+    });
+    await svc.issueManualRefund(input());
+    expect(providerRefund).not.toHaveBeenCalled();
+    expect(txRefundUpdate).not.toHaveBeenCalled();
+  });
+
+  it("guard defensivo do teto: valor acima de pago − reembolsado → no-op (loga e ignora)", async () => {
+    const { svc, providerRefund } = makeSvc({
+      order: {
+        id: "o1",
+        payment: paid, // pago 10000
+        refund: { id: "ref1", status: "processed", amountCents: 9000, components: [] },
+      },
+    });
+    await svc.issueManualRefund(input({ amountCents: 1500 })); // teto restante = 1000
+    expect(providerRefund).not.toHaveBeenCalled();
+  });
+
+  it("refund failed não conta no teto (nada saiu do gateway)", async () => {
+    const { svc, providerRefund, txRefundUpdate } = makeSvc({
+      order: {
+        id: "o1",
+        payment: paid,
+        refund: { id: "ref1", status: "failed", amountCents: 9000, components: [] },
+      },
+    });
+    await svc.issueManualRefund(input({ amountCents: 9500 }));
+    expect(providerRefund).toHaveBeenCalled();
+    expect(txRefundUpdate).toHaveBeenCalled();
+  });
+
+  it("amountCents <= 0 → no-op", async () => {
+    const { svc, providerRefund } = makeSvc({ order: { id: "o1", payment: paid, refund: null } });
+    await svc.issueManualRefund(input({ amountCents: 0 }));
+    expect(providerRefund).not.toHaveBeenCalled();
+  });
+
+  it("pedido não pago → no-op", async () => {
+    const { svc, providerRefund } = makeSvc({
+      order: { id: "o1", payment: { status: "pending" }, refund: null },
+    });
+    await svc.issueManualRefund(input());
+    expect(providerRefund).not.toHaveBeenCalled();
+  });
+
+  it("pedido inexistente → no-op", async () => {
+    const { svc, providerRefund } = makeSvc({ order: null });
+    await svc.issueManualRefund(input());
+    expect(providerRefund).not.toHaveBeenCalled();
+  });
+
+  it("falha do provider PROPAGA (job retenta) sem gravar Refund", async () => {
+    const { svc, txRefundCreate } = makeSvc({
+      order: { id: "o1", payment: paid, refund: null },
+      refundThrows: true,
+    });
+    await expect(svc.issueManualRefund(input())).rejects.toThrow("gateway down");
+    expect(txRefundCreate).not.toHaveBeenCalled();
+  });
+});

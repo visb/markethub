@@ -31,6 +31,7 @@ export class AdminDashboardController {
     @Query("to") to?: string,
     @Query("page") page?: string,
     @Query("pageSize") pageSize?: string,
+    @Query("q") q?: string,
   ) {
     return this.dashboard.orders({
       status: status as OrderStatus | undefined,
@@ -39,6 +40,7 @@ export class AdminDashboardController {
       to: toDate(to),
       page: page ? Number(page) : undefined,
       pageSize: pageSize ? Number(pageSize) : undefined,
+      q: q || undefined,
     });
   }
 

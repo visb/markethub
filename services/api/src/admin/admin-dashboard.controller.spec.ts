@@ -63,6 +63,14 @@ describe("AdminDashboardController", () => {
     });
   });
 
+  it("orders repassa a busca `q` (story 67); string vazia vira undefined", () => {
+    const { ctrl, dashboard } = makeController();
+    ctrl.orders(undefined, undefined, undefined, undefined, undefined, undefined, "ana@ex.com");
+    expect(dashboard.orders).toHaveBeenCalledWith(expect.objectContaining({ q: "ana@ex.com" }));
+    ctrl.orders(undefined, undefined, undefined, undefined, undefined, undefined, "");
+    expect((dashboard.orders as jest.Mock).mock.calls[1][0].q).toBeUndefined();
+  });
+
   it("orderDetail delega o id", () => {
     const { ctrl, dashboard } = makeController();
     ctrl.orderDetail("o1");

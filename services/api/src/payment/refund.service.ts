@@ -139,6 +139,96 @@ export class RefundService {
     this.logger.log(`Estorno parcial de ${amountCents}c (grupo ${groupId} cancelado) p/ pedido ${orderId}`);
   }
 
+  /**
+   * Estorno PARCIAL manual do suporte/admin (story 67) — handler do evento
+   * `order.refund_requested`. Acumula um `RefundComponent` (reason `manual`,
+   * `createdById` = admin) no Refund 1:1 do pedido e dispara o estorno do valor
+   * arbitrário no gateway — mesmo mecanismo durável da 48/54 (retry via BullMQ;
+   * falha do provider PROPAGA).
+   *
+   * Idempotência: `componentId` vem no payload (gerado na emissão) — o
+   * componente é gravado com ESSE id junto do resultado do provider, então a
+   * reentrega após sucesso faz short-circuit pela presença dele (vários
+   * reembolsos manuais do MESMO grupo são permitidos; a marca é por evento, não
+   * por grupo). O teto (pago − já reembolsado) é validado na emissão (admin
+   * service); aqui há um guard defensivo que loga e ignora se o estado mudou
+   * entre a emissão e o processamento.
+   */
+  async issueManualRefund(input: {
+    orderId: string;
+    groupId: string;
+    amountCents: number;
+    componentId: string;
+    createdById: string | null;
+  }): Promise<void> {
+    if (input.amountCents <= 0) return;
+    const order = await this.prisma.order.findUnique({
+      where: { id: input.orderId },
+      include: { payment: true, refund: { include: { components: true } } },
+    });
+    if (!order) return;
+    if (!order.payment || order.payment.status !== "paid") return; // só estorna pedido pago
+
+    // já processado ESTE pedido de reembolso? (component com o id do evento) → no-op
+    if (order.refund?.components.some((c) => c.id === input.componentId)) return;
+
+    // guard defensivo do teto (a validação principal é na emissão)
+    const refundedCents =
+      order.refund && order.refund.status !== "failed" ? order.refund.amountCents : 0;
+    if (input.amountCents > order.payment.amountCents - refundedCents) {
+      this.logger.warn(
+        `Reembolso manual de ${input.amountCents}c excede o teto do pedido ${input.orderId} — ignorado`,
+      );
+      return;
+    }
+
+    // estorno no gateway ANTES de registrar o componente (o componente com o
+    // componentId é a marca de "processado" p/ a reentrega fazer short-circuit).
+    const result = await this.provider.refund({
+      chargeId: order.payment.providerChargeId ?? "",
+      amountCents: input.amountCents,
+      reason: "manual",
+    });
+
+    const component = {
+      id: input.componentId,
+      orderGroupId: input.groupId,
+      amountCents: input.amountCents,
+      reason: "manual" as const,
+      createdById: input.createdById,
+    };
+    await this.prisma.$transaction(async (tx) => {
+      if (order.refund) {
+        await tx.refund.update({
+          where: { id: order.refund.id },
+          data: {
+            amountCents: { increment: input.amountCents },
+            status: "processed",
+            providerRefundId: result.refundId,
+            processedAt: new Date(),
+            components: { create: component },
+          },
+        });
+      } else {
+        await tx.refund.create({
+          data: {
+            orderId: input.orderId,
+            amountCents: input.amountCents,
+            status: "processed",
+            provider: order.payment!.provider,
+            reason: "manual",
+            providerRefundId: result.refundId,
+            processedAt: new Date(),
+            components: { create: component },
+          },
+        });
+      }
+    });
+    this.logger.log(
+      `Estorno manual de ${input.amountCents}c (grupo ${input.groupId}) p/ pedido ${input.orderId}`,
+    );
+  }
+
   async maybeIssueRefundForOrder(orderId: string): Promise<void> {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },

@@ -9,6 +9,8 @@ interface OrdersFilter {
   to?: Date;
   page?: number;
   pageSize?: number;
+  /** Busca do suporte (story 67): id EXATO do pedido, nome ou e-mail do cliente. */
+  q?: string;
 }
 
 interface PeriodFilter {
@@ -34,6 +36,17 @@ export class AdminDashboardService {
       ...(filter.storeId ? { groups: { some: { storeId: filter.storeId } } } : {}),
       ...(filter.from || filter.to
         ? { createdAt: { ...(filter.from ? { gte: filter.from } : {}), ...(filter.to ? { lte: filter.to } : {}) } }
+        : {}),
+      // busca do suporte (story 67): id exato OU nome/e-mail contains insensitive.
+      // Telefone entra quando a story de conta/perfil criar o campo no User.
+      ...(filter.q
+        ? {
+            OR: [
+              { id: filter.q },
+              { user: { is: { name: { contains: filter.q, mode: "insensitive" as const } } } },
+              { user: { is: { email: { contains: filter.q, mode: "insensitive" as const } } } },
+            ],
+          }
         : {}),
     };
 
@@ -77,7 +90,7 @@ export class AdminDashboardService {
     };
   }
 
-  /** Detalhe completo do pedido (grupos, separação, entrega, pagamento, reembolso). */
+  /** Detalhe completo do pedido (grupos, separação c/ substituições, entrega, pagamento, reembolso). */
   orderDetail(id: string) {
     return this.prisma.order.findUniqueOrThrow({
       where: { id },
@@ -90,7 +103,21 @@ export class AdminDashboardService {
           include: {
             merchant: { select: { name: true } },
             store: { select: { name: true } },
-            items: true,
+            // itens com resolução da separação + substituição (story 67: suporte vê o que foi trocado)
+            items: {
+              include: {
+                pickItem: {
+                  select: {
+                    status: true,
+                    quantityPicked: true,
+                    weightGramsPicked: true,
+                    substitution: {
+                      select: { nameSnapshot: true, unitPriceCents: true, approvalStatus: true },
+                    },
+                  },
+                },
+              },
+            },
             pickTask: { select: { id: true, status: true, pickerId: true } },
             delivery: { select: { id: true, status: true, driver: { select: { name: true } } } },
           },

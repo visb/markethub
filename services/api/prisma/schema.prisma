@@ -755,6 +755,7 @@ enum RefundReason {
   weight_shortfall // separou menos gramas que o pedido (item de peso)
   refused // item recusado/sem estoque (valor integral)
   group_canceled // sub-pedido (OrderGroup) cancelado pela loja/marketplace — total do grupo com cupom rateado (story 54)
+  manual // reembolso manual do suporte (admin) — valor arbitrário até o teto (story 67)
 }
 
 // Reembolso único por Order (SF.3): consolida faltas de peso e itens recusados de
@@ -784,6 +785,8 @@ model RefundComponent {
   orderGroupId String
   amountCents  Int
   reason       RefundReason
+  // trilha mínima do reembolso manual (story 67): admin que criou (weak ref, sem FK)
+  createdById  String?
 
   @@index([refundId])
   @@index([orderGroupId])

@@ -21,6 +21,7 @@ export const ORDER_CANCELED_NOTIFICAR = "order-canceled.notificar";
 export const ORDER_GROUP_CANCELED_EMITIR_ESTORNO = "order-group-canceled.emitir-estorno";
 export const ORDER_GROUP_CANCELED_NOTIFICAR = "order-group-canceled.notificar";
 export const DELIVERY_FAILED_NOTIFICAR = "delivery-failed.notificar";
+export const ORDER_REFUND_REQUESTED_EMITIR_ESTORNO = "order-refund-requested.emitir-estorno";
 
 /** eventType → handlers inscritos. */
 export const SUBSCRIPTIONS: Record<DomainEventType, readonly string[]> = {
@@ -41,6 +42,7 @@ export const SUBSCRIPTIONS: Record<DomainEventType, readonly string[]> = {
     ORDER_GROUP_CANCELED_NOTIFICAR,
   ],
   "delivery.failed": [DELIVERY_FAILED_NOTIFICAR],
+  "order.refund_requested": [ORDER_REFUND_REQUESTED_EMITIR_ESTORNO],
 };
 
 /** Todas as filas de handler (p/ registerQueue + injeção do mapa no relay). */

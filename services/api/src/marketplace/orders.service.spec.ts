@@ -908,3 +908,80 @@ describe("OrdersService.cancelGroup (story 54 — cancelamento por sub-pedido)",
     });
   });
 });
+
+describe("OrdersService.adminCancel (story 67 — cancelamento pelo suporte/admin)", () => {
+  function setupAdmin(opts: { status?: string; deliverySlotId?: string | null; missing?: boolean } = {}) {
+    const order = opts.missing
+      ? null
+      : { id: "order1", status: opts.status ?? "paid", deliverySlotId: opts.deliverySlotId ?? null };
+
+    const tx = {
+      pickTask: { deleteMany: jest.fn().mockResolvedValue({}) },
+      delivery: { updateMany: jest.fn().mockResolvedValue({}) },
+      orderGroup: { updateMany: jest.fn().mockResolvedValue({}) },
+      order: { update: jest.fn().mockResolvedValue({ id: "order1", status: "canceled" }) },
+    };
+    const prisma = {
+      order: { findUnique: jest.fn().mockResolvedValue(order) },
+      $transaction: jest.fn(async (cb: (t: typeof tx) => unknown) => cb(tx)),
+    } as never;
+    const outbox = { publish: jest.fn().mockResolvedValue({ id: "evt1" }) };
+    const svc = new OrdersService(prisma, {} as never, {} as never, {} as never, outbox as never);
+    return { svc, prisma, tx, outbox };
+  }
+
+  it.each(["created", "paid", "preparing", "picking", "ready_for_pickup", "on_the_way"])(
+    "status=%s (não-terminal, inclusive on_the_way): cancela tudo e emite order.canceled NA MESMA TX",
+    async (status) => {
+      const { svc, tx, outbox } = setupAdmin({ status });
+      const res = await svc.adminCancel("order1", "cliente pediu");
+
+      // só as tasks ainda na fila saem; as avançadas ficam (histórico da separação)
+      expect(tx.pickTask.deleteMany).toHaveBeenCalledWith({
+        where: { orderGroup: { orderId: "order1" }, status: { in: ["queued", "assigned"] } },
+      });
+      // entregas não-terminais viram canceled
+      expect(tx.delivery.updateMany).toHaveBeenCalledWith({
+        where: { orderGroup: { orderId: "order1" }, status: { notIn: ["delivered", "canceled"] } },
+        data: { status: "canceled" },
+      });
+      // grupos não-terminais viram canceled (delivered fica como está)
+      expect(tx.orderGroup.updateMany).toHaveBeenCalledWith({
+        where: { orderId: "order1", status: { notIn: ["delivered", "canceled"] } },
+        data: { status: "canceled" },
+      });
+      expect(tx.order.update).toHaveBeenCalledWith({ where: { id: "order1" }, data: { status: "canceled" } });
+      // evento com trilha do admin — atômico com o cancelamento (estorno total via handlers da 48)
+      expect(outbox.publish).toHaveBeenCalledTimes(1);
+      expect(outbox.publish).toHaveBeenCalledWith(tx, {
+        type: "order.canceled",
+        payload: { orderId: "order1", deliverySlotId: null, canceledBy: "admin", reason: "cliente pediu" },
+        aggregateId: "order1",
+      });
+      expect(res).toMatchObject({ status: "canceled" });
+    },
+  );
+
+  it("pedido com slot: o payload carrega o deliverySlotId (handler liberar-slot usa)", async () => {
+    const { svc, outbox } = setupAdmin({ status: "paid", deliverySlotId: "slot1" });
+    await svc.adminCancel("order1");
+    expect(outbox.publish).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        payload: { orderId: "order1", deliverySlotId: "slot1", canceledBy: "admin", reason: null },
+      }),
+    );
+  });
+
+  it.each(["delivered", "canceled"])("status terminal (%s) → CANNOT_CANCEL sem evento", async (status) => {
+    const { svc, tx, outbox } = setupAdmin({ status });
+    await expect(svc.adminCancel("order1")).rejects.toMatchObject({ response: { code: "CANNOT_CANCEL" } });
+    expect(tx.order.update).not.toHaveBeenCalled();
+    expect(outbox.publish).not.toHaveBeenCalled();
+  });
+
+  it("pedido inexistente → ORDER_NOT_FOUND", async () => {
+    const { svc } = setupAdmin({ missing: true });
+    await expect(svc.adminCancel("x")).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
