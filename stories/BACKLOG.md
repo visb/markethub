@@ -1,9 +1,5 @@
 # BACKLOG — itens crus para refinar
 
-## Perfil
-
-Criar itens no menu para "Meus dados" e "Segurança"
-
 ## Ganhos
 
 No app do driver, na pagina "/earnings", o "Historico de entregas" está mostrando todo o historico de entregas, nao esta respeitando o filtro "hoje", "7 dias" e "30 dias"
