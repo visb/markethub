@@ -21,7 +21,8 @@ jest.mock("expo-location", () => ({
 }));
 
 const mockBack = jest.fn();
-jest.mock("expo-router", () => ({ useRouter: () => ({ back: mockBack, push: jest.fn() }) }));
+const mockPush = jest.fn();
+jest.mock("expo-router", () => ({ useRouter: () => ({ back: mockBack, push: mockPush }) }));
 
 let list: Address[];
 const mockRequest = jest.fn((url: string, opts?: { method?: string }) => {
@@ -84,6 +85,7 @@ function byTitle(tree: renderer.ReactTestRenderer, title: string) {
 beforeEach(() => {
   mockRequest.mockClear();
   mockBack.mockClear();
+  mockPush.mockClear();
   list = [addr({ id: "a1", label: "Casa", isDefault: true }), addr({ id: "a2", label: "Trabalho", street: "Rua B" })];
 });
 
@@ -125,6 +127,15 @@ describe("AddressesScreen", () => {
     act(() => cancelar.props.onPress());
     // volta para a lista
     expect(byTitle(tree, "+ Adicionar endereço").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("link 'Gerenciar endereços' leva ao livro de endereços (story 71)", async () => {
+    const tree = await mount();
+    const link = tree.root
+      .findAll((n) => typeof n.props.onPress === "function" && typeof n.type !== "string")
+      .find((n) => deepText(n).includes("Gerenciar endereços"))!;
+    act(() => link.props.onPress());
+    expect(mockPush).toHaveBeenCalledWith("/addresses");
   });
 
   it("adicionar abre o formulário de novo endereço", async () => {
