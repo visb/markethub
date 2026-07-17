@@ -1,9 +1,5 @@
 # BACKLOG — itens crus para refinar
 
-## Cupons
-
-- No carrinho de compras, deve mostrar os cupons disponiveis para o usuario selecionar qual ele quer aplicar
-
 ## Endereço do customer
 
 - ao salvar um endereço, no app customer, deve-se carregar a lat & lng exata para salvar no banco de dados. o sistema usa estes valores como referencia
