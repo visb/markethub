@@ -57,6 +57,9 @@ import type {
   EarningsPeriodDTO,
   DriverEarningsDTO,
   DeliveryHistoryPageDTO,
+  UpdateMeInput,
+  ChangePasswordInput,
+  ChangePasswordResultDTO,
 } from "@markethub/types";
 import { MemoryTokenStore, type TokenStore } from "./token-store";
 
@@ -176,6 +179,20 @@ export class ApiClient {
 
   me(): Promise<AuthUser> {
     return this.request<AuthUser>("/auth/me", { auth: true });
+  }
+
+  /** Atualiza nome/telefone do usuário autenticado (story 70). PATCH parcial: só o enviado muda. */
+  updateMe(input: UpdateMeInput): Promise<AuthUser> {
+    return this.request<AuthUser>("/users/me", { method: "PATCH", body: input, auth: true });
+  }
+
+  /** Troca a senha do usuário autenticado; revoga as demais sessões (story 70). */
+  changeMyPassword(input: ChangePasswordInput): Promise<ChangePasswordResultDTO> {
+    return this.request<ChangePasswordResultDTO>("/users/me/password", {
+      method: "POST",
+      body: input,
+      auth: true,
+    });
   }
 
   health(): Promise<{ status: string; checks: Record<string, string> }> {

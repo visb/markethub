@@ -388,6 +388,27 @@ describe("ApiClient — auth", () => {
     expect(store.getRefresh()).toBeNull();
   });
 
+  it("updateMe: PATCH /users/me com body parcial e auth (story 70)", async () => {
+    const fetchMock = withFetch({ id: "u1", phone: "41999991234" });
+    const { client } = makeClient({ tokens: { accessToken: "a", refreshToken: "r" } });
+    const out = await client.updateMe({ phone: "41999991234" });
+    expect(url(fetchMock)).toBe("http://api.test/api/v1/users/me");
+    expect(init(fetchMock).method).toBe("PATCH");
+    expect(JSON.parse(init(fetchMock).body)).toEqual({ phone: "41999991234" });
+    expect(init(fetchMock).headers.Authorization).toBe("Bearer a");
+    expect(out).toEqual({ id: "u1", phone: "41999991234" });
+  });
+
+  it("changeMyPassword: POST /users/me/password com auth (story 70)", async () => {
+    const fetchMock = withFetch({ ok: true, revokedSessions: 2 });
+    const { client } = makeClient({ tokens: { accessToken: "a", refreshToken: "r" } });
+    const out = await client.changeMyPassword({ currentPassword: "velha123", newPassword: "nova1234" });
+    expect(url(fetchMock)).toBe("http://api.test/api/v1/users/me/password");
+    expect(init(fetchMock).method).toBe("POST");
+    expect(JSON.parse(init(fetchMock).body)).toEqual({ currentPassword: "velha123", newPassword: "nova1234" });
+    expect(out).toEqual({ ok: true, revokedSessions: 2 });
+  });
+
   it("me e health usam as rotas corretas", async () => {
     const fetchMock = withFetch({});
     const { client } = makeClient({ tokens: { accessToken: "a", refreshToken: "r" } });

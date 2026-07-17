@@ -42,4 +42,8 @@ export const queryKeys = {
     /** Endereços do usuário autenticado. */
     all: ["addresses"] as const,
   },
+  account: {
+    /** Perfil do usuário autenticado (conta — story 70). */
+    me: ["account", "me"] as const,
+  },
 } as const;

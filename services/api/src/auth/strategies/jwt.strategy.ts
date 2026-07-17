@@ -16,6 +16,6 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
   }
 
   validate(payload: JwtAccessPayload): AuthUser {
-    return { id: payload.sub, email: payload.email, roles: payload.roles };
+    return { id: payload.sub, email: payload.email, roles: payload.roles, sessionId: payload.sid };
   }
 }

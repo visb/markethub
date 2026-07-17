@@ -9,8 +9,23 @@ interface OrdersFilter {
   to?: Date;
   page?: number;
   pageSize?: number;
-  /** Busca do suporte (story 67): id EXATO do pedido, nome ou e-mail do cliente. */
+  /** Busca do suporte (story 67/70): id EXATO do pedido, nome, e-mail ou telefone do cliente. */
   q?: string;
+}
+
+/**
+ * Cláusulas OR da busca do suporte: id exato OU nome/e-mail contains insensitive
+ * (story 67) OU telefone (story 70 — User.phone é só-dígitos; o termo é reduzido
+ * a dígitos e só vira cláusula com ≥ 4, p/ não casar qualquer número solto).
+ */
+function buildSupportSearch(q: string): Prisma.OrderWhereInput[] {
+  const digits = q.replace(/\D/g, "");
+  return [
+    { id: q },
+    { user: { is: { name: { contains: q, mode: "insensitive" as const } } } },
+    { user: { is: { email: { contains: q, mode: "insensitive" as const } } } },
+    ...(digits.length >= 4 ? [{ user: { is: { phone: { contains: digits } } } }] : []),
+  ];
 }
 
 interface PeriodFilter {
@@ -38,16 +53,9 @@ export class AdminDashboardService {
         ? { createdAt: { ...(filter.from ? { gte: filter.from } : {}), ...(filter.to ? { lte: filter.to } : {}) } }
         : {}),
       // busca do suporte (story 67): id exato OU nome/e-mail contains insensitive.
-      // Telefone entra quando a story de conta/perfil criar o campo no User.
-      ...(filter.q
-        ? {
-            OR: [
-              { id: filter.q },
-              { user: { is: { name: { contains: filter.q, mode: "insensitive" as const } } } },
-              { user: { is: { email: { contains: filter.q, mode: "insensitive" as const } } } },
-            ],
-          }
-        : {}),
+      // Story 70: `q` também casa User.phone (armazenado só-dígitos) — o termo é
+      // normalizado p/ dígitos e só entra com ≥ 4 (evita ruído de ids/nomes com número).
+      ...(filter.q ? { OR: buildSupportSearch(filter.q) } : {}),
     };
 
     const [items, total, statusGroups] = await Promise.all([
