@@ -23,6 +23,8 @@ describe("couponSchema", () => {
   const base = {
     id: "c1",
     code: "DEZ10",
+    title: "Dez por cento",
+    description: null,
     type: "percent",
     value: 10,
     merchantId: null,
@@ -48,20 +50,35 @@ describe("couponSchema", () => {
     expect(couponSchema.safeParse(semMerchantId).success).toBe(false);
     expect(couponSchema.safeParse({ ...base, type: "bogo" }).success).toBe(false);
   });
+
+  it("title/description aceitam string ou null (story 73)", () => {
+    expect(couponSchema.safeParse({ ...base, title: "Bem-vindo", description: "Ganhe 10%" }).success).toBe(
+      true,
+    );
+    // ausente ≠ null: campo faltando reprova.
+    const { title: _t, ...semTitle } = base;
+    expect(couponSchema.safeParse(semTitle).success).toBe(false);
+  });
 });
 
 describe("createCouponInputSchema (merchant)", () => {
-  it("aceita payload mínimo (code + type + value)", () => {
+  it("aceita payload mínimo (code + title + type + value)", () => {
     expect(
-      createCouponInputSchema.safeParse({ code: "FRETEGRATIS", type: "free_shipping", value: 0 })
-        .success,
+      createCouponInputSchema.safeParse({
+        code: "FRETEGRATIS",
+        title: "Frete grátis",
+        type: "free_shipping",
+        value: 0,
+      }).success,
     ).toBe(true);
   });
 
-  it("aceita opcionais nullable e merchantId p/ desambiguar rede", () => {
+  it("aceita opcionais nullable, description e merchantId p/ desambiguar rede", () => {
     expect(
       createCouponInputSchema.safeParse({
         code: "DEZ10",
+        title: "Dez reais",
+        description: "R$10 de desconto",
         type: "fixed",
         value: 1000,
         minOrderCents: 5000,
@@ -74,8 +91,18 @@ describe("createCouponInputSchema (merchant)", () => {
     ).toBe(true);
   });
 
+  it("exige title (story 73): payload sem título ou com título vazio reprova", () => {
+    expect(
+      createCouponInputSchema.safeParse({ code: "SEMTITULO", type: "fixed", value: 1000 }).success,
+    ).toBe(false);
+    expect(
+      createCouponInputSchema.safeParse({ code: "VAZIO", title: "", type: "fixed", value: 1000 })
+        .success,
+    ).toBe(false);
+  });
+
   it("rejeita code vazio, value não-inteiro, minOrderCents negativo e maxUses < 1", () => {
-    const base = { code: "OK", type: "fixed", value: 1000 };
+    const base = { code: "OK", title: "Cupom OK", type: "fixed", value: 1000 };
     expect(createCouponInputSchema.safeParse({ ...base, code: "" }).success).toBe(false);
     expect(createCouponInputSchema.safeParse({ ...base, value: 10.5 }).success).toBe(false);
     expect(createCouponInputSchema.safeParse({ ...base, minOrderCents: -1 }).success).toBe(false);
@@ -84,23 +111,32 @@ describe("createCouponInputSchema (merchant)", () => {
 
   it("merchantId não aceita null no payload do merchant", () => {
     expect(
-      createCouponInputSchema.safeParse({ code: "OK", type: "fixed", value: 1, merchantId: null })
-        .success,
+      createCouponInputSchema.safeParse({
+        code: "OK",
+        title: "Cupom OK",
+        type: "fixed",
+        value: 1,
+        merchantId: null,
+      }).success,
     ).toBe(false);
   });
 });
 
 describe("adminCreateCouponInputSchema (admin)", () => {
   it("merchantId null/ausente = global; id = atrelado a uma rede", () => {
-    const base = { code: "GLOBAL5", type: "percent", value: 5 };
+    const base = { code: "GLOBAL5", title: "Global 5%", type: "percent", value: 5 };
     expect(adminCreateCouponInputSchema.safeParse(base).success).toBe(true);
     expect(adminCreateCouponInputSchema.safeParse({ ...base, merchantId: null }).success).toBe(true);
     expect(adminCreateCouponInputSchema.safeParse({ ...base, merchantId: "m1" }).success).toBe(true);
   });
 
-  it("mantém as demais validações do payload base", () => {
+  it("mantém as demais validações do payload base (title obrigatório)", () => {
     expect(
-      adminCreateCouponInputSchema.safeParse({ code: "", type: "percent", value: 5 }).success,
+      adminCreateCouponInputSchema.safeParse({ code: "", title: "X", type: "percent", value: 5 })
+        .success,
+    ).toBe(false);
+    expect(
+      adminCreateCouponInputSchema.safeParse({ code: "SEMTITULO", type: "percent", value: 5 }).success,
     ).toBe(false);
   });
 });

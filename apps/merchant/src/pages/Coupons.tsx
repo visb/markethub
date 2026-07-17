@@ -56,7 +56,7 @@ export function Coupons() {
         <table className="table">
           <thead>
             <tr>
-              <th>Código</th>
+              <th>Cupom</th>
               <th>Tipo/valor</th>
               <th>Validade</th>
               <th>Usos</th>
@@ -105,6 +105,8 @@ function CouponRow({ coupon }: { coupon: CouponDTO }) {
       {
         id: coupon.id,
         patch: {
+          title: payload.title,
+          description: payload.description,
           type: payload.type,
           value: payload.value,
           minOrderCents: payload.minOrderCents,
@@ -148,6 +150,8 @@ function CouponRow({ coupon }: { coupon: CouponDTO }) {
             codeLocked
             defaultValues={{
               code: coupon.code,
+              title: coupon.title ?? "",
+              description: coupon.description ?? "",
               type: coupon.type,
               value: coupon.type === "free_shipping" ? "" : String(coupon.value),
               minOrderCents: coupon.minOrderCents != null ? String(coupon.minOrderCents) : "",
@@ -168,7 +172,9 @@ function CouponRow({ coupon }: { coupon: CouponDTO }) {
   return (
     <tr>
       <td>
-        <strong>{coupon.code}</strong>
+        <strong>{coupon.title ?? coupon.code}</strong>
+        {coupon.title && <div className="muted">{coupon.code}</div>}
+        {coupon.description && <div className="muted">{coupon.description}</div>}
       </td>
       <td>{couponValue(coupon)}</td>
       <td className="muted">{couponWindow(coupon)}</td>

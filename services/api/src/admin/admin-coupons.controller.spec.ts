@@ -23,7 +23,7 @@ describe("AdminCouponsController (story 53)", () => {
 
   it("create: delega o dto", async () => {
     const { controller, svc } = makeController();
-    const dto = { code: "X10", type: "percent" as const, value: 10 };
+    const dto = { code: "X10", title: "X 10%", type: "percent" as const, value: 10 };
     await controller.create(dto);
     expect(svc.create).toHaveBeenCalledWith(dto);
   });
