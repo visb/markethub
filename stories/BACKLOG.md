@@ -1,9 +1,5 @@
 # BACKLOG — itens crus para refinar
 
-## Endereço do customer
-
-- ao tentar setar o endereço com "usar minha localização", estou recebendo esta mensagem no console: The Geocoding API has been removed in SDK 49, use Place Autocomplete service instead(https://developers.google.com/maps/documentation/places/web-service/autocomplete)
-
 ## Gorjeta
 
 A gorjeta é individual. O usuario pode dar gorjeta para a plataforma, entregador e mercado.
