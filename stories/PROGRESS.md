@@ -42,7 +42,7 @@ Cuidados da rodada:
 | 69 | admin — suspensão de merchant propagada | — | done |
 | 70 | customer — conta/perfil (editar dados + senha) | — | done |
 | 71 | customer — livro de endereços | — | done |
-| 72 | merchant — remover Placeholder.tsx morto | — | todo |
+| 72 | merchant — remover Placeholder.tsx morto | — | done |
 
 ## Log
 
@@ -68,3 +68,18 @@ Cuidados da rodada:
 [OK] 69 — testes: api 1447/1447, admin 185/185, merchant 320/320, customer 248/248, types 17/17, api-client 65/65 — commit: 1868c39 — merge: 8a5151e — 2026-07-17 — parcial da sessão anterior retomado (nada descartado). Sem migration. Picking/driver com specs de regressão (pedidos em voo seguem); débito types coverage não piorado (68.85→69.84%).
 [OK] 70 — testes: api 1471/1471, customer 282/282, api-client 67/67, types 22/22 — commit: 5cd64e1 — merge: 961448c — 2026-07-17 — migration story70_user_phone autorada, NÃO aplicada (Docker down). PENDENTE-MANUAL: `prisma migrate deploy`. Claim `sid` novo no access token identifica sessão corrente; token legado sem sid → troca de senha revoga todas. Débitos types/api-client melhorados, não piorados.
 [OK] 71 — testes: customer 303/303 — commit: a733930 — merge: 6de7270 — 2026-07-17 — 1ª tentativa cortada por limite; retomado via SendMessage → concluiu. Frontend-only, zero backend. Deletar padrão só remove badge (backend não promove outro); link "gerenciar" no seletor /delivery cobre delivery+checkout.
+[OK] 72 — testes: merchant 320/320 — commit: 7c75708 — merge: be6fd50 — 2026-07-17 — delete puro (zero referências vivas), cobertura merchant 94.36% linhas.
+
+## Resumo final da rodada (2026-07-17)
+
+**23/23 unidades done (50–72), zero blocked.** Todas mergeadas na main (`--no-ff`, sem push, sem PR), branches preservadas, stories arquivadas em `stories/done/`.
+
+PENDENTE-MANUAL acumulado da rodada:
+- `pnpm --filter @markethub/api prisma:migrate deploy` — migrations autoradas e NÃO aplicadas (Docker/Postgres down durante toda a rodada): story52_store_closures, enum group_canceled (54), story56_review_reply, story57_store_paused_at, story58_store_delivery_config, story61_delivery_failed, story62_driver_available_at, story67_manual_refund, story68_review_moderation, story70_user_phone.
+- Validação em device físico: push Expo (50), posição em background (51), scanner EAN (63).
+
+Débitos de cobertura pré-existentes (fora do escopo das stories; drenar em rodada futura):
+- `packages/types` test:coverage 70.76% < 80 (coupons/picking-events/slots/store-hours/delivery-events sem teste) — vermelho na main desde antes da rodada, melhorou (68.85→70.76), nunca piorado.
+- `packages/api-client` perFile 98: client.ts 93.12% linhas — baseline da story 52 (métodos store-hours sem teste), melhorou, nunca piorado.
+
+Reproduzir gates: `pnpm typecheck && pnpm build && pnpm test` (por workspace: `pnpm --filter @markethub/<ws> test:coverage`).
