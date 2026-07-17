@@ -78,8 +78,8 @@ PENDENTE-MANUAL acumulado da rodada:
 - `pnpm --filter @markethub/api prisma:migrate deploy` — migrations autoradas e NÃO aplicadas (Docker/Postgres down durante toda a rodada): story52_store_closures, enum group_canceled (54), story56_review_reply, story57_store_paused_at, story58_store_delivery_config, story61_delivery_failed, story62_driver_available_at, story67_manual_refund, story68_review_moderation, story70_user_phone.
 - Validação em device físico: push Expo (50), posição em background (51), scanner EAN (63).
 
-Débitos de cobertura pré-existentes (fora do escopo das stories; drenar em rodada futura):
-- `packages/types` test:coverage 70.76% < 80 (coupons/picking-events/slots/store-hours/delivery-events sem teste) — vermelho na main desde antes da rodada, melhorou (68.85→70.76), nunca piorado.
-- `packages/api-client` perFile 98: client.ts 93.12% linhas — baseline da story 52 (métodos store-hours sem teste), melhorou, nunca piorado.
+Débitos de cobertura pré-existentes — **DRENADOS em 2026-07-17** (commit 1676ab1, merge 70270bc, só testes):
+- `packages/types` test:coverage 70.76% → **100%** (coupons/picking-events/slots/store-hours/delivery-events cobertos).
+- `packages/api-client` client.ts perFile 93.12% → **100%** (métodos store-hours/closures da 52 + cupons da 53).
 
 Reproduzir gates: `pnpm typecheck && pnpm build && pnpm test` (por workspace: `pnpm --filter @markethub/<ws> test:coverage`).
