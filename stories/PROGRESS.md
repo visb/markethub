@@ -39,7 +39,7 @@ Cuidados da rodada:
 | 66 | admin — dashboard real (KPIs + alertas) | — | done |
 | 67 | admin — detalhe profundo do pedido, timeline, suporte | — | done |
 | 68 | admin — moderação de avaliações | 56 | done |
-| 69 | admin — suspensão de merchant propagada | — | todo |
+| 69 | admin — suspensão de merchant propagada | — | done |
 | 70 | customer — conta/perfil (editar dados + senha) | — | todo |
 | 71 | customer — livro de endereços | — | todo |
 | 72 | merchant — remover Placeholder.tsx morto | — | todo |
@@ -65,3 +65,4 @@ Cuidados da rodada:
 [OK] 66 — testes: api 1367/1367, admin 147/147 — commit: ff2a685 — merge na main + arquivada — 2026-07-16 — sem migration; tipagem local no admin (padrão vizinhas, sem rebuild packages); janela SP offset fixo -03:00; thresholds em constantes exportadas.
 [OK] 67 — testes: api 1412/1412, admin 166/166 — commit: 2b1f2bc — merge na main + arquivada — 2026-07-16 — 1ª tentativa cortada por limite de sessão; retomado via SendMessage → concluiu. Migration story67_manual_refund autorada, NÃO aplicada (Docker down). PENDENTE-MANUAL: `prisma migrate deploy`. Refund manual durável via evento order.refund_requested (outbox, idempotente por componentId); adminCancel via barrel (matriz admin→fulfillment).
 [OK] 68 — testes: api 1429/1429, admin 183/183, api-client 65/65, types 16/16 — commit: 0717809 — merge na main + arquivada — 2026-07-16 — 1ª tentativa cortada por limite; retomado via SendMessage → concluiu. Migration story68_review_moderation autorada, NÃO aplicada. PENDENTE-MANUAL: `prisma migrate deploy`. Dep 56→68 satisfeita. Filtro VISIBLE_REVIEWS em ponto único (3 superfícies).
+[OK] 69 — testes: api 1447/1447, admin 185/185, merchant 320/320, customer 248/248, types 17/17, api-client 65/65 — commit: 1868c39 — merge: 8a5151e — 2026-07-17 — parcial da sessão anterior retomado (nada descartado). Sem migration. Picking/driver com specs de regressão (pedidos em voo seguem); débito types coverage não piorado (68.85→69.84%).
