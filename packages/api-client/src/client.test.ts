@@ -723,6 +723,68 @@ describe("ApiClient — endpoints (rota + método + body)", () => {
     expect(init(2).method).toBe("DELETE");
   });
 
+  it("merchant: horário de funcionamento + fechamentos (story 52)", async () => {
+    await client.merchantStoreHours("st 1");
+    expect(url(0)).toBe(`${B}/merchant/stores/st 1/hours`);
+    expect(init(0).method).toBe("GET");
+    await client.merchantSetStoreHours("s1", [{ dayOfWeek: 1, opensAt: 480, closesAt: 1080 }]);
+    expect(url(1)).toBe(`${B}/merchant/stores/s1/hours`);
+    expect(init(1).method).toBe("PUT");
+    expect(JSON.parse(init(1).body!)).toEqual({
+      hours: [{ dayOfWeek: 1, opensAt: 480, closesAt: 1080 }],
+    });
+    await client.merchantStoreClosures("s1");
+    expect(url(2)).toBe(`${B}/merchant/stores/s1/closures`);
+    await client.merchantAddStoreClosure("s1", { date: "2026-12-25", reason: "Natal" });
+    expect(url(3)).toBe(`${B}/merchant/stores/s1/closures`);
+    expect(init(3).method).toBe("POST");
+    expect(JSON.parse(init(3).body!)).toEqual({ date: "2026-12-25", reason: "Natal" });
+    await client.merchantRemoveStoreClosure("s1", "cl1");
+    expect(url(4)).toBe(`${B}/merchant/stores/s1/closures/cl1`);
+    expect(init(4).method).toBe("DELETE");
+  });
+
+  it("merchant: cupons da rede (querystring opcional + CRUD — story 53)", async () => {
+    await client.merchantCoupons();
+    expect(url(0)).toBe(`${B}/merchant/coupons`);
+    await client.merchantCoupons("m 1");
+    expect(url(1)).toBe(`${B}/merchant/coupons?merchantId=m%201`);
+    await client.merchantCreateCoupon({ code: "DEZ10", type: "percent", value: 10 });
+    expect(url(2)).toBe(`${B}/merchant/coupons`);
+    expect(init(2).method).toBe("POST");
+    expect(JSON.parse(init(2).body!)).toEqual({ code: "DEZ10", type: "percent", value: 10 });
+    await client.merchantUpdateCoupon("c1", { active: false });
+    expect(url(3)).toBe(`${B}/merchant/coupons/c1`);
+    expect(init(3).method).toBe("PATCH");
+    expect(JSON.parse(init(3).body!)).toEqual({ active: false });
+    await client.merchantRemoveCoupon("c1");
+    expect(url(4)).toBe(`${B}/merchant/coupons/c1`);
+    expect(init(4).method).toBe("DELETE");
+  });
+
+  it("admin: cupons globais/por rede (filtro opcional + CRUD — story 53)", async () => {
+    await client.adminCoupons();
+    expect(url(0)).toBe(`${B}/admin/coupons`);
+    await client.adminCoupons("m 1");
+    expect(url(1)).toBe(`${B}/admin/coupons?merchantId=m%201`);
+    await client.adminCreateCoupon({ code: "GLOBAL5", type: "fixed", value: 500, merchantId: null });
+    expect(url(2)).toBe(`${B}/admin/coupons`);
+    expect(init(2).method).toBe("POST");
+    expect(JSON.parse(init(2).body!)).toEqual({
+      code: "GLOBAL5",
+      type: "fixed",
+      value: 500,
+      merchantId: null,
+    });
+    await client.adminUpdateCoupon("c1", { maxUses: 10 });
+    expect(url(3)).toBe(`${B}/admin/coupons/c1`);
+    expect(init(3).method).toBe("PATCH");
+    expect(JSON.parse(init(3).body!)).toEqual({ maxUses: 10 });
+    await client.adminRemoveCoupon("c1");
+    expect(url(4)).toBe(`${B}/admin/coupons/c1`);
+    expect(init(4).method).toBe("DELETE");
+  });
+
   it("notificações: registra e remove device token", async () => {
     await client.registerDeviceToken("tok", "ios");
     expect(url(0)).toBe(`${B}/notifications/device-tokens`);
