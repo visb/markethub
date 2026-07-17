@@ -158,7 +158,7 @@ describe("AccountScreen (story 70)", () => {
   it("Endereços navega e Sair desloga", () => {
     const tree = render();
     act(() => pressable(tree, "Endereços").props.onPress());
-    expect(mockPush).toHaveBeenCalledWith("/delivery");
+    expect(mockPush).toHaveBeenCalledWith("/addresses");
     act(() => pressable(tree, "Sair").props.onPress());
     expect(mockLogout).toHaveBeenCalled();
   });

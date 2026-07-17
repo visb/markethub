@@ -146,6 +146,13 @@ export default function AddressesScreen() {
           style={{ marginTop: spacing.sm }}
           onPress={() => setAdding(true)}
         />
+
+        {/* Livro de endereços dedicado (story 71) — o seletor continua como está. */}
+        <Pressable style={styles.manage} onPress={() => router.push("/addresses")}>
+          <Text variant="caption" style={styles.manageText}>
+            Gerenciar endereços
+          </Text>
+        </Pressable>
       </ScrollView>
 
       <View style={styles.footer}>
@@ -168,5 +175,7 @@ const styles = StyleSheet.create({
   },
   addrOn: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
   addrMain: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  manage: { alignSelf: "center", paddingVertical: spacing.sm },
+  manageText: { color: colors.primary, fontWeight: "600", textDecorationLine: "underline" },
   footer: { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
 });

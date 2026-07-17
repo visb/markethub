@@ -37,8 +37,8 @@ export default function AccountScreen() {
   const rows: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void }[] = [
     { icon: "receipt-outline", label: "Minhas compras", onPress: () => router.push("/orders") },
     { icon: "heart-outline", label: "Favoritos", onPress: () => router.push("/favorites") },
-    // Livro de endereços dedicado fica na story 71 — por ora leva à tela de entrega.
-    { icon: "location-outline", label: "Endereços", onPress: () => router.push("/delivery") },
+    // Livro de endereços dedicado (story 71).
+    { icon: "location-outline", label: "Endereços", onPress: () => router.push("/addresses") },
     { icon: "log-out-outline", label: "Sair", onPress: () => void logout() },
   ];
 
