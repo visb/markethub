@@ -220,6 +220,11 @@ export class CartService {
     const subtotalByMerchant = new Map(totals.groups.map((g) => [g.merchantId, g.subtotalCents]));
     return {
       couponCode,
+      // Cupom aplicado com título/descrição legíveis (story 73); null quando não
+      // há cupom válido. O app cliente consome estes campos na story 74.
+      appliedCoupon: coupon
+        ? { code: coupon.code, title: coupon.title, description: coupon.description }
+        : null,
       itemCount: items.length,
       groups: viewGroups.map((g) => {
         // Progresso rumo ao pedido mínimo da loja (story 58): 0 quando não há
@@ -286,7 +291,9 @@ export class CartService {
     return { quantity: qty, weightGrams: null };
   }
 
-  private async loadValidCoupon(code: string): Promise<CalcCoupon | null> {
+  private async loadValidCoupon(
+    code: string,
+  ): Promise<(CalcCoupon & { code: string; title: string | null; description: string | null }) | null> {
     const c = await this.prisma.coupon.findUnique({ where: { code } });
     if (!c || !c.active) return null;
     const now = new Date();
@@ -298,6 +305,11 @@ export class CartService {
       value: c.value,
       merchantId: c.merchantId,
       minOrderCents: c.minOrderCents,
+      // Título/descrição legíveis expostos no carrinho (story 73); cupom legado
+      // sem título segue aplicável (title null).
+      code: c.code,
+      title: c.title,
+      description: c.description,
     };
   }
 

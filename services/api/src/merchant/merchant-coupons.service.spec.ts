@@ -21,6 +21,8 @@ function makeService(opts: {
   const base = {
     id: "c1",
     code: "BLACK10",
+    title: "Black 10%",
+    description: null,
     type: "percent",
     value: 10,
     merchantId: "mer1",
@@ -67,6 +69,8 @@ const storeOther = { id: "sB", name: "Loja B", merchantId: "mer2" };
 const row = {
   id: "c1",
   code: "BLACK10",
+  title: "Black 10%",
+  description: null,
   type: "percent",
   value: 10,
   merchantId: "mer1",
@@ -99,11 +103,34 @@ describe("MerchantCouponsService (story 53)", () => {
   describe("create", () => {
     it("resolve merchantId do contexto e normaliza o código", async () => {
       const { svc, couponCreate } = makeService({ myStores: [storeA] });
-      await svc.create(owner, { code: " verao20 ", type: "percent", value: 20 });
+      await svc.create(owner, { code: " verao20 ", title: "Verão 20%", type: "percent", value: 20 });
       expect(couponCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ code: "VERAO20", merchantId: "mer1", value: 20 }),
         }),
+      );
+    });
+
+    it("persiste title/description (story 73); description ausente vira null", async () => {
+      const { svc, couponCreate } = makeService({ myStores: [storeA] });
+      const dto = await svc.create(owner, {
+        code: "PRIMAVERA",
+        title: "Primavera",
+        description: "Desconto de primavera",
+        type: "percent",
+        value: 15,
+      });
+      expect(couponCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ title: "Primavera", description: "Desconto de primavera" }),
+        }),
+      );
+      expect(dto).toMatchObject({ title: "Primavera", description: "Desconto de primavera" });
+
+      const { svc: svc2, couponCreate: create2 } = makeService({ myStores: [storeA] });
+      await svc2.create(owner, { code: "SEMDESC", title: "Sem descrição", type: "percent", value: 5 });
+      expect(create2).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ description: null }) }),
       );
     });
 
@@ -113,7 +140,7 @@ describe("MerchantCouponsService (story 53)", () => {
         existingByCode: { id: "other" },
       });
       await expect(
-        svc.create(owner, { code: "BLACK10", type: "percent", value: 10 }),
+        svc.create(owner, { code: "BLACK10", title: "Black 10%", type: "percent", value: 10 }),
       ).rejects.toMatchObject({ response: expect.objectContaining({ code: "COUPON_CODE_TAKEN" }) });
       expect(couponCreate).not.toHaveBeenCalled();
     });
@@ -121,7 +148,7 @@ describe("MerchantCouponsService (story 53)", () => {
     it("percent fora da faixa → BadRequest (COUPON_INVALID_PERCENT)", async () => {
       const { svc, couponCreate } = makeService({ myStores: [storeA] });
       await expect(
-        svc.create(owner, { code: "X10", type: "percent", value: 150 }),
+        svc.create(owner, { code: "X10", title: "X 10", type: "percent", value: 150 }),
       ).rejects.toMatchObject({
         response: expect.objectContaining({ code: "COUPON_INVALID_PERCENT" }),
       });
@@ -133,6 +160,7 @@ describe("MerchantCouponsService (story 53)", () => {
       await expect(
         svc.create(owner, {
           code: "WIN10",
+          title: "Janela 10",
           type: "fixed",
           value: 500,
           validFrom: "2026-02-01T00:00:00.000Z",
@@ -144,21 +172,21 @@ describe("MerchantCouponsService (story 53)", () => {
     it("merchantId do body fora do escopo → FORBIDDEN (MERCHANT_NOT_IN_SCOPE)", async () => {
       const { svc } = makeService({ myStores: [storeA] });
       await expect(
-        svc.create(owner, { code: "SC10", type: "percent", value: 10, merchantId: "alheia" }),
+        svc.create(owner, { code: "SC10", title: "SC 10", type: "percent", value: 10, merchantId: "alheia" }),
       ).rejects.toMatchObject({ response: expect.objectContaining({ code: "MERCHANT_NOT_IN_SCOPE" }) });
     });
 
     it("múltiplas redes sem merchantId → BadRequest (MERCHANT_AMBIGUOUS)", async () => {
       const { svc } = makeService({ myStores: [storeA, storeOther] });
       await expect(
-        svc.create(owner, { code: "AMB10", type: "percent", value: 10 }),
+        svc.create(owner, { code: "AMB10", title: "Amb 10", type: "percent", value: 10 }),
       ).rejects.toMatchObject({ response: expect.objectContaining({ code: "MERCHANT_AMBIGUOUS" }) });
     });
 
     it("usuário sem rede → FORBIDDEN (NOT_A_MERCHANT_USER)", async () => {
       const { svc } = makeService({ myStores: [] });
       await expect(
-        svc.create(owner, { code: "NO10", type: "percent", value: 10 }),
+        svc.create(owner, { code: "NO10", title: "No 10", type: "percent", value: 10 }),
       ).rejects.toMatchObject({ response: expect.objectContaining({ code: "NOT_A_MERCHANT_USER" }) });
     });
   });
@@ -193,6 +221,23 @@ describe("MerchantCouponsService (story 53)", () => {
       expect(couponUpdate).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: "c1" }, data: { value: 15 } }),
       );
+    });
+
+    it("PATCH sem title/description não os apaga; com envio atualiza (story 73)", async () => {
+      const { svc, couponUpdate } = makeService({ myStores: [storeA], couponRow: row });
+      await svc.update(owner, "c1", { value: 15 });
+      const data = couponUpdate.mock.calls[0][0].data;
+      expect(data).not.toHaveProperty("title");
+      expect(data).not.toHaveProperty("description");
+
+      const { svc: svc2, couponUpdate: update2 } = makeService({ myStores: [storeA], couponRow: row });
+      const dto = await svc2.update(owner, "c1", { title: "Renovado", description: "Nova desc" });
+      expect(update2).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ title: "Renovado", description: "Nova desc" }),
+        }),
+      );
+      expect(dto).toMatchObject({ title: "Renovado", description: "Nova desc" });
     });
 
     it("cupom de outra rede → FORBIDDEN (MERCHANT_NOT_IN_SCOPE)", async () => {
@@ -271,7 +316,7 @@ describe("MerchantCouponsService (story 53)", () => {
   it("conflito de código usa ConflictException", async () => {
     const { svc } = makeService({ myStores: [storeA], existingByCode: { id: "x" } });
     await expect(
-      svc.create(owner, { code: "DUP10", type: "percent", value: 10 }),
+      svc.create(owner, { code: "DUP10", title: "Dup 10", type: "percent", value: 10 }),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 });

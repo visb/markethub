@@ -16,6 +16,8 @@ import { MerchantService } from "./merchant.service";
 
 export interface CreateCouponInput {
   code: string;
+  title: string;
+  description?: string | null;
   type: CouponType;
   value: number;
   minOrderCents?: number | null;
@@ -27,6 +29,8 @@ export interface CreateCouponInput {
 }
 
 export interface UpdateCouponInput {
+  title?: string;
+  description?: string | null;
   type?: CouponType;
   value?: number;
   minOrderCents?: number | null;
@@ -151,6 +155,8 @@ export class MerchantCouponsService {
     const created = await this.prisma.coupon.create({
       data: {
         code,
+        title: input.title,
+        description: input.description ?? null,
         type: input.type,
         value: input.value,
         merchantId,
@@ -202,6 +208,8 @@ export class MerchantCouponsService {
     );
 
     const data: Prisma.CouponUpdateInput = {};
+    if (patch.title !== undefined) data.title = patch.title;
+    if (patch.description !== undefined) data.description = patch.description;
     if (patch.type !== undefined) data.type = patch.type;
     if (patch.value !== undefined) data.value = patch.value;
     if (patch.minOrderCents !== undefined) data.minOrderCents = patch.minOrderCents;
@@ -243,6 +251,8 @@ export class MerchantCouponsService {
     return {
       id: c.id,
       code: c.code,
+      title: c.title,
+      description: c.description,
       type: c.type as CouponType,
       value: c.value,
       merchantId: c.merchantId,

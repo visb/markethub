@@ -21,6 +21,8 @@ import { useCoupons, useCreateCoupon, useDeleteCoupon, useUpdateCoupon } from ".
 const couponRow: CouponDTO = {
   id: "c1",
   code: "BLACK10",
+  title: "Black 10%",
+  description: null,
   type: "percent",
   value: 10,
   merchantId: "m1",
@@ -68,7 +70,7 @@ describe("useCoupons hooks (story 53)", () => {
     merchantCreateCoupon.mockResolvedValueOnce(couponRow);
     const spy = vi.spyOn(qc, "invalidateQueries");
     const { result } = renderHook(() => useCreateCoupon(), { wrapper });
-    const input = { code: "BLACK10", type: "percent" as const, value: 10 };
+    const input = { code: "BLACK10", title: "Black 10%", type: "percent" as const, value: 10 };
     result.current.mutate(input);
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(merchantCreateCoupon).toHaveBeenCalledWith(input);

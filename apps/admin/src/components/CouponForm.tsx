@@ -25,6 +25,8 @@ const couponFormSchema = z
       .trim()
       .transform((v) => v.toUpperCase())
       .refine((v) => /^[A-Z0-9_-]{3,32}$/.test(v), "Código: 3–32 letras/números/-/_"),
+    title: z.string().trim().min(1, "Informe um título"),
+    description: z.string(),
     type: z.enum(["fixed", "percent", "free_shipping"]),
     value: z.string(),
     merchantId: z.string(),
@@ -67,6 +69,8 @@ export function buildAdminCouponPayload(values: CouponFormValues): AdminCreateCo
   const toNum = (v: string) => (v === "" ? null : Number(v));
   return {
     code: values.code,
+    title: values.title.trim(),
+    description: values.description.trim() || null,
     type: values.type,
     value: values.type === "free_shipping" ? 0 : Number(values.value),
     merchantId: values.merchantId || null,
@@ -109,6 +113,8 @@ export function CouponForm({
     resolver: zodResolver(couponFormSchema),
     defaultValues: {
       code: defaultValues?.code ?? "",
+      title: defaultValues?.title ?? "",
+      description: defaultValues?.description ?? "",
       type: defaultValues?.type ?? "percent",
       value: defaultValues?.value ?? "",
       merchantId: defaultValues?.merchantId ?? "",
@@ -130,6 +136,17 @@ export function CouponForm({
         <input className="input" {...register("code")} disabled={codeLocked} />
         {codeLocked && <small className="muted">O código não pode ser alterado.</small>}
         {errors.code && <p className="error">{errors.code.message}</p>}
+      </label>
+
+      <label className="field">
+        <span>Título</span>
+        <input className="input" {...register("title")} />
+        {errors.title && <p className="error">{errors.title.message}</p>}
+      </label>
+
+      <label className="field">
+        <span>Descrição (opcional)</span>
+        <textarea className="input" rows={2} {...register("description")} />
       </label>
 
       <label className="field">

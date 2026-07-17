@@ -19,6 +19,8 @@ import { Coupons } from "./Coupons";
 const row = (over: Partial<CouponDTO> = {}): CouponDTO => ({
   id: "c1",
   code: "BLACK10",
+  title: null,
+  description: null,
   type: "percent",
   value: 10,
   merchantId: "m1",
@@ -82,11 +84,13 @@ describe("Coupons (story 53)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Novo cupom" }));
     expect(screen.getByText("Novo cupom")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText(/Código/), { target: { value: "verao20" } });
+    fireEvent.change(screen.getByLabelText("Título"), { target: { value: "Verão 20%" } });
     fireEvent.change(screen.getByLabelText("Percentual (%)"), { target: { value: "20" } });
     fireEvent.click(screen.getByRole("button", { name: "Cadastrar" }));
     await vi.waitFor(() => expect(createMutate).toHaveBeenCalledTimes(1));
     expect(createMutate.mock.calls[0][0]).toMatchObject({
       code: "VERAO20",
+      title: "Verão 20%",
       type: "percent",
       value: 20,
     });
@@ -144,13 +148,33 @@ describe("Coupons (story 53)", () => {
     await screen.findByText("Cupom já foi utilizado");
   });
 
-  it("editar abre o form com código travado e salva via updateCoupon", async () => {
+  it("editar abre o form com código travado e salva via updateCoupon (título/descrição no patch)", async () => {
+    couponsResult = { data: [row({ title: "Black Friday", description: "10% off" })], isLoading: false };
     render(<Coupons />);
     fireEvent.click(screen.getByRole("button", { name: "Editar" }));
     expect(screen.getByText("Editar cupom")).toBeInTheDocument();
     expect((screen.getByLabelText(/Código/) as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText("Título") as HTMLInputElement).value).toBe("Black Friday");
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
     await vi.waitFor(() => expect(updateMutate).toHaveBeenCalledTimes(1));
-    expect(updateMutate.mock.calls[0][0]).toMatchObject({ id: "c1" });
+    expect(updateMutate.mock.calls[0][0]).toMatchObject({
+      id: "c1",
+      patch: { title: "Black Friday", description: "10% off" },
+    });
+  });
+
+  it("lista mostra title como principal e code secundário; fallback p/ code quando title null (story 73)", () => {
+    couponsResult = {
+      data: [
+        row({ id: "c1", code: "BEMVINDO", title: "Bem-vindo", description: "Ganhe 10%" }),
+        row({ id: "c2", code: "LEGADO", title: null }),
+      ],
+      isLoading: false,
+    };
+    render(<Coupons />);
+    expect(screen.getByText("Bem-vindo")).toBeInTheDocument();
+    expect(screen.getByText("BEMVINDO")).toBeInTheDocument();
+    expect(screen.getByText("Ganhe 10%")).toBeInTheDocument();
+    expect(screen.getByText("LEGADO")).toBeInTheDocument();
   });
 });

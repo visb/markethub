@@ -13,6 +13,10 @@ export type CouponType = z.infer<typeof couponTypeSchema>;
 export const couponSchema = z.object({
   id: z.string(),
   code: z.string(),
+  /** Título legível (story 73); null em cupons legados — exibir `title ?? code`. */
+  title: z.string().nullable(),
+  /** Descrição curta opcional (story 73). */
+  description: z.string().nullable(),
   type: couponTypeSchema,
   /** fixed: centavos; percent: %; free_shipping: ignorado. */
   value: z.number(),
@@ -34,6 +38,9 @@ export type CouponDTO = z.infer<typeof couponSchema>;
  */
 export const createCouponInputSchema = z.object({
   code: z.string().min(1),
+  /** Título obrigatório na criação (story 73). */
+  title: z.string().min(1),
+  description: z.string().nullable().optional(),
   type: couponTypeSchema,
   value: z.number().int(),
   minOrderCents: z.number().int().min(0).nullable().optional(),
@@ -56,6 +63,8 @@ export type AdminCreateCouponInput = z.infer<typeof adminCreateCouponInputSchema
 
 /** Patch de cupom: código é imutável (fora do payload); demais campos editáveis. */
 export type UpdateCouponInput = Partial<{
+  title: string;
+  description: string | null;
   type: CouponType;
   value: number;
   minOrderCents: number | null;

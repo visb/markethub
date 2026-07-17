@@ -77,7 +77,7 @@ export function Coupons() {
       <table className="table">
         <thead>
           <tr>
-            <th>Código</th>
+            <th>Cupom</th>
             <th>Rede</th>
             <th>Tipo/valor</th>
             <th>Validade</th>
@@ -146,6 +146,8 @@ function CouponRow({
       {
         id: coupon.id,
         patch: {
+          title: payload.title,
+          description: payload.description,
           type: payload.type,
           value: payload.value,
           minOrderCents: payload.minOrderCents,
@@ -191,6 +193,8 @@ function CouponRow({
             merchants={merchants}
             defaultValues={{
               code: coupon.code,
+              title: coupon.title ?? "",
+              description: coupon.description ?? "",
               type: coupon.type,
               merchantId: coupon.merchantId ?? "",
               value: coupon.type === "free_shipping" ? "" : String(coupon.value),
@@ -212,7 +216,9 @@ function CouponRow({
   return (
     <tr>
       <td>
-        <strong>{coupon.code}</strong>
+        <strong>{coupon.title ?? coupon.code}</strong>
+        {coupon.title && <div className="muted">{coupon.code}</div>}
+        {coupon.description && <div className="muted">{coupon.description}</div>}
       </td>
       <td>{coupon.merchantName ?? <span className="badge">Global</span>}</td>
       <td>{couponValue(coupon)}</td>

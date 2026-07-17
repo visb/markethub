@@ -621,6 +621,11 @@ model CartItem {
 model Coupon {
   id            String     @id @default(cuid())
   code          String     @unique
+  // Título legível e descrição curta (story 73). `title` é nullable no banco
+  // (cupons legados ficam sem título); a criação exige título via DTO e a exibição
+  // usa `title ?? code` como fallback. `description` é texto livre opcional.
+  title         String?
+  description   String?
   type          CouponType
   value         Int        @default(0) // fixed: centavos; percent: %
   merchant      Merchant?  @relation(fields: [merchantId], references: [id])

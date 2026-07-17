@@ -11,6 +11,8 @@ const merchants = [
 describe("buildAdminCouponPayload", () => {
   const base: CouponFormValues = {
     code: "GLOBAL10",
+    title: "Global 10%",
+    description: "",
     type: "percent",
     value: "10",
     merchantId: "",
@@ -22,6 +24,13 @@ describe("buildAdminCouponPayload", () => {
 
   it("merchantId vazio vira null (global)", () => {
     expect(buildAdminCouponPayload(base).merchantId).toBeNull();
+  });
+
+  it("title trimado; description vazia vira null, preenchida trimada (story 73)", () => {
+    expect(
+      buildAdminCouponPayload({ ...base, title: "  Promo  ", description: "  detalhe  " }),
+    ).toMatchObject({ title: "Promo", description: "detalhe" });
+    expect(buildAdminCouponPayload({ ...base, description: "  " }).description).toBeNull();
   });
 
   it("merchantId selecionado é preservado", () => {
@@ -53,6 +62,7 @@ describe("CouponForm admin", () => {
     const onSubmit = vi.fn();
     render(<CouponForm merchants={merchants} onSubmit={onSubmit} onCancel={vi.fn()} />);
     fireEvent.change(screen.getByLabelText(/Código/), { target: { value: "rede9" } });
+    fireEvent.change(screen.getByLabelText("Título"), { target: { value: "Rede 9%" } });
     fireEvent.change(screen.getByLabelText("Rede"), { target: { value: "m2" } });
     fireEvent.change(screen.getByLabelText("Percentual (%)"), { target: { value: "9" } });
     fireEvent.click(screen.getByRole("button", { name: "Criar cupom" }));
@@ -69,6 +79,16 @@ describe("CouponForm admin", () => {
     fireEvent.change(screen.getByLabelText("Valor (centavos)"), { target: { value: "0" } });
     fireEvent.click(screen.getByRole("button", { name: "Criar cupom" }));
     await screen.findByText("Valor em centavos maior que zero");
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("título obrigatório bloqueia o submit (story 73)", async () => {
+    const onSubmit = vi.fn();
+    render(<CouponForm merchants={merchants} onSubmit={onSubmit} onCancel={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText(/Código/), { target: { value: "semtit" } });
+    fireEvent.change(screen.getByLabelText("Percentual (%)"), { target: { value: "10" } });
+    fireEvent.click(screen.getByRole("button", { name: "Criar cupom" }));
+    await screen.findByText("Informe um título");
     expect(onSubmit).not.toHaveBeenCalled();
   });
 

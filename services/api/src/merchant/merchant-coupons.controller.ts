@@ -4,6 +4,7 @@ import {
   IsIn,
   IsInt,
   IsISO8601,
+  IsNotEmpty,
   IsOptional,
   IsString,
   Min,
@@ -16,6 +17,9 @@ import { MerchantCouponsService } from "./merchant-coupons.service";
 
 class CreateCouponDto {
   @IsString() @MinLength(1) code!: string;
+  /** Título legível (obrigatório na criação — story 73). */
+  @IsString() @IsNotEmpty() title!: string;
+  @IsOptional() @IsString() description?: string | null;
   @IsIn(COUPON_TYPES) type!: (typeof COUPON_TYPES)[number];
   @IsInt() value!: number;
   @IsOptional() @IsInt() @Min(0) minOrderCents?: number | null;
@@ -27,6 +31,8 @@ class CreateCouponDto {
 }
 
 class UpdateCouponDto {
+  @IsOptional() @IsString() @IsNotEmpty() title?: string;
+  @IsOptional() @IsString() description?: string | null;
   @IsOptional() @IsIn(COUPON_TYPES) type?: (typeof COUPON_TYPES)[number];
   @IsOptional() @IsInt() value?: number;
   @IsOptional() @IsInt() @Min(0) minOrderCents?: number | null;

@@ -32,6 +32,8 @@ import { Coupons } from "./Coupons";
 const row = (over: Partial<CouponDTO> = {}): CouponDTO => ({
   id: "c1",
   code: "GLOBAL10",
+  title: null,
+  description: null,
   type: "percent",
   value: 10,
   merchantId: null,
@@ -91,11 +93,13 @@ describe("Coupons admin (story 53)", () => {
     render(<Coupons />);
     fireEvent.click(screen.getByRole("button", { name: "+ Novo cupom" }));
     fireEvent.change(screen.getByLabelText(/Código/), { target: { value: "natal5" } });
+    fireEvent.change(screen.getByLabelText("Título"), { target: { value: "Natal 5%" } });
     fireEvent.change(screen.getByLabelText("Percentual (%)"), { target: { value: "5" } });
     fireEvent.click(screen.getByRole("button", { name: "Criar cupom" }));
     await vi.waitFor(() => expect(createMutate).toHaveBeenCalledTimes(1));
     expect(createMutate.mock.calls[0][0]).toMatchObject({
       code: "NATAL5",
+      title: "Natal 5%",
       type: "percent",
       value: 5,
       merchantId: null,
@@ -106,6 +110,7 @@ describe("Coupons admin (story 53)", () => {
     render(<Coupons />);
     fireEvent.click(screen.getByRole("button", { name: "+ Novo cupom" }));
     fireEvent.change(screen.getByLabelText(/Código/), { target: { value: "rede9" } });
+    fireEvent.change(screen.getByLabelText("Título"), { target: { value: "Rede 9%" } });
     fireEvent.change(screen.getByLabelText("Rede"), { target: { value: "m1" } });
     fireEvent.change(screen.getByLabelText("Percentual (%)"), { target: { value: "9" } });
     fireEvent.click(screen.getByRole("button", { name: "Criar cupom" }));
@@ -135,14 +140,35 @@ describe("Coupons admin (story 53)", () => {
     expect(removeMutate.mock.calls[0][0]).toBe("c1");
   });
 
-  it("editar trava código e rede e salva via updateCoupon", async () => {
+  it("editar trava código e rede e salva via updateCoupon (título/descrição no patch)", async () => {
+    couponsResult = { data: [row({ title: "Bem-vindo", description: "10% off" })], isLoading: false };
     render(<Coupons />);
     fireEvent.click(screen.getByRole("button", { name: "Editar" }));
     expect(screen.getByText("Editar cupom")).toBeInTheDocument();
     expect((screen.getByLabelText(/Código/) as HTMLInputElement).disabled).toBe(true);
     expect((screen.getByLabelText("Rede") as HTMLSelectElement).disabled).toBe(true);
+    expect((screen.getByLabelText("Título") as HTMLInputElement).value).toBe("Bem-vindo");
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
     await vi.waitFor(() => expect(updateMutate).toHaveBeenCalledTimes(1));
-    expect(updateMutate.mock.calls[0][0]).toMatchObject({ id: "c1" });
+    expect(updateMutate.mock.calls[0][0]).toMatchObject({
+      id: "c1",
+      patch: { title: "Bem-vindo", description: "10% off" },
+    });
+  });
+
+  it("lista mostra title como principal e code secundário; fallback p/ code quando title null (story 73)", () => {
+    couponsResult = {
+      data: [
+        row({ id: "c1", code: "BEMVINDO", title: "Bem-vindo", description: "Ganhe 10%" }),
+        row({ id: "c2", code: "LEGADO", title: null }),
+      ],
+      isLoading: false,
+    };
+    render(<Coupons />);
+    expect(screen.getByText("Bem-vindo")).toBeInTheDocument();
+    expect(screen.getByText("BEMVINDO")).toBeInTheDocument();
+    expect(screen.getByText("Ganhe 10%")).toBeInTheDocument();
+    // cupom legado sem título mostra o código como principal (fallback)
+    expect(screen.getByText("LEGADO")).toBeInTheDocument();
   });
 });

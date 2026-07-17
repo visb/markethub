@@ -6,6 +6,8 @@ import { buildCouponPayload, CouponForm, type CouponFormValues } from "./CouponF
 describe("buildCouponPayload", () => {
   const base: CouponFormValues = {
     code: "BLACK10",
+    title: "Black 10%",
+    description: "",
     type: "percent",
     value: "10",
     minOrderCents: "",
@@ -17,6 +19,8 @@ describe("buildCouponPayload", () => {
   it("percent: value numérico, opcionais como null", () => {
     expect(buildCouponPayload(base)).toEqual({
       code: "BLACK10",
+      title: "Black 10%",
+      description: null,
       type: "percent",
       value: 10,
       minOrderCents: null,
@@ -24,6 +28,14 @@ describe("buildCouponPayload", () => {
       validTo: null,
       maxUses: null,
     });
+  });
+
+  it("title é trimado; description vazia vira null; preenchida é trimada (story 73)", () => {
+    expect(buildCouponPayload({ ...base, title: "  Promoção  ", description: "  detalhe  " })).toMatchObject({
+      title: "Promoção",
+      description: "detalhe",
+    });
+    expect(buildCouponPayload({ ...base, description: "   " }).description).toBeNull();
   });
 
   it("free_shipping zera o value", () => {
@@ -60,6 +72,7 @@ describe("CouponForm", () => {
     const onSubmit = vi.fn();
     render(<CouponForm onSubmit={onSubmit} onCancel={vi.fn()} />);
     fireEvent.change(screen.getByLabelText(/Código/), { target: { value: "frete1" } });
+    fireEvent.change(screen.getByLabelText("Título"), { target: { value: "Frete grátis" } });
     fireEvent.change(screen.getByLabelText("Tipo"), { target: { value: "free_shipping" } });
     fireEvent.click(screen.getByRole("button", { name: "Cadastrar" }));
     await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
@@ -87,6 +100,16 @@ describe("CouponForm", () => {
     fireEvent.change(screen.getByLabelText(/Válido até/), { target: { value: "2026-01-01T10:00" } });
     fireEvent.click(screen.getByRole("button", { name: "Cadastrar" }));
     await screen.findByText("Fim deve ser após o início");
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("título obrigatório bloqueia o submit (story 73)", async () => {
+    const onSubmit = vi.fn();
+    render(<CouponForm onSubmit={onSubmit} onCancel={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText(/Código/), { target: { value: "semtit" } });
+    fireEvent.change(screen.getByLabelText("Percentual (%)"), { target: { value: "10" } });
+    fireEvent.click(screen.getByRole("button", { name: "Cadastrar" }));
+    await screen.findByText("Informe um título");
     expect(onSubmit).not.toHaveBeenCalled();
   });
 

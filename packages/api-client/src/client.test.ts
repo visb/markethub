@@ -749,10 +749,15 @@ describe("ApiClient — endpoints (rota + método + body)", () => {
     expect(url(0)).toBe(`${B}/merchant/coupons`);
     await client.merchantCoupons("m 1");
     expect(url(1)).toBe(`${B}/merchant/coupons?merchantId=m%201`);
-    await client.merchantCreateCoupon({ code: "DEZ10", type: "percent", value: 10 });
+    await client.merchantCreateCoupon({ code: "DEZ10", title: "Dez 10%", type: "percent", value: 10 });
     expect(url(2)).toBe(`${B}/merchant/coupons`);
     expect(init(2).method).toBe("POST");
-    expect(JSON.parse(init(2).body!)).toEqual({ code: "DEZ10", type: "percent", value: 10 });
+    expect(JSON.parse(init(2).body!)).toEqual({
+      code: "DEZ10",
+      title: "Dez 10%",
+      type: "percent",
+      value: 10,
+    });
     await client.merchantUpdateCoupon("c1", { active: false });
     expect(url(3)).toBe(`${B}/merchant/coupons/c1`);
     expect(init(3).method).toBe("PATCH");
@@ -767,11 +772,18 @@ describe("ApiClient — endpoints (rota + método + body)", () => {
     expect(url(0)).toBe(`${B}/admin/coupons`);
     await client.adminCoupons("m 1");
     expect(url(1)).toBe(`${B}/admin/coupons?merchantId=m%201`);
-    await client.adminCreateCoupon({ code: "GLOBAL5", type: "fixed", value: 500, merchantId: null });
+    await client.adminCreateCoupon({
+      code: "GLOBAL5",
+      title: "Global 5%",
+      type: "fixed",
+      value: 500,
+      merchantId: null,
+    });
     expect(url(2)).toBe(`${B}/admin/coupons`);
     expect(init(2).method).toBe("POST");
     expect(JSON.parse(init(2).body!)).toEqual({
       code: "GLOBAL5",
+      title: "Global 5%",
       type: "fixed",
       value: 500,
       merchantId: null,

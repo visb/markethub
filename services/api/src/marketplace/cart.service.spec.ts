@@ -310,6 +310,37 @@ describe("CartService.applyCoupon / removeCoupon", () => {
     expect(view.totals.discountCents).toBe(200);
   });
 
+  it("expõe appliedCoupon com title/description (story 73)", async () => {
+    const { svc } = makePrisma({
+      coupon: { ...activeCoupon, title: "Dez off", description: "10% na primeira compra" },
+      couponCode: "OFF10",
+      items: [makeItem({ quantity: 2, priceCents: 1000 })],
+    });
+    const view = await svc.applyCoupon("u1", "OFF10");
+    expect(view.appliedCoupon).toEqual({
+      code: "OFF10",
+      title: "Dez off",
+      description: "10% na primeira compra",
+    });
+  });
+
+  it("cupom legado sem título (title null) segue aplicável no carrinho (story 73)", async () => {
+    const { svc } = makePrisma({
+      coupon: { ...activeCoupon, title: null, description: null },
+      couponCode: "OFF10",
+      items: [makeItem({ quantity: 2, priceCents: 1000 })],
+    });
+    const view = await svc.applyCoupon("u1", "OFF10");
+    expect(view.totals.discountCents).toBe(200);
+    expect(view.appliedCoupon).toEqual({ code: "OFF10", title: null, description: null });
+  });
+
+  it("sem cupom aplicado → appliedCoupon null", async () => {
+    const { svc } = makePrisma({ items: [makeItem({ quantity: 1, priceCents: 1000 })] });
+    const view = await svc.getCart("u1");
+    expect(view.appliedCoupon).toBeNull();
+  });
+
   it("cupom inexistente → INVALID_COUPON", async () => {
     const { svc } = makePrisma({ coupon: null });
     await expect(svc.applyCoupon("u1", "NOPE")).rejects.toMatchObject({
