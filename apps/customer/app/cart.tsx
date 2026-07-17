@@ -1,19 +1,26 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useQueryClient } from "@tanstack/react-query";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Button, Text, colors, radius, spacing } from "@markethub/ui";
 import { useAuth } from "@/auth-context";
 import { brl, marketplace, type CartItemView, type CartView } from "@/api/marketplace";
+import { useApplyCoupon, useRemoveCoupon } from "@/api/hooks/useAvailableCoupons";
+import { queryKeys } from "@/lib/queryKeys";
 import { Header } from "@/components/Header";
 import { MerchantLogo } from "@/components/MerchantLogo";
 import { QtyStepper } from "@/components/QtyStepper";
+import { AvailableCouponsList } from "@/components/AvailableCouponsList";
 
 export default function CartScreen() {
   const { api } = useAuth();
   const mkt = marketplace(api);
   const router = useRouter();
+  const qc = useQueryClient();
+  const applyMut = useApplyCoupon();
+  const removeMut = useRemoveCoupon();
   const [cart, setCart] = useState<CartView | null>(null);
   const [loading, setLoading] = useState(true);
   const [couponOpen, setCouponOpen] = useState(false);
@@ -44,6 +51,17 @@ export default function CartScreen() {
       if (q <= 0) setCart(await mkt.removeItem(it.id));
       else setCart(await mkt.updateItem(it.id, { quantity: q }));
     }
+    // Mudar itens muda a elegibilidade dos cupons (pedido mínimo) — story 74.
+    void qc.invalidateQueries({ queryKey: queryKeys.cart.availableCoupons });
+  }
+
+  // Aplica um cupom (campo manual ou lista de disponíveis); a mutação invalida a lista.
+  async function applyCode(code: string) {
+    setCart(await applyMut.mutateAsync(code));
+  }
+
+  async function removeCoupon() {
+    setCart(await removeMut.mutateAsync());
   }
 
   if (loading) {
@@ -148,6 +166,13 @@ export default function CartScreen() {
           );
         })}
 
+        {/* Cupons disponíveis (story 74): lista inline; toque aplica via mutação. */}
+        <AvailableCouponsList
+          appliedCode={cart.couponCode}
+          onApply={(code) => void applyCode(code)}
+          onRemove={() => void removeCoupon()}
+        />
+
         {/* Cupom (aplica ao carrinho; cupom de loja restringe pelo merchant) */}
         {cart.couponCode ? (
           <View style={styles.coupon}>
@@ -155,10 +180,7 @@ export default function CartScreen() {
             <Text variant="caption" style={{ flex: 1, color: colors.success, fontWeight: "700" }}>
               Cupom {cart.couponCode} aplicado
             </Text>
-            <Pressable
-              hitSlop={8}
-              onPress={async () => setCart(await mkt.removeCoupon())}
-            >
+            <Pressable hitSlop={8} onPress={() => void removeCoupon()}>
               <Ionicons name="close" size={18} color={colors.textMuted} />
             </Pressable>
           </View>
@@ -181,7 +203,7 @@ export default function CartScreen() {
               disabled={!couponInput.trim()}
               onPress={async () => {
                 try {
-                  setCart(await mkt.applyCoupon(couponInput.trim().toUpperCase()));
+                  await applyCode(couponInput.trim().toUpperCase());
                   setCouponOpen(false);
                   setCouponInput("");
                 } catch {

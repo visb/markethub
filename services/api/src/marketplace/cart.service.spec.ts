@@ -98,6 +98,7 @@ function makePrisma(opts: {
   offer?: Record<string, unknown> | null;
   foundItem?: Record<string, unknown> | null;
   coupon?: Record<string, unknown> | null;
+  coupons?: Record<string, unknown>[];
   address?: Record<string, unknown> | null;
 } = {}) {
   const cartUpsert = jest.fn().mockResolvedValue({ id: "cart1", couponCode: opts.couponCode ?? null });
@@ -110,6 +111,7 @@ function makePrisma(opts: {
   const cartItemFindMany = jest.fn().mockResolvedValue(opts.items ?? []);
   const offerFindUnique = jest.fn().mockResolvedValue(opts.offer ?? null);
   const couponFindUnique = jest.fn().mockResolvedValue(opts.coupon ?? null);
+  const couponFindMany = jest.fn().mockResolvedValue(opts.coupons ?? []);
   const addressFindFirst = jest.fn().mockResolvedValue(opts.address ?? null);
 
   const prisma = {
@@ -122,7 +124,7 @@ function makePrisma(opts: {
       findMany: cartItemFindMany,
     },
     offer: { findUnique: offerFindUnique },
-    coupon: { findUnique: couponFindUnique },
+    coupon: { findUnique: couponFindUnique, findMany: couponFindMany },
     address: { findFirst: addressFindFirst },
   } as never;
 
@@ -137,6 +139,7 @@ function makePrisma(opts: {
     cartItemFindMany,
     offerFindUnique,
     couponFindUnique,
+    couponFindMany,
     addressFindFirst,
   };
 }
@@ -513,6 +516,108 @@ describe("CartService.getCart / buildView (ETA + agrupamento)", () => {
     const g2 = view.groups.find((g) => g.merchantId === "m2")!;
     expect(g1.merchantSuspended).toBe(true);
     expect(g2.merchantSuspended).toBe(false);
+  });
+});
+
+describe("CartService.availableCoupons (story 74)", () => {
+  /** Cupom persistido (formato do prisma) para a listagem de disponíveis. */
+  function coupon(over: Record<string, unknown> = {}) {
+    return {
+      code: "GLOBAL10",
+      title: "Dez off",
+      description: "10% de desconto",
+      type: "percent",
+      value: 10,
+      merchantId: null as string | null,
+      minOrderCents: null as number | null,
+      validFrom: null as Date | null,
+      validTo: null as Date | null,
+      maxUses: null as number | null,
+      usedCount: 0,
+      active: true,
+      createdAt: new Date("2026-01-01T00:00:00Z"),
+      ...over,
+    };
+  }
+
+  it("carrinho vazio → lista vazia (não consulta cupons)", async () => {
+    const { svc, couponFindMany } = makePrisma({ items: [], coupons: [coupon()] });
+    expect(await svc.availableCoupons("u1")).toEqual([]);
+    expect(couponFindMany).not.toHaveBeenCalled();
+  });
+
+  it("cupom global e do merchant do carrinho são listados como aplicáveis", async () => {
+    // Carrinho: 2×1000 = 2000 no merchant m1.
+    const { svc } = makePrisma({
+      items: [makeItem({ quantity: 2, priceCents: 1000, merchantId: "m1" })],
+      coupons: [
+        coupon({ code: "GLOBAL10", merchantId: null }),
+        coupon({ code: "M1OFF", merchantId: "m1", type: "fixed", value: 300 }),
+      ],
+    });
+    const list = await svc.availableCoupons("u1");
+    expect(list.map((c) => c.code).sort()).toEqual(["GLOBAL10", "M1OFF"]);
+    expect(list.every((c) => c.applicable && c.reason === null)).toBe(true);
+    // percent 10 de 2000 = 200; fixed = 300.
+    expect(list.find((c) => c.code === "GLOBAL10")!.discountCents).toBe(200);
+    expect(list.find((c) => c.code === "M1OFF")!.discountCents).toBe(300);
+  });
+
+  it("consulta cupons ativos globais ou dos merchants do carrinho", async () => {
+    const { svc, couponFindMany } = makePrisma({
+      items: [makeItem({ merchantId: "m1" })],
+      coupons: [coupon()],
+    });
+    await svc.availableCoupons("u1");
+    expect(couponFindMany).toHaveBeenCalledWith({
+      where: { active: true, OR: [{ merchantId: null }, { merchantId: { in: ["m1"] } }] },
+      orderBy: { createdAt: "desc" },
+    });
+  });
+
+  it("cupom de merchant fora do carrinho é excluído", async () => {
+    const { svc } = makePrisma({
+      items: [makeItem({ merchantId: "m1" })],
+      coupons: [coupon({ code: "OTHER", merchantId: "m2" }), coupon({ code: "GLOBAL10" })],
+    });
+    const list = await svc.availableCoupons("u1");
+    expect(list.map((c) => c.code)).toEqual(["GLOBAL10"]);
+  });
+
+  it("expirado, inativo e esgotado são excluídos", async () => {
+    const { svc } = makePrisma({
+      items: [makeItem({ merchantId: "m1" })],
+      coupons: [
+        coupon({ code: "EXPIRED", validTo: new Date("2000-01-01") }),
+        coupon({ code: "INACTIVE", active: false }),
+        coupon({ code: "SOLDOUT", maxUses: 5, usedCount: 5 }),
+        coupon({ code: "FUTURE", validFrom: new Date("2999-01-01") }),
+      ],
+    });
+    expect(await svc.availableCoupons("u1")).toEqual([]);
+  });
+
+  it("abaixo do minOrderCents → applicable false + reason MIN_ORDER_NOT_MET com missingCents", async () => {
+    // subtotal 2000; mínimo 5000 → faltam 3000.
+    const { svc } = makePrisma({
+      items: [makeItem({ quantity: 2, priceCents: 1000, merchantId: "m1" })],
+      coupons: [coupon({ code: "BIG", minOrderCents: 5000, type: "percent", value: 10 })],
+    });
+    const [c] = await svc.availableCoupons("u1");
+    expect(c!.applicable).toBe(false);
+    expect(c!.reason).toEqual({ code: "MIN_ORDER_NOT_MET", missingCents: 3000 });
+    // discountCents exibe o potencial (ignora o piso): 10% de 2000 = 200.
+    expect(c!.discountCents).toBe(200);
+  });
+
+  it("minOrderCents atingido → applicable true sem reason", async () => {
+    const { svc } = makePrisma({
+      items: [makeItem({ quantity: 5, priceCents: 1000, merchantId: "m1" })],
+      coupons: [coupon({ code: "OK", minOrderCents: 5000 })],
+    });
+    const [c] = await svc.availableCoupons("u1");
+    expect(c!.applicable).toBe(true);
+    expect(c!.reason).toBeNull();
   });
 });
 

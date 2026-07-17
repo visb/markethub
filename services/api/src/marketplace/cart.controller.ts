@@ -51,6 +51,11 @@ export class CartController {
     return this.cart.clear(user.id);
   }
 
+  @Get("coupons")
+  availableCoupons(@CurrentUser() user: AuthUser) {
+    return this.cart.availableCoupons(user.id);
+  }
+
   @Post("coupon")
   applyCoupon(@CurrentUser() user: AuthUser, @Body() dto: CouponDto) {
     return this.cart.applyCoupon(user.id, dto.code);

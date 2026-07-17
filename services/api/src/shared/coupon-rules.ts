@@ -49,6 +49,31 @@ function toDate(v: Date | string | null | undefined): Date | null {
   return v instanceof Date ? v : new Date(v);
 }
 
+/** Estado de resgate de um cupom persistido (validade + limite de usos). */
+export interface CouponRedeemState {
+  active: boolean;
+  validFrom?: Date | string | null;
+  validTo?: Date | string | null;
+  maxUses?: number | null;
+  usedCount?: number | null;
+}
+
+/**
+ * Cupom resgatável AGORA? Regra única (story 74) reutilizada pela aplicação no
+ * carrinho (`POST /cart/coupon`) e pela listagem de disponíveis (`GET /cart/coupons`):
+ * ativo, dentro da janela de validade e ainda com usos disponíveis. Não avalia
+ * escopo de merchant nem pedido mínimo — isso depende do carrinho.
+ */
+export function isCouponRedeemable(c: CouponRedeemState, now: Date = new Date()): boolean {
+  if (!c.active) return false;
+  const from = toDate(c.validFrom);
+  const to = toDate(c.validTo);
+  if (from && from > now) return false;
+  if (to && to < now) return false;
+  if (c.maxUses !== null && c.maxUses !== undefined && (c.usedCount ?? 0) >= c.maxUses) return false;
+  return true;
+}
+
 /**
  * Valida os valores efetivos de um cupom (após merge do patch, se for edição).
  * `usedCount` é o total já consumido — o novo `maxUses` não pode ficar abaixo.

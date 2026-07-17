@@ -42,6 +42,10 @@ export const queryKeys = {
     /** Endereços do usuário autenticado. */
     all: ["addresses"] as const,
   },
+  cart: {
+    /** Cupons disponíveis para o carrinho atual (story 74). */
+    availableCoupons: ["cart", "available-coupons"] as const,
+  },
   account: {
     /** Perfil do usuário autenticado (conta — story 70). */
     me: ["account", "me"] as const,
