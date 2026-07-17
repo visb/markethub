@@ -5,7 +5,7 @@ import {
 } from "@nestjs/common";
 import type { RoleName, User } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
-import type { AuthTokens, AuthUser } from "./auth.types";
+import type { AuthTokens } from "./auth.types";
 import type { LoginDto } from "./dto/login.dto";
 import type { RegisterDto } from "./dto/register.dto";
 import { TokenService } from "./token.service";
@@ -122,7 +122,14 @@ export class AuthService {
     }
   }
 
-  async me(userId: string): Promise<AuthUser & { name: string }> {
+  /** Perfil do usuário autenticado — inclui phone (story 70). */
+  async me(userId: string): Promise<{
+    id: string;
+    email: string;
+    name: string;
+    phone: string | null;
+    roles: RoleName[];
+  }> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: { roles: { include: { role: true } } },
@@ -132,6 +139,7 @@ export class AuthService {
       id: user.id,
       email: user.email,
       name: user.name,
+      phone: user.phone,
       roles: user.roles.map((r) => r.role.name),
     };
   }
@@ -157,10 +165,13 @@ export class AuthService {
       },
     });
 
+    // `sid` no access token identifica a sessão corrente (story 70) — usado pela
+    // troca de senha p/ revogar as demais sessões preservando esta.
     const accessToken = await this.tokens.signAccess({
       sub: user.id,
       email: user.email,
       roles: user.roles,
+      sid: session.id,
     });
     const refreshToken = await this.tokens.signRefresh({ sub: user.id, sid: session.id });
 

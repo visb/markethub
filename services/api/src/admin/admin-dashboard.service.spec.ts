@@ -142,6 +142,27 @@ describe("AdminDashboardService.orders", () => {
     ]);
   });
 
+  it("busca `q` com telefone (story 70): normaliza p/ dígitos e casa User.phone", async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const prisma = makePrisma({
+      order: { findMany, count: jest.fn().mockResolvedValue(0), groupBy: jest.fn().mockResolvedValue([]) },
+    });
+    await new AdminDashboardService(prisma).orders({ q: "(41) 99999-1234" });
+    const where = findMany.mock.calls[0][0].where;
+    expect(where.OR).toContainEqual({ user: { is: { phone: { contains: "41999991234" } } } });
+  });
+
+  it("busca `q` com < 4 dígitos não monta cláusula de telefone", async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    const prisma = makePrisma({
+      order: { findMany, count: jest.fn().mockResolvedValue(0), groupBy: jest.fn().mockResolvedValue([]) },
+    });
+    await new AdminDashboardService(prisma).orders({ q: "loja 12" });
+    const where = findMany.mock.calls[0][0].where;
+    expect(where.OR).toHaveLength(3);
+    expect(JSON.stringify(where.OR)).not.toContain("phone");
+  });
+
   it("sem `q` não monta OR de busca", async () => {
     const findMany = jest.fn().mockResolvedValue([]);
     const prisma = makePrisma({

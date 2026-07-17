@@ -79,6 +79,17 @@ describe("AuthService.register", () => {
     expect(roleCreate[0].role.connectOrCreate.where.name).toBe("customer");
   });
 
+  it("access token carrega o claim sid da sessão corrente (story 70)", async () => {
+    const create = jest.fn().mockResolvedValue({ id: "u1", email: "a@b.com" });
+    const prisma = makePrisma({ user: { findUnique: jest.fn().mockResolvedValue(null), create } });
+    const svc = new AuthService(prisma, tokens);
+
+    const result = await svc.register({ email: "a@b.com", password: "senha-1234", name: "Ana" });
+
+    const payload = new JwtService().decode(result.accessToken) as { sid?: string };
+    expect(payload.sid).toBe("new-session");
+  });
+
   it("deduplica roles informadas", async () => {
     const create = jest.fn().mockResolvedValue({ id: "u1", email: "a@b.com" });
     const prisma = makePrisma({ user: { findUnique: jest.fn().mockResolvedValue(null), create } });
@@ -320,13 +331,14 @@ describe("AuthService.logout", () => {
 });
 
 describe("AuthService.me", () => {
-  it("retorna identidade e roles do usuário", async () => {
+  it("retorna identidade, phone e roles do usuário (story 70)", async () => {
     const prisma = makePrisma({
       user: {
         findUnique: jest.fn().mockResolvedValue({
           id: "u1",
           email: "a@b.com",
           name: "Ana",
+          phone: "41999991234",
           roles: [{ role: { name: "customer" } }, { role: { name: "admin" } }],
         }),
         create: jest.fn(),
@@ -338,8 +350,26 @@ describe("AuthService.me", () => {
       id: "u1",
       email: "a@b.com",
       name: "Ana",
+      phone: "41999991234",
       roles: ["customer", "admin"],
     });
+  });
+
+  it("phone null aparece como null (sem telefone cadastrado)", async () => {
+    const prisma = makePrisma({
+      user: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "u1",
+          email: "a@b.com",
+          name: "Ana",
+          phone: null,
+          roles: [{ role: { name: "customer" } }],
+        }),
+        create: jest.fn(),
+      },
+    });
+    const svc = new AuthService(prisma, tokens);
+    await expect(svc.me("u1")).resolves.toMatchObject({ phone: null });
   });
 
   it("rejeita usuário inexistente com INVALID_TOKEN", async () => {
