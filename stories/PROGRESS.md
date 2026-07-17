@@ -11,7 +11,7 @@ Cuidados da rodada:
 | #  | Título | Dep | Status |
 |----|--------|-----|--------|
 | 73 | Cupons — título e descrição | — | done |
-| 74 | Cupons disponíveis no carrinho (seleção) | 73 | todo |
+| 74 | Cupons disponíveis no carrinho (seleção) | 73 | done |
 | 75 | Endereço — lat/lng exata ao salvar (provider Google) | — | todo |
 | 76 | "Usar minha localização" — reverse geocode via backend | 75 | todo |
 | 77 | Gorjeta individual por alvo (plataforma/entregador/mercado) | — | todo |
@@ -24,3 +24,4 @@ Cuidados da rodada:
 ## Registro
 
 [OK] 73 — testes: api 1479, admin 188, merchant 323, types 46, api-client 70 — commit: ff845d1 — merge: 8eeefac — 2026-07-17
+[OK] 74 — testes: api 1495, customer 315, types 50 — commit: 14a013f — merge: 2e5ab05 — 2026-07-17
