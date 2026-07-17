@@ -35,8 +35,10 @@ export default function CheckoutScreen() {
   // Erro de checkout + código p/ escolher o CTA:
   // - STORE_CLOSED (story 52) → CTA "agendar";
   // - OUT_OF_DELIVERY_AREA (story 58) → CTA "retirar na loja" (quando permitido);
+  // - MERCHANT_SUSPENDED (story 69) → CTA "remover itens" da(s) rede(s) suspensa(s);
   // - MIN_ORDER_NOT_MET (story 58) / STORE_PAUSED (story 57) → só a mensagem.
   const [checkoutError, setCheckoutError] = useState<{ message: string; code: string | null } | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -101,6 +103,27 @@ export default function CheckoutScreen() {
   function switchToPickup() {
     setCheckoutError(null);
     setFulfillment("pickup");
+  }
+
+  /**
+   * CTA de MERCHANT_SUSPENDED (story 69): remove os itens dos grupos cuja rede
+   * está suspensa (flag `merchantSuspended` do carrinho) e recarrega a tela.
+   * Carrinho esvaziado → volta ao carrinho (estado vazio).
+   */
+  async function removeSuspendedItems() {
+    setRemoving(true);
+    try {
+      const view = await mkt.getCart();
+      const items = view.groups.filter((g) => g.merchantSuspended).flatMap((g) => g.items);
+      for (const it of items) await mkt.removeItem(it.id);
+      setCheckoutError(null);
+      const updated = await mkt.getCart();
+      setCart(updated);
+      setStoreId(updated.groups[0]?.storeId ?? null);
+      if (updated.itemCount === 0) router.replace("/cart");
+    } finally {
+      setRemoving(false);
+    }
   }
 
   if (loading) {
@@ -255,6 +278,13 @@ export default function CheckoutScreen() {
                 <Pressable onPress={switchToPickup}>
                   <Text variant="caption" style={styles.scheduleCta}>
                     Trocar para retirada na loja
+                  </Text>
+                </Pressable>
+              )}
+              {checkoutError.code === "MERCHANT_SUSPENDED" && (
+                <Pressable onPress={removeSuspendedItems} disabled={removing}>
+                  <Text variant="caption" style={styles.scheduleCta}>
+                    {removing ? "Removendo itens…" : "Remover itens da loja indisponível"}
                   </Text>
                 </Pressable>
               )}

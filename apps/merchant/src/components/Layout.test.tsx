@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MerchantRole } from "@markethub/api-client";
 
 const logout = vi.fn();
@@ -9,8 +9,13 @@ vi.mock("@/auth/auth-context", () => ({
 }));
 
 let role: MerchantRole | null = "owner";
+let suspended = false;
 vi.mock("@/api/hooks/useMerchantContext", () => ({
-  useMerchantContext: () => ({ data: role ? { role, merchantId: "m1", stores: [] } : undefined }),
+  useMerchantContext: () => ({
+    data: role
+      ? { role, merchantId: "m1", stores: [], merchantSuspended: suspended }
+      : undefined,
+  }),
 }));
 
 import { Layout } from "./Layout";
@@ -22,6 +27,10 @@ function renderLayout() {
     </MemoryRouter>,
   );
 }
+
+beforeEach(() => {
+  suspended = false;
+});
 
 describe("Layout — nav gated por can() (story 07)", () => {
   it("owner vê todos os itens (incl. Integração)", () => {
@@ -52,5 +61,26 @@ describe("Layout — nav gated por can() (story 07)", () => {
       expect(screen.getByRole("link", { name: label })).toBeInTheDocument();
     }
     expect(screen.getByText(/Administrador/)).toBeInTheDocument();
+  });
+});
+
+// Story 69: rede suspensa substitui o painel inteiro pela tela bloqueante.
+describe("Layout — rede suspensa (story 69)", () => {
+  it("merchantSuspended true → tela bloqueante no lugar do shell (sem nav)", () => {
+    role = "owner";
+    suspended = true;
+    renderLayout();
+    expect(screen.getByText("Rede suspensa")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Lojas" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Painel do mercado", { exact: false })).not.toBeInTheDocument();
+    // só o logout fica disponível
+    expect(screen.getByRole("button", { name: "Sair" })).toBeInTheDocument();
+  });
+
+  it("merchantSuspended false → painel normal", () => {
+    role = "owner";
+    renderLayout();
+    expect(screen.queryByText("Rede suspensa")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Lojas" })).toBeInTheDocument();
   });
 });

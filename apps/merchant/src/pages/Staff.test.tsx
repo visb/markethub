@@ -45,7 +45,7 @@ describe("Staff (story 10)", () => {
     updateMutate.mockClear();
     removeMutate.mockClear();
     lastStoreFilter = undefined;
-    ctx = { data: { role: "owner", merchantId: "m1", stores } };
+    ctx = { data: { role: "owner", merchantId: "m1", stores, merchantSuspended: false } };
     staffResult = { data: [row()], isLoading: false };
   });
 
@@ -86,7 +86,7 @@ describe("Staff (story 10)", () => {
   });
 
   it("manager não gerencia gerente (sem ações na linha)", () => {
-    ctx = { data: { role: "manager", merchantId: "m1", stores: [stores[0]] } };
+    ctx = { data: { role: "manager", merchantId: "m1", stores: [stores[0]], merchantSuspended: false } };
     staffResult = { data: [row({ staffRole: "manager" })], isLoading: false };
     render(<Staff />);
     expect(screen.queryByRole("button", { name: "Desativar" })).not.toBeInTheDocument();
@@ -94,7 +94,7 @@ describe("Staff (story 10)", () => {
   });
 
   it("admin (story 16) gerencia gerente (vê ações na linha)", () => {
-    ctx = { data: { role: "admin", merchantId: "m1", stores: [stores[0]] } };
+    ctx = { data: { role: "admin", merchantId: "m1", stores: [stores[0]], merchantSuspended: false } };
     staffResult = { data: [row({ staffRole: "manager" })], isLoading: false };
     render(<Staff />);
     expect(screen.getByRole("button", { name: "Desativar" })).toBeInTheDocument();
@@ -102,7 +102,7 @@ describe("Staff (story 10)", () => {
   });
 
   it("admin (story 16) NÃO gerencia outro admin (sem ações na linha)", () => {
-    ctx = { data: { role: "admin", merchantId: "m1", stores: [stores[0]] } };
+    ctx = { data: { role: "admin", merchantId: "m1", stores: [stores[0]], merchantSuspended: false } };
     staffResult = { data: [row({ staffRole: "admin" })], isLoading: false };
     render(<Staff />);
     expect(screen.queryByRole("button", { name: "Desativar" })).not.toBeInTheDocument();
@@ -117,7 +117,7 @@ describe("Staff (story 10)", () => {
   });
 
   it("manager: remover desativa (hard=false)", () => {
-    ctx = { data: { role: "manager", merchantId: "m1", stores: [stores[0]] } };
+    ctx = { data: { role: "manager", merchantId: "m1", stores: [stores[0]], merchantSuspended: false } };
     render(<Staff />);
     fireEvent.click(screen.getByRole("button", { name: "Remover" }));
     expect(removeMutate.mock.calls[0][0]).toMatchObject({ id: "st1", hard: false });

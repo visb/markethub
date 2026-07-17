@@ -2,6 +2,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "@/auth/auth-context";
 import { useMerchantContext } from "@/api/hooks/useMerchantContext";
 import { can, type Capability } from "@/auth/permissions";
+import { SuspendedNotice } from "@/components/SuspendedNotice";
 import type { MerchantRole } from "@markethub/api-client";
 
 /** Rótulo do nível efetivo do usuário no topo do painel (story 16). */
@@ -36,6 +37,9 @@ export function Layout() {
   const { data: context } = useMerchantContext();
   const role = context?.role ?? null;
   const items = NAV.filter((item) => can(role, item.capability));
+
+  // Rede suspensa (story 69): substitui o painel inteiro pela tela bloqueante.
+  if (context?.merchantSuspended) return <SuspendedNotice />;
 
   return (
     <div className="shell">

@@ -110,6 +110,20 @@ describe("PickingService.assign", () => {
     expect(taskStatusChanged).toHaveBeenCalled();
     expect(dto.id).toBe("t1");
   });
+
+  /**
+   * Story 69 (decisão travada): suspender a rede NÃO bloqueia a separação em
+   * voo — só pedidos novos são barrados (checkout). O fluxo de picking nunca
+   * consulta `merchant.active`: o prisma fake sequer tem o model `merchant`,
+   * então qualquer checagem nova quebraria este teste.
+   */
+  it("rede suspensa não afeta a separação em voo: assign segue sem consultar merchant", async () => {
+    const { svc } = makeService({
+      task: { ...TASK_WITH_RELS, status: "queued", pickerId: null },
+      updateManyCount: 1,
+    });
+    await expect(svc.assign("u1", "t1")).resolves.toMatchObject({ id: "t1" });
+  });
 });
 
 describe("PickingService.listQueue — ordenação (story 01)", () => {

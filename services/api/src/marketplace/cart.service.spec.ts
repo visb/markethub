@@ -15,6 +15,8 @@ const MERCHANT = {
   deliveryFeeCents: 700,
   prepFeeCents: 100,
   platformFeeBps: 1000, // 10%
+  // Rede ativa (story 69): buildView deriva merchantSuspended de !active.
+  active: true,
 };
 
 const STORE = {
@@ -49,6 +51,8 @@ function makeItem(over: {
   minOrderCents?: number | null;
   deliveryRadiusKm?: number | null;
   allowsPickup?: boolean;
+  /** Rede ativa? (story 69) — false simula rede suspensa no grupo. */
+  merchantActive?: boolean;
 } = {}) {
   const saleType = over.saleType ?? "unit";
   const merchantId = over.merchantId ?? "m1";
@@ -82,7 +86,7 @@ function makeItem(over: {
         minOrderCents: over.minOrderCents ?? null,
         deliveryRadiusKm: over.deliveryRadiusKm ?? null,
         allowsPickup: over.allowsPickup ?? true,
-        merchant: MERCHANT,
+        merchant: { ...MERCHANT, active: over.merchantActive ?? true },
       },
     },
   };
@@ -463,6 +467,21 @@ describe("CartService.getCart / buildView (ETA + agrupamento)", () => {
     const view = await svc.getCart("u1", {});
     expect(view.groups).toHaveLength(2);
     expect(view.itemCount).toBe(2);
+  });
+
+  // Story 69: rede suspensa sinaliza o grupo (o app avisa; o checkout bloqueia).
+  it("rede suspensa → merchantSuspended true só no grupo afetado", async () => {
+    const { svc } = makePrisma({
+      items: [
+        makeItem({ id: "a", offerId: "o1", merchantId: "m1", storeId: "s1", merchantActive: false }),
+        makeItem({ id: "b", offerId: "o2", merchantId: "m2", storeId: "s2" }),
+      ],
+    });
+    const view = await svc.getCart("u1", {});
+    const g1 = view.groups.find((g) => g.merchantId === "m1")!;
+    const g2 = view.groups.find((g) => g.merchantId === "m2")!;
+    expect(g1.merchantSuspended).toBe(true);
+    expect(g2.merchantSuspended).toBe(false);
   });
 });
 

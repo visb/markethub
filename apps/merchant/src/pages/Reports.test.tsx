@@ -38,7 +38,7 @@ const stores = [
 
 describe("Reports page (story 13)", () => {
   beforeEach(() => {
-    ctx = { data: { role: "owner", merchantId: "m1", stores } };
+    ctx = { data: { role: "owner", merchantId: "m1", stores, merchantSuspended: false } };
     salesArgs.length = 0;
     opsArgs.length = 0;
     salesData = {
@@ -119,7 +119,7 @@ describe("Reports page (story 13)", () => {
   });
 
   it("gerente com uma só loja não vê o seletor de loja", () => {
-    ctx = { data: { role: "manager", merchantId: "m1", stores: [stores[0]] } };
+    ctx = { data: { role: "manager", merchantId: "m1", stores: [stores[0]], merchantSuspended: false } };
     render(<Reports />);
     expect(screen.queryByLabelText("Loja")).not.toBeInTheDocument();
   });

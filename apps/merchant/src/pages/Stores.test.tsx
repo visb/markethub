@@ -52,7 +52,7 @@ describe("Stores (story 08 CRUD)", () => {
   beforeEach(() => {
     createMutate.mockClear();
     updateMutate.mockClear();
-    ctx = { data: { role: "owner", merchantId: "m1", stores: [] } };
+    ctx = { data: { role: "owner", merchantId: "m1", stores: [], merchantSuspended: false } };
     storesResult = { data: [store()], isLoading: false };
   });
 
@@ -93,7 +93,7 @@ describe("Stores (story 08 CRUD)", () => {
   });
 
   it("manager NÃO vê botão Nova loja nem editar (can=false)", () => {
-    ctx = { data: { role: "manager", merchantId: "m1", stores: [] } };
+    ctx = { data: { role: "manager", merchantId: "m1", stores: [], merchantSuspended: false } };
     render(<Stores />);
     expect(screen.queryByRole("button", { name: "Nova loja" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Editar" })).not.toBeInTheDocument();

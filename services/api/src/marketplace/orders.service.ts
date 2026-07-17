@@ -442,13 +442,16 @@ export class OrdersService {
   }
 
   /**
-   * Regras de aceitação de pedido por loja no checkout (stories 52/57):
+   * Regras de aceitação de pedido por loja no checkout (stories 52/57/69):
+   * - Rede suspensa (`merchant.active = false`, story 69) bloqueia SEMPRE →
+   *   `MERCHANT_SUSPENDED`. Pedidos em voo seguem até concluir (decisão travada);
+   *   só o pedido NOVO é barrado. Tem precedência sobre pausa/horário.
    * - Pausa temporária (`pausedAt`) bloqueia SEMPRE (imediato e agendado) →
    *   `STORE_PAUSED`. É emergência curta; nem o agendamento contorna.
    * - Fechada por horário (semanal + fechamento excepcional do dia) só bloqueia o
    *   pedido `immediate` → `STORE_CLOSED` (com CTA de agendar). Loja SEM horário
    *   configurado é tratada como disponível (comportamento pré-52).
-   * Em multi-loja, lista as lojas bloqueadas na mensagem. A pausa tem precedência.
+   * Em multi-loja, lista as lojas bloqueadas na mensagem.
    */
   private async assertStoresAcceptOrders(
     storeIds: string[],
@@ -462,10 +465,24 @@ export class OrdersService {
         id: true,
         name: true,
         pausedAt: true,
+        merchant: { select: { active: true } },
         hours: { select: { dayOfWeek: true, opensAt: true, closesAt: true } },
         closures: { select: { date: true } },
       },
     });
+
+    const suspended = stores.filter((s) => !s.merchant.active);
+    if (suspended.length > 0) {
+      const names = suspended.map((s) => s.name).join(", ");
+      throw new BadRequestException({
+        code: "MERCHANT_SUSPENDED",
+        message:
+          suspended.length === 1
+            ? `A loja ${names} está temporariamente indisponível e não aceita novos pedidos.`
+            : `As lojas ${names} estão temporariamente indisponíveis e não aceitam novos pedidos.`,
+        stores: suspended.map((s) => ({ id: s.id, name: s.name })),
+      });
+    }
 
     const paused = stores.filter((s) => s.pausedAt != null);
     if (paused.length > 0) {

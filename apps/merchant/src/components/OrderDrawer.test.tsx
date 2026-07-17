@@ -69,7 +69,7 @@ const detail = (over: Partial<MerchantOrderDetailDTO> = {}): MerchantOrderDetail
 
 describe("OrderDrawer", () => {
   beforeEach(() => {
-    ctx = { data: { role: "owner", merchantId: "m1", stores: [] } };
+    ctx = { data: { role: "owner", merchantId: "m1", stores: [], merchantSuspended: false } };
     detailResult = { data: detail(), isLoading: false, isError: false };
     mutate.mockReset();
     retryMutate.mockReset();

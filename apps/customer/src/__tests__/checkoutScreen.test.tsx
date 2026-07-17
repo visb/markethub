@@ -28,7 +28,7 @@ const ADDR: Address[] = [
 const CART: CartView = {
   couponCode: "PROMO",
   itemCount: 1,
-  groups: [{ merchantId: "m1", merchant: "Rede A", merchantLogoUrl: null, storeId: "s1", etaMinutes: 30, distanceKm: 2, deliveryFeeCents: 800, minOrderCents: null, missingForMinCents: 0, allowsPickup: true, items: [] }],
+  groups: [{ merchantId: "m1", merchant: "Rede A", merchantLogoUrl: null, storeId: "s1", etaMinutes: 30, distanceKm: 2, deliveryFeeCents: 800, minOrderCents: null, missingForMinCents: 0, allowsPickup: true, merchantSuspended: false, items: [] }],
   totals: { itemsCents: 5000, deliveryCents: 800, prepCents: 0, platformFeeCents: 200, discountCents: 500, doorSurchargeCents: 0, totalCents: 5500, groups: [] },
 };
 const SLOTS: SlotView[] = [
@@ -199,6 +199,51 @@ describe("CheckoutScreen", () => {
       await proceed(tree).props.onPress();
     });
     expect(checkoutBody.last).toEqual({ fulfillment: "pickup", deliverySlotId: null });
+  });
+
+  it("rede suspensa (MERCHANT_SUSPENDED): erro + CTA remove os itens do grupo (story 69)", async () => {
+    const suspendedGroup = {
+      ...CART.groups[0]!,
+      merchantSuspended: true,
+      items: [
+        { id: "it1", offerId: "o1", name: "Arroz", imageUrl: null, saleType: "unit" as const, packageSize: null, unitPriceCents: 1000, quantity: 1, weightGrams: null, available: true },
+      ],
+    };
+    let cartState: CartView = { ...CART, groups: [suspendedGroup] };
+    const removed: string[] = [];
+    mockRequest.mockImplementation((url: string, opts?: { method?: string; body?: unknown }) => {
+      if (url === "/addresses") return Promise.resolve(ADDR);
+      if (url === "/cart") return Promise.resolve(cartState);
+      if (url.endsWith("/slots")) return Promise.resolve(SLOTS);
+      if (url.startsWith("/cart/items/") && opts?.method === "DELETE") {
+        removed.push(url);
+        cartState = { ...CART, itemCount: 0, groups: [] }; // carrinho esvaziado
+        return Promise.resolve(cartState);
+      }
+      if (url === "/checkout") {
+        return Promise.reject(
+          new ApiClientError(400, {
+            code: "MERCHANT_SUSPENDED",
+            message: "A loja Rede A está temporariamente indisponível e não aceita novos pedidos.",
+          }),
+        );
+      }
+      return Promise.resolve({});
+    });
+    const tree = await mount();
+    await act(async () => {
+      await proceed(tree).props.onPress();
+    });
+    const text = JSON.stringify(tree.toJSON());
+    expect(text).toContain("temporariamente indisponível");
+    expect(text).toContain("Remover itens da loja indisponível");
+    expect(mockReplace).not.toHaveBeenCalledWith("/payment/ord1");
+    // CTA remove os itens do grupo suspenso e, com o carrinho vazio, volta ao carrinho
+    await act(async () => {
+      await radio(tree, "Remover itens da loja indisponível").props.onPress();
+    });
+    expect(removed).toEqual(["/cart/items/it1"]);
+    expect(mockReplace).toHaveBeenCalledWith("/cart");
   });
 
   it("pedido mínimo (MIN_ORDER_NOT_MET): mostra o erro sem CTA (story 58)", async () => {

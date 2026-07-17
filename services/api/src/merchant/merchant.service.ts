@@ -101,7 +101,12 @@ export class MerchantService {
   async getContext(user: {
     id: string;
     roles: string[];
-  }): Promise<{ role: "owner" | "admin" | "manager"; merchantId: string | null; stores: { id: string; name: string; merchantId: string }[] }> {
+  }): Promise<{
+    role: "owner" | "admin" | "manager";
+    merchantId: string | null;
+    stores: { id: string; name: string; merchantId: string }[];
+    merchantSuspended: boolean;
+  }> {
     const stores = await this.myStores(user.id);
     const role = await this.resolveLevel(user);
 
@@ -112,10 +117,22 @@ export class MerchantService {
       });
     }
 
+    const merchantId = stores[0]?.merchantId ?? null;
+    // Rede suspensa (story 69): o context é a leitura mínima que o app usa p/
+    // montar a tela bloqueante ("rede suspensa — contate a plataforma"). O staff
+    // continua logando (sem 403 aqui); picker/driver seguem os pedidos em voo.
+    const merchant = merchantId
+      ? await this.prisma.merchant.findUnique({
+          where: { id: merchantId },
+          select: { active: true },
+        })
+      : null;
+
     return {
       role,
-      merchantId: stores[0]?.merchantId ?? null,
+      merchantId,
       stores,
+      merchantSuspended: merchant ? !merchant.active : false,
     };
   }
 

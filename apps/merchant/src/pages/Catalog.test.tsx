@@ -72,7 +72,7 @@ describe("Catalog (story 11)", () => {
     vi.clearAllMocks();
     lastOfferFilters = undefined;
     lastStockStoreId = undefined;
-    ctx = { data: { role: "owner", merchantId: "m1", stores } };
+    ctx = { data: { role: "owner", merchantId: "m1", stores, merchantSuspended: false } };
     offersResult = { data: [offer()], isLoading: false };
     stocksResult = { data: [stock()], isLoading: false };
   });

@@ -327,6 +327,8 @@ function makeManager(opts: {
       findFirst: jest.fn().mockResolvedValue(opts.hasAdminLink ? { id: "lnk" } : null),
     },
     store: { findMany: jest.fn().mockResolvedValue(managed.map((id) => ({ id }))) },
+    // Story 69: getContext consulta merchant.active (rede ativa por padrão).
+    merchant: { findUnique: jest.fn().mockResolvedValue({ active: true }) },
     offer: {
       findMany: jest.fn().mockResolvedValue(opts.offers ?? []),
       findUnique: jest.fn().mockResolvedValue(opts.offer ?? null),
@@ -349,7 +351,7 @@ describe("MerchantService.getContext (story 16)", () => {
   it("owner sem loja ainda é permitido (merchantId null)", async () => {
     const { svc } = makeManager({ managed: [] });
     const ctx = await svc.getContext({ id: "u1", roles: ["merchant"] });
-    expect(ctx).toEqual({ role: "owner", merchantId: null, stores: [] });
+    expect(ctx).toEqual({ role: "owner", merchantId: null, stores: [], merchantSuspended: false });
   });
 
   it("manager sem loja → FORBIDDEN NOT_A_MERCHANT_USER", async () => {
