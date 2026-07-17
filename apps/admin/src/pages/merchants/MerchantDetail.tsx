@@ -33,6 +33,14 @@ interface PresignedUpload {
 const brl = (c: number) => `R$ ${(c / 100).toFixed(2).replace(".", ",")}`;
 const pct = (bps: number) => `${(bps / 100).toFixed(1)}%`;
 
+/** Efeitos da suspensão listados no confirm (story 69 — decisão travada). */
+const suspendConfirmMessage = (name: string) =>
+  `Suspender ${name}?\n\n` +
+  "• As lojas da rede saem da vitrine do marketplace\n" +
+  "• Novos pedidos são bloqueados no checkout\n" +
+  "• O painel do lojista fica bloqueado\n" +
+  "• Pedidos em andamento seguem até concluir";
+
 export function MerchantDetail() {
   const { merchantId } = useParams();
   const { api } = useAuth();
@@ -56,6 +64,9 @@ export function MerchantDetail() {
 
   async function toggleActive() {
     if (!data) return;
+    // Suspender propaga de ponta a ponta (story 69) → confirm com os efeitos.
+    // Reativar não pede confirmação.
+    if (data.active && !window.confirm(suspendConfirmMessage(data.name))) return;
     await api.request(`/admin/merchants/${data.id}`, {
       method: "PATCH",
       auth: true,

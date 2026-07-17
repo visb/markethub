@@ -91,6 +91,8 @@ export interface CartView {
     missingForMinCents: number;
     /** Loja permite retirada — sugere retirada quando fora do raio (story 58). */
     allowsPickup: boolean;
+    /** Rede suspensa pela plataforma (story 69): aviso no carrinho; checkout bloqueia. */
+    merchantSuspended: boolean;
     items: CartItemView[];
   }[];
   totals: CartTotals;

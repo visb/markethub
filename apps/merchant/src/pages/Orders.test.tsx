@@ -66,7 +66,7 @@ describe("groupByStatus", () => {
 
 describe("Orders page", () => {
   beforeEach(() => {
-    ctx = { data: { role: "owner", merchantId: "m1", stores } };
+    ctx = { data: { role: "owner", merchantId: "m1", stores, merchantSuspended: false } };
     ordersResult = { orders: [order()], loading: false, connected: true };
     lastOptions = undefined;
     toggleSound.mockReset();

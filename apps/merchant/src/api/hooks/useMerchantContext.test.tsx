@@ -16,7 +16,7 @@ function wrapper({ children }: { children: React.ReactNode }) {
   return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
 }
 
-const ctx: MerchantContextDTO = { role: "owner", merchantId: "m1", stores: [{ id: "s1", name: "Loja", merchantId: "m1" }] };
+const ctx: MerchantContextDTO = { role: "owner", merchantId: "m1", stores: [{ id: "s1", name: "Loja", merchantId: "m1" }], merchantSuspended: false };
 
 describe("useMerchantContext (story 07)", () => {
   it("popula papel e lojas a partir do client", async () => {

@@ -54,6 +54,14 @@ describe("CatalogService.listStoresInBounds", () => {
     expect(where.longitude).toEqual({ not: null, gte: -10, lte: 10 });
   });
 
+  // Story 69: rede suspensa some dos marcadores do mapa.
+  it("exige rede (merchant) ativa no where do viewport", async () => {
+    const { prisma, findMany } = makePrisma([]);
+    const svc = new CatalogService(prisma, followsStub);
+    await svc.listStoresInBounds(bounds);
+    expect(findMany.mock.calls[0][0].where.merchant).toEqual({ active: true });
+  });
+
   it("mapeia para o shape enxuto de marcador (sem produtos)", async () => {
     const { prisma } = makePrisma([makeStore("a", 1, 2)]);
     const svc = new CatalogService(prisma, followsStub);
@@ -114,7 +122,9 @@ function makeCatalog() {
   return { prisma, m };
 }
 
-const activeStore = { id: "s1", active: true, latitude: 0, longitude: 0 };
+// assertStore (story 69) também exige a rede ativa — o select traz merchant.active.
+const activeStore = { id: "s1", active: true, latitude: 0, longitude: 0, merchant: { active: true } };
+const suspendedStore = { ...activeStore, merchant: { active: false } };
 
 function offerRow(id: string, over: Partial<Record<string, unknown>> = {}) {
   return {
@@ -159,11 +169,21 @@ describe("CatalogService.listStores", () => {
 
   it("lista lojas ativas do mercado", async () => {
     const { prisma, m } = makeCatalog();
-    m.merchant.findUnique.mockResolvedValue({ id: "m1" });
+    m.merchant.findUnique.mockResolvedValue({ id: "m1", active: true });
     m.store.findMany.mockResolvedValue([{ id: "s1" }]);
     const res = await new CatalogService(prisma, followsStub).listStores("m1");
     expect(m.store.findMany.mock.calls[0][0].where).toEqual({ merchantId: "m1", active: true });
     expect(res).toEqual([{ id: "s1" }]);
+  });
+
+  // Story 69: rede suspensa nega o acesso direto com code próprio.
+  it("lança MERCHANT_SUSPENDED quando a rede está suspensa", async () => {
+    const { prisma, m } = makeCatalog();
+    m.merchant.findUnique.mockResolvedValue({ id: "m1", active: false });
+    await expect(new CatalogService(prisma, followsStub).listStores("m1")).rejects.toMatchObject({
+      response: { code: "MERCHANT_SUSPENDED" },
+    });
+    expect(m.store.findMany).not.toHaveBeenCalled();
   });
 });
 
@@ -186,6 +206,18 @@ describe("CatalogService.listStoreCategories", () => {
     m.store.findUnique.mockResolvedValue(null);
     await expect(new CatalogService(prisma, followsStub).listStoreCategories("s1")).rejects.toMatchObject({
       response: { code: "STORE_NOT_FOUND" },
+    });
+  });
+
+  // Story 69: loja de rede suspensa nega categorias/produtos com code próprio.
+  it("propaga MERCHANT_SUSPENDED quando a rede da loja está suspensa", async () => {
+    const { prisma, m } = makeCatalog();
+    m.store.findUnique.mockResolvedValue(suspendedStore);
+    await expect(new CatalogService(prisma, followsStub).listStoreCategories("s1")).rejects.toMatchObject({
+      response: { code: "MERCHANT_SUSPENDED" },
+    });
+    await expect(new CatalogService(prisma, followsStub).listStoreProducts("s1", {})).rejects.toMatchObject({
+      response: { code: "MERCHANT_SUSPENDED" },
     });
   });
 });
@@ -243,6 +275,16 @@ describe("CatalogService.search", () => {
     expect(where.product.OR).toHaveLength(3);
     expect(res.items[0]).toMatchObject({ offerId: "o1" });
   });
+
+  // Story 69: a busca só devolve ofertas de loja ativa de rede ativa.
+  it("filtra ofertas por loja ativa E rede ativa no where", async () => {
+    const { prisma, m } = makeCatalog();
+    await new CatalogService(prisma, followsStub).search("arroz", {});
+    expect(m.offer.findMany.mock.calls[0][0].where.store).toEqual({
+      active: true,
+      merchant: { active: true },
+    });
+  });
 });
 
 describe("CatalogService.productDetail", () => {
@@ -288,6 +330,18 @@ describe("CatalogService.productDetail", () => {
     expect(noCat.category).toBeNull();
     expect(noCat.prepOptions).toBeNull();
   });
+
+  // Story 69: oferta de loja/rede suspensa some do detalhe do produto.
+  it("só inclui ofertas de loja ativa de rede ativa", async () => {
+    const { prisma, m } = makeCatalog();
+    m.product.findUnique.mockResolvedValue({ id: "p1", name: "Arroz", category: null, offers: [] });
+    await new CatalogService(prisma, followsStub).productDetail("p1");
+    const include = m.product.findUnique.mock.calls[0][0].include;
+    expect(include.offers.where).toEqual({
+      available: true,
+      store: { active: true, merchant: { active: true } },
+    });
+  });
 });
 
 describe("CatalogService.storeSections", () => {
@@ -303,7 +357,7 @@ describe("CatalogService.storeSections", () => {
       deliveryFeeCents: null,
       minOrderCents: null,
       deliveryRadiusKm: null,
-      merchant: { name: "Mercado", logoUrl: null, deliveryFeeCents: 500 },
+      merchant: { name: "Mercado", logoUrl: null, deliveryFeeCents: 500, active: true },
       hours: [],
       closures: [],
       ...over,
@@ -315,6 +369,17 @@ describe("CatalogService.storeSections", () => {
     m.store.findUnique.mockResolvedValue(sectionStore({ active: false }));
     await expect(new CatalogService(prisma, followsStub).storeSections("s1")).rejects.toMatchObject({
       response: { code: "STORE_NOT_FOUND" },
+    });
+  });
+
+  // Story 69: rede suspensa nega a página da loja com code próprio.
+  it("lança MERCHANT_SUSPENDED quando a rede está suspensa", async () => {
+    const { prisma, m } = makeCatalog();
+    m.store.findUnique.mockResolvedValue(
+      sectionStore({ merchant: { name: "Mercado", logoUrl: null, deliveryFeeCents: 500, active: false } }),
+    );
+    await expect(new CatalogService(prisma, followsStub).storeSections("s1")).rejects.toMatchObject({
+      response: { code: "MERCHANT_SUSPENDED" },
     });
   });
 
@@ -394,6 +459,38 @@ describe("CatalogService.storeSections", () => {
     const res = await new CatalogService(prisma, followsStub).storeSections("s1");
     expect(res.store.paused).toBe(true);
     expect(res.store.openNow).toBe(false);
+  });
+});
+
+// Story 69: o resumo do explore (modal) também nega rede suspensa.
+describe("CatalogService.storeSummary — rede suspensa (story 69)", () => {
+  it("lança MERCHANT_SUSPENDED quando a rede está suspensa", async () => {
+    const { prisma, m } = makeCatalog();
+    m.store.findUnique.mockResolvedValue({
+      id: "s1",
+      name: "Loja",
+      active: true,
+      merchant: { name: "Mercado", logoUrl: null, deliveryFeeCents: 500, active: false },
+      hours: [],
+      closures: [],
+    });
+    await expect(new CatalogService(prisma, followsStub).storeSummary("s1")).rejects.toMatchObject({
+      response: { code: "MERCHANT_SUSPENDED" },
+    });
+  });
+});
+
+// Story 69: o feed por categoria curada só traz ofertas de loja/rede ativas.
+describe("CatalogService.categoryFeed — rede suspensa (story 69)", () => {
+  it("aplica o filtro de loja ativa E rede ativa nas ofertas", async () => {
+    const { prisma, m } = makeCatalog();
+    m.marketplaceCategory.findUnique.mockResolvedValue({ id: "mc1", name: "Bebidas", slug: "bebidas" });
+    m.offer.findMany.mockResolvedValue([]);
+    await new CatalogService(prisma, followsStub).categoryFeed("mc1", {});
+    expect(m.offer.findMany.mock.calls[0][0].where.store).toEqual({
+      active: true,
+      merchant: { active: true },
+    });
   });
 });
 
@@ -553,7 +650,7 @@ describe("CatalogService.storeSummary (story 29)", () => {
     deliveryFeeCents: null,
     minOrderCents: null,
     deliveryRadiusKm: null,
-    merchant: { name: "Supermercado Europa", logoUrl: null, deliveryFeeCents: 700 },
+    merchant: { name: "Supermercado Europa", logoUrl: null, deliveryFeeCents: 700, active: true },
     hours: [{ dayOfWeek: 0, opensAt: 480, closesAt: 1200 }],
     closures: [],
   };

@@ -78,6 +78,8 @@ export default function CartScreen() {
   const t = cart.totals;
   // CTA de checkout bloqueado enquanto houver grupo abaixo do mínimo (story 58).
   const belowMin = cart.groups.some((g) => g.missingForMinCents > 0);
+  // Rede suspensa (story 69) também bloqueia o CTA — o checkout negaria mesmo.
+  const hasSuspended = cart.groups.some((g) => g.merchantSuspended);
   return (
     <SafeAreaView style={styles.flex} edges={["top"]}>
       <Header title="Meu carrinho" />
@@ -119,6 +121,17 @@ export default function CartScreen() {
                 />
               </View>
             ))}
+
+            {/* Rede suspensa (story 69): aviso no grupo; itens seguem no carrinho. */}
+            {g.merchantSuspended && (
+              <View style={styles.minOrder} testID={`suspended-${g.merchantId}`}>
+                <Ionicons name="alert-circle-outline" size={16} color={colors.danger} />
+                <Text variant="caption" style={styles.minOrderText}>
+                  {g.merchant} está temporariamente indisponível. Remova os itens desta loja para
+                  finalizar a compra.
+                </Text>
+              </View>
+            )}
 
             {/* Pedido mínimo da loja (story 58): progresso quando ainda não atingido. */}
             {g.missingForMinCents > 0 && (
@@ -208,10 +221,15 @@ export default function CartScreen() {
             Ajuste os itens para atingir o pedido mínimo das lojas destacadas.
           </Text>
         )}
+        {hasSuspended && (
+          <Text variant="caption" style={styles.footerHint} testID="cart-suspended-hint">
+            Remova os itens das lojas indisponíveis para finalizar a compra.
+          </Text>
+        )}
         <Button
           title="Finalizar Compra"
           variant="outline"
-          disabled={belowMin}
+          disabled={belowMin || hasSuspended}
           onPress={() => router.push("/checkout")}
         />
       </View>

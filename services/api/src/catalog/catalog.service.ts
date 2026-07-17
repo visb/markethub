@@ -43,6 +43,17 @@ export class CatalogService {
     private readonly storeFollows: StoreFollowsService,
   ) {}
 
+  /**
+   * Fragmento único da vitrine (story 69): toda superfície pública exige loja
+   * ativa E rede (merchant) ativa. Aplicado às listas de loja e, via relação
+   * `store`, às consultas de oferta (busca/feed/detalhe de produto). Acesso
+   * direto a loja/rede suspensa → MERCHANT_SUSPENDED (404).
+   */
+  private readonly visibleStoreWhere = {
+    active: true,
+    merchant: { active: true },
+  } satisfies Prisma.StoreWhereInput;
+
   listMerchants() {
     return this.prisma.merchant.findMany({
       where: { active: true },
@@ -54,6 +65,10 @@ export class CatalogService {
   async listStores(merchantId: string) {
     const merchant = await this.prisma.merchant.findUnique({ where: { id: merchantId } });
     if (!merchant) throw this.notFound("MERCHANT_NOT_FOUND", "Merchant not found");
+    // Rede suspensa (story 69): acesso direto ao detalhe nega com code próprio.
+    if (!merchant.active) {
+      throw this.notFound("MERCHANT_SUSPENDED", "Mercado temporariamente indisponível");
+    }
     return this.prisma.store.findMany({
       where: { merchantId, active: true },
       select: {
@@ -76,7 +91,7 @@ export class CatalogService {
   async listStoresInBounds(bounds: ViewportBounds) {
     const rows = await this.prisma.store.findMany({
       where: {
-        active: true,
+        ...this.visibleStoreWhere,
         latitude: { not: null, gte: bounds.south, lte: bounds.north },
         longitude: { not: null, gte: bounds.west, lte: bounds.east },
       },
@@ -180,6 +195,8 @@ export class CatalogService {
 
     const where: Prisma.OfferWhereInput = {
       available: true,
+      // Só ofertas de loja visível (ativa + rede ativa — story 69).
+      store: this.visibleStoreWhere,
       ...(opts.storeId ? { storeId: opts.storeId } : {}),
       product: {
         OR: [
@@ -219,7 +236,8 @@ export class CatalogService {
           },
         },
         offers: {
-          where: { available: true },
+          // Oferta de loja/rede suspensa some do detalhe do produto (story 69).
+          where: { available: true, store: this.visibleStoreWhere },
           select: {
             id: true,
             priceCents: true,
@@ -261,12 +279,16 @@ export class CatalogService {
         deliveryFeeCents: true,
         minOrderCents: true,
         deliveryRadiusKm: true,
-        merchant: { select: { name: true, logoUrl: true, deliveryFeeCents: true } },
+        merchant: { select: { name: true, logoUrl: true, deliveryFeeCents: true, active: true } },
         hours: { select: { dayOfWeek: true, opensAt: true, closesAt: true } },
         closures: { select: { date: true } },
       },
     });
     if (!store || !store.active) throw this.notFound("STORE_NOT_FOUND", "Store not found");
+    // Rede suspensa (story 69): a página da loja nega com code próprio.
+    if (!store.merchant.active) {
+      throw this.notFound("MERCHANT_SUSPENDED", "Mercado temporariamente indisponível");
+    }
     const base: Prisma.OfferWhereInput = { storeId, available: true };
 
     const [featured, mostBought, recommended] = await this.prisma.$transaction([
@@ -353,12 +375,16 @@ export class CatalogService {
         deliveryFeeCents: true,
         minOrderCents: true,
         deliveryRadiusKm: true,
-        merchant: { select: { name: true, logoUrl: true, deliveryFeeCents: true } },
+        merchant: { select: { name: true, logoUrl: true, deliveryFeeCents: true, active: true } },
         hours: { select: { dayOfWeek: true, opensAt: true, closesAt: true } },
         closures: { select: { date: true } },
       },
     });
     if (!store || !store.active) throw this.notFound("STORE_NOT_FOUND", "Store not found");
+    // Rede suspensa (story 69): o resumo do explore nega com code próprio.
+    if (!store.merchant.active) {
+      throw this.notFound("MERCHANT_SUSPENDED", "Mercado temporariamente indisponível");
+    }
 
     const agg = await this.prisma.review.aggregate({
       where: { axis: "merchant", targetMerchantId: store.merchantId },
@@ -454,6 +480,8 @@ export class CatalogService {
     const offers = await this.prisma.offer.findMany({
       where: {
         available: true,
+        // Só ofertas de loja visível (ativa + rede ativa — story 69).
+        store: this.visibleStoreWhere,
         ...(opts.storeId ? { storeId: opts.storeId } : {}),
         product: {
           category: { marketplaceCategoryId },
@@ -529,8 +557,15 @@ export class CatalogService {
   }
 
   private async assertStore(storeId: string) {
-    const store = await this.prisma.store.findUnique({ where: { id: storeId } });
+    const store = await this.prisma.store.findUnique({
+      where: { id: storeId },
+      select: { active: true, merchant: { select: { active: true } } },
+    });
     if (!store || !store.active) throw this.notFound("STORE_NOT_FOUND", "Store not found");
+    // Rede suspensa (story 69): categorias/produtos da loja negam com code próprio.
+    if (!store.merchant.active) {
+      throw this.notFound("MERCHANT_SUSPENDED", "Mercado temporariamente indisponível");
+    }
   }
 
   private notFound(code: string, message: string) {

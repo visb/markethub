@@ -70,14 +70,48 @@ describe("MerchantDetail", () => {
     await screen.findByText("Mercado não encontrado.");
   });
 
-  it("alterna ativo/inativo via PATCH", async () => {
+  // Story 69: suspender exige confirm listando os efeitos da propagação.
+  it("suspende via PATCH após confirmar (confirm lista os efeitos)", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     renderDetail();
     await screen.findByRole("heading", { name: "Rede Boa Compra" });
     fireEvent.click(screen.getByRole("button", { name: "Desativar" }));
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    const msg = confirmSpy.mock.calls[0]![0] as string;
+    expect(msg).toContain("Suspender Rede Boa Compra?");
+    expect(msg).toContain("saem da vitrine");
+    expect(msg).toContain("Novos pedidos são bloqueados");
+    expect(msg).toContain("painel do lojista fica bloqueado");
+    expect(msg).toContain("Pedidos em andamento seguem");
     await waitFor(() => {
       const patch = request.mock.calls.find((c) => c[1]?.method === "PATCH");
       expect(patch![1].body).toEqual({ active: false });
     });
+    confirmSpy.mockRestore();
+  });
+
+  it("cancelar o confirm de suspensão NÃO envia o PATCH", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    renderDetail();
+    await screen.findByRole("heading", { name: "Rede Boa Compra" });
+    fireEvent.click(screen.getByRole("button", { name: "Desativar" }));
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(request.mock.calls.find((c) => c[1]?.method === "PATCH")).toBeUndefined();
+    confirmSpy.mockRestore();
+  });
+
+  it("reativar não pede confirmação e envia o PATCH direto", async () => {
+    request = vi.fn(() => Promise.resolve({ ...DETAIL, active: false }));
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    renderDetail();
+    await screen.findByRole("heading", { name: "Rede Boa Compra" });
+    fireEvent.click(screen.getByRole("button", { name: "Ativar" }));
+    await waitFor(() => {
+      const patch = request.mock.calls.find((c) => c[1]?.method === "PATCH");
+      expect(patch![1].body).toEqual({ active: true });
+    });
+    expect(confirmSpy).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
   });
 
   it("edita os dados da rede e salva via PATCH", async () => {

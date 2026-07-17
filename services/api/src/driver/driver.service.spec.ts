@@ -61,6 +61,19 @@ describe("DriverService.confirmDelivery", () => {
     await svc.confirmDelivery("drv1", "d1", "AB12");
     expect(confirmDelivered).toHaveBeenCalledWith("g1", "AB12");
   });
+
+  /**
+   * Story 69 (decisão travada): suspender a rede NÃO bloqueia a entrega em
+   * voo — só pedidos novos são barrados (checkout). O fluxo do driver nunca
+   * consulta `merchant.active`: o prisma fake sequer tem o model `merchant`,
+   * então qualquer checagem nova quebraria este teste.
+   */
+  it("rede suspensa não afeta a entrega em voo: confirmDelivery segue sem consultar merchant", async () => {
+    const confirmDelivered = jest.fn().mockResolvedValue(undefined);
+    const prisma = makePrisma({ id: "d1", driverId: "drv1", status: "picked_up", orderGroupId: "g1" });
+    const svc = new DriverService(prisma, { confirmDelivered } as never, { emit: jest.fn() } as never, noopOutbox);
+    await expect(svc.confirmDelivery("drv1", "d1", "AB12")).resolves.toMatchObject({ id: "d1" });
+  });
 });
 
 /**

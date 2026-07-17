@@ -104,10 +104,12 @@ function makeDeps(opts: {
     latitude?: number | null;
     longitude?: number | null;
     deliveryRadiusKm?: number | null;
+    /** Rede da loja (story 69); omitido → rede ativa. */
+    merchant?: { active: boolean };
   }[];
 } = {}) {
   const view = opts.view ?? makeView();
-  const openStores =
+  const openStores = (
     opts.stores ??
     view.groups.map((g) => ({
       id: g.storeId,
@@ -118,7 +120,9 @@ function makeDeps(opts: {
       latitude: null,
       longitude: null,
       deliveryRadiusKm: null,
-    }));
+    }))
+    // Rede ativa por padrão (story 69): o guard de checkout lê merchant.active.
+  ).map((s) => ({ merchant: { active: true }, ...s }));
 
   const tx = {
     order: {
@@ -413,6 +417,74 @@ describe("OrdersService.checkout", () => {
     expect(tx.order.create).not.toHaveBeenCalled();
     // a pausa é checada antes de reservar o slot
     expect(scheduling.reserveInTx).not.toHaveBeenCalled();
+  });
+
+  // ── Story 69: rede suspensa bloqueia todo pedido NOVO (imediato e agendado) ──
+  it("rede suspensa → MERCHANT_SUSPENDED no checkout imediato, com a(s) loja(s)", async () => {
+    const order = { id: "order1", userId: "u1", status: "created", groups: [] };
+    const { svc, tx } = makeDeps({
+      address: validAddress,
+      order,
+      stores: [
+        { id: "store1", name: "Europa Centro", hours: ALWAYS_OPEN_HOURS, closures: [], merchant: { active: false } },
+      ],
+    });
+    await expect(svc.checkout("u1", deliveryInput)).rejects.toMatchObject({
+      response: { code: "MERCHANT_SUSPENDED", stores: [{ id: "store1", name: "Europa Centro" }] },
+    });
+    expect(tx.order.create).not.toHaveBeenCalled();
+  });
+
+  it("rede suspensa bloqueia até o pedido AGENDADO com slot → MERCHANT_SUSPENDED", async () => {
+    const order = { id: "order1", userId: "u1", status: "created", groups: [] };
+    const { svc, tx, scheduling } = makeDeps({
+      address: validAddress,
+      order,
+      stores: [
+        { id: "store1", name: "Europa Centro", hours: ALWAYS_OPEN_HOURS, closures: [], merchant: { active: false } },
+      ],
+    });
+    await expect(
+      svc.checkout("u1", { ...deliveryInput, deliverySlotId: "slot1" }),
+    ).rejects.toMatchObject({ response: { code: "MERCHANT_SUSPENDED" } });
+    expect(tx.order.create).not.toHaveBeenCalled();
+    expect(scheduling.reserveInTx).not.toHaveBeenCalled();
+  });
+
+  it("rede suspensa tem precedência sobre pausa: MERCHANT_SUSPENDED (não STORE_PAUSED)", async () => {
+    const order = { id: "order1", userId: "u1", status: "created", groups: [] };
+    const { svc } = makeDeps({
+      address: validAddress,
+      order,
+      stores: [
+        {
+          id: "store1",
+          name: "Europa Centro",
+          pausedAt: new Date("2026-06-28T10:00:00Z"),
+          hours: ALWAYS_OPEN_HOURS,
+          closures: [],
+          merchant: { active: false },
+        },
+      ],
+    });
+    await expect(svc.checkout("u1", deliveryInput)).rejects.toMatchObject({
+      response: { code: "MERCHANT_SUSPENDED" },
+    });
+  });
+
+  it("multi-loja: só a loja da rede suspensa entra na mensagem/lista", async () => {
+    const order = { id: "order1", userId: "u1", status: "created", groups: [] };
+    const { svc } = makeDeps({
+      address: validAddress,
+      order,
+      stores: [
+        { id: "store1", name: "Ativa", hours: ALWAYS_OPEN_HOURS, closures: [] },
+        { id: "store2", name: "Suspensa", hours: ALWAYS_OPEN_HOURS, closures: [], merchant: { active: false } },
+      ],
+    });
+    await expect(svc.checkout("u1", deliveryInput)).rejects.toMatchObject({
+      response: { code: "MERCHANT_SUSPENDED", stores: [{ id: "store2", name: "Suspensa" }] },
+    });
   });
 
   it("multi-loja: lista apenas a(s) fechada(s) na mensagem", async () => {

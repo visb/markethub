@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createVehicleInputSchema,
+  merchantContextSchema,
   merchantRoleSchema,
   pickersReportSchema,
   staffRoleSchema,
@@ -19,6 +20,21 @@ describe("merchantRoleSchema (hierarquia owner > admin > manager)", () => {
       expect(merchantRoleSchema.safeParse(r).success).toBe(true);
     }
     expect(merchantRoleSchema.safeParse("picker").success).toBe(false);
+  });
+});
+
+describe("merchantContextSchema (story 69)", () => {
+  const base = {
+    role: "owner",
+    merchantId: "m1",
+    stores: [{ id: "s1", name: "Loja", merchantId: "m1" }],
+  };
+
+  it("exige merchantSuspended booleano (flag da tela bloqueante)", () => {
+    expect(merchantContextSchema.safeParse({ ...base, merchantSuspended: false }).success).toBe(true);
+    expect(merchantContextSchema.safeParse({ ...base, merchantSuspended: true }).success).toBe(true);
+    expect(merchantContextSchema.safeParse(base).success).toBe(false);
+    expect(merchantContextSchema.safeParse({ ...base, merchantSuspended: "sim" }).success).toBe(false);
   });
 });
 

@@ -26,6 +26,11 @@ export const merchantContextSchema = z.object({
   /** merchant (rede) "principal" do usuário; null se owner sem rede ainda. */
   merchantId: z.string().nullable(),
   stores: z.array(merchantStoreSchema),
+  /**
+   * Rede suspensa pela plataforma (story 69): o painel exibe tela bloqueante
+   * (só logout). Pedidos em voo seguem nos apps picker/driver.
+   */
+  merchantSuspended: z.boolean(),
 });
 export type MerchantContextDTO = z.infer<typeof merchantContextSchema>;
 

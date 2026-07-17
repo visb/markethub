@@ -187,6 +187,9 @@ export class CartService {
         merchantId: mid,
         merchant: merchant.name,
         merchantLogoUrl: merchant.logoUrl,
+        // Rede suspensa (story 69): flag de aviso por grupo — o app sinaliza e o
+        // checkout bloqueia (MERCHANT_SUSPENDED); os itens seguem no carrinho.
+        merchantSuspended: !merchant.active,
         storeId: its[0]!.offer.storeId,
         // Config de entrega por loja exposta ao carrinho (story 58).
         deliveryFeeCents: opts.pickup ? 0 : effectiveDeliveryFeeCents,

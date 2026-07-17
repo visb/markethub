@@ -37,6 +37,7 @@ function cart(over: Partial<CartView> = {}): CartView {
         minOrderCents: null,
         missingForMinCents: 0,
         allowsPickup: true,
+        merchantSuspended: false,
         items: [
           { id: "it1", offerId: "o1", name: "Arroz", imageUrl: null, saleType: "unit", packageSize: "1kg", unitPriceCents: 1000, quantity: 2, weightGrams: null, available: true },
           { id: "it2", offerId: "o2", name: "Carne", imageUrl: "http://x/c.png", saleType: "weight", packageSize: null, unitPriceCents: 4000, quantity: 1, weightGrams: 500, available: true },
@@ -161,6 +162,29 @@ describe("CartScreen", () => {
     const tree = await mount();
     const j = json(tree);
     expect(j).not.toContain("para o mínimo de");
+    const finalizar = tree.root.findAll((n) => n.props.title === "Finalizar Compra")[0]!;
+    expect(finalizar.props.disabled).toBe(false);
+  });
+
+  // Story 69: rede suspensa → aviso no grupo e checkout bloqueado.
+  it("rede suspensa: mostra o aviso do grupo e desabilita o checkout (story 69)", async () => {
+    current = cart({
+      groups: [{ ...cart().groups[0]!, merchantSuspended: true }],
+    });
+    const tree = await mount();
+    const j = json(tree);
+    expect(j).toContain("suspended-m1");
+    expect(j).toContain("temporariamente indisponível");
+    expect(j).toContain("cart-suspended-hint");
+    const finalizar = tree.root.findAll((n) => n.props.title === "Finalizar Compra")[0]!;
+    expect(finalizar.props.disabled).toBe(true);
+  });
+
+  it("sem rede suspensa: sem aviso e checkout habilitado (story 69)", async () => {
+    const tree = await mount();
+    const j = json(tree);
+    expect(j).not.toContain("suspended-m1");
+    expect(j).not.toContain("cart-suspended-hint");
     const finalizar = tree.root.findAll((n) => n.props.title === "Finalizar Compra")[0]!;
     expect(finalizar.props.disabled).toBe(false);
   });
