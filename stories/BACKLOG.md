@@ -2,7 +2,6 @@
 
 ## Endereço do customer
 
-- ao salvar um endereço, no app customer, deve-se carregar a lat & lng exata para salvar no banco de dados. o sistema usa estes valores como referencia
 - ao tentar setar o endereço com "usar minha localização", estou recebendo esta mensagem no console: The Geocoding API has been removed in SDK 49, use Place Autocomplete service instead(https://developers.google.com/maps/documentation/places/web-service/autocomplete)
 
 ## Gorjeta
