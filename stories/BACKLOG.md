@@ -1,11 +1,5 @@
 # BACKLOG — itens crus para refinar
 
-## Gorjeta
-
-A gorjeta é individual. O usuario pode dar gorjeta para a plataforma, entregador e mercado.
-O checkbox deve vir marcado por padrao e ao lado de cada um dos itens(plataforma, entregador e mercado), deve ter um input para informar o valor para cada um deles. o valor inicial para todos é de R$2.
-no final soma tudo e faz um unico pagamento
-
 ## Perfil
 
 Criar itens no menu para "Meus dados" e "Segurança"
