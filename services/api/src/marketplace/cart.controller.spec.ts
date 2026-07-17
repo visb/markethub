@@ -10,6 +10,7 @@ function make() {
     updateItem: jest.fn().mockResolvedValue({ id: "i1" }),
     removeItem: jest.fn().mockResolvedValue({ removed: true }),
     clear: jest.fn().mockResolvedValue({ cleared: true }),
+    availableCoupons: jest.fn().mockResolvedValue([{ code: "PROMO" }]),
     applyCoupon: jest.fn().mockResolvedValue({ code: "PROMO" }),
     removeCoupon: jest.fn().mockResolvedValue({ removed: true }),
   };
@@ -47,6 +48,12 @@ describe("CartController", () => {
     const { controller, svc, user } = make();
     await controller.clear(user);
     expect(svc.clear).toHaveBeenCalledWith("u1");
+  });
+
+  it("GET coupons delega availableCoupons (story 74)", async () => {
+    const { controller, svc, user } = make();
+    expect(await controller.availableCoupons(user)).toEqual([{ code: "PROMO" }]);
+    expect(svc.availableCoupons).toHaveBeenCalledWith("u1");
   });
 
   it("POST coupon delega applyCoupon com o code do dto", async () => {

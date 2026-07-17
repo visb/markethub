@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { etaMinutes, haversineKm } from "../common/geo";
 import { PrismaService } from "../prisma/prisma.service";
+import { isCouponRedeemable } from "../shared/coupon-rules";
 import {
   computeCart,
   DOOR_SURCHARGE_CENTS,
@@ -13,6 +14,25 @@ export interface AddItemInput {
   quantity?: number;
   weightGrams?: number | null;
   note?: string | null;
+}
+
+/**
+ * Cupom disponível no carrinho (story 74). Contrato espelhado em
+ * `packages/types` (`availableCouponSchema`) — backend não importa o pacote.
+ * `applicable: false` acompanha `reason` discriminável (`MIN_ORDER_NOT_MET`).
+ */
+export interface AvailableCoupon {
+  code: string;
+  title: string | null;
+  description: string | null;
+  type: "fixed" | "percent" | "free_shipping";
+  value: number;
+  merchantId: string | null;
+  minOrderCents: number | null;
+  /** Desconto que o cupom daria no carrinho atual (ignora o piso, p/ exibir no card). */
+  discountCents: number;
+  applicable: boolean;
+  reason: { code: "MIN_ORDER_NOT_MET"; missingCents: number } | null;
 }
 
 @Injectable()
@@ -111,6 +131,108 @@ export class CartService {
     const cart = await this.ensureCart(userId);
     await this.prisma.cart.update({ where: { id: cart.id }, data: { couponCode: null } });
     return this.buildView(cart.id, null, 0);
+  }
+
+  /**
+   * Cupons disponíveis para o carrinho atual (story 74): globais + dos merchants
+   * presentes no carrinho, resgatáveis agora (ativos/vigentes/não esgotados). Além
+   * dos aplicáveis, inclui os que falham SÓ pelo pedido mínimo — marcados
+   * `applicable: false` com `MIN_ORDER_NOT_MET` + quanto falta. Expirados, inativos,
+   * esgotados e de merchant fora do carrinho não aparecem. Carrinho vazio → lista vazia.
+   */
+  async availableCoupons(userId: string): Promise<AvailableCoupon[]> {
+    const cart = await this.ensureCart(userId);
+    const { calcGroups, merchantIds, itemsCents } = await this.loadCartCalc(cart.id);
+    if (merchantIds.length === 0) return [];
+
+    const now = new Date();
+    const coupons = await this.prisma.coupon.findMany({
+      where: { active: true, OR: [{ merchantId: null }, { merchantId: { in: merchantIds } }] },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const out: AvailableCoupon[] = [];
+    for (const c of coupons) {
+      // Escopo de merchant (defensivo além do WHERE) e resgate (janela/usos).
+      if (c.merchantId && !merchantIds.includes(c.merchantId)) continue;
+      if (!isCouponRedeemable(c, now)) continue;
+
+      const calcCoupon: CalcCoupon = {
+        type: c.type,
+        value: c.value,
+        merchantId: c.merchantId,
+        minOrderCents: c.minOrderCents,
+      };
+      // Valor exibido no card: desconto que aplicaria no carrinho ignorando o piso,
+      // para mostrar "você economiza R$ X" mesmo no cupom "quase-lá".
+      const discountCents = computeCart(calcGroups, {
+        coupon: { ...calcCoupon, minOrderCents: null },
+      }).discountCents;
+
+      const min = c.minOrderCents;
+      const belowMin = min != null && min > 0 && itemsCents < min;
+      out.push({
+        code: c.code,
+        title: c.title,
+        description: c.description,
+        type: c.type,
+        value: c.value,
+        merchantId: c.merchantId,
+        minOrderCents: c.minOrderCents,
+        discountCents,
+        applicable: !belowMin,
+        reason: belowMin ? { code: "MIN_ORDER_NOT_MET", missingCents: min - itemsCents } : null,
+      });
+    }
+    return out;
+  }
+
+  /**
+   * Grupos de cálculo do carrinho (subtotais por merchant) reaproveitando a
+   * precificação pura — usado pela elegibilidade de cupons sem montar a visão inteira.
+   */
+  private async loadCartCalc(
+    cartId: string,
+  ): Promise<{ calcGroups: CalcGroup[]; merchantIds: string[]; itemsCents: number }> {
+    const items = await this.prisma.cartItem.findMany({
+      where: { cartId },
+      include: {
+        offer: {
+          include: {
+            product: { select: { saleType: true } },
+            store: { include: { merchant: true } },
+          },
+        },
+      },
+    });
+
+    const byMerchant = new Map<string, typeof items>();
+    for (const it of items) {
+      const mid = it.offer.store.merchantId;
+      if (!byMerchant.has(mid)) byMerchant.set(mid, []);
+      byMerchant.get(mid)!.push(it);
+    }
+
+    const calcGroups: CalcGroup[] = [...byMerchant.entries()].map(([mid, its]) => {
+      const st = its[0]!.offer.store;
+      const merchant = st.merchant;
+      const effectiveDeliveryFeeCents = st.deliveryFeeCents ?? merchant.deliveryFeeCents;
+      return {
+        merchantId: mid,
+        deliveryFeeCents: effectiveDeliveryFeeCents,
+        prepFeeCents: merchant.prepFeeCents,
+        platformFeeBps: merchant.platformFeeBps,
+        items: its.map((it) => ({
+          saleType: it.offer.product.saleType,
+          unitPriceCents: it.offer.promoPriceCents ?? it.offer.priceCents,
+          quantity: it.quantity,
+          weightGrams: it.weightGrams,
+        })),
+      };
+    });
+
+    const itemsCents = computeCart(calcGroups).itemsCents;
+    return { calcGroups, merchantIds: [...byMerchant.keys()], itemsCents };
   }
 
   // ─── montagem da visão + totais ───
@@ -295,11 +417,8 @@ export class CartService {
     code: string,
   ): Promise<(CalcCoupon & { code: string; title: string | null; description: string | null }) | null> {
     const c = await this.prisma.coupon.findUnique({ where: { code } });
-    if (!c || !c.active) return null;
-    const now = new Date();
-    if (c.validFrom && c.validFrom > now) return null;
-    if (c.validTo && c.validTo < now) return null;
-    if (c.maxUses !== null && c.usedCount >= c.maxUses) return null;
+    // Resgate (ativo/vigente/não esgotado): regra única compartilhada (story 74).
+    if (!c || !isCouponRedeemable(c)) return null;
     return {
       type: c.type,
       value: c.value,

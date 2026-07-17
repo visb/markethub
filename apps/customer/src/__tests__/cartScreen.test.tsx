@@ -1,5 +1,6 @@
 import React from "react";
 import renderer, { act } from "react-test-renderer";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import CartScreen from "../../app/cart";
 import type { CartView } from "../api/marketplace";
 
@@ -61,6 +62,7 @@ function cart(over: Partial<CartView> = {}): CartView {
 let current: CartView;
 const mockRequest = jest.fn((url: string, opts?: { method?: string }) => {
   if (url === "/cart") return Promise.resolve(current);
+  if (url === "/cart/coupons") return Promise.resolve([]); // cupons disponíveis (story 74)
   if (url === "/cart/coupon" && opts?.method === "POST") return Promise.resolve(cart({ couponCode: "PROMO" }));
   return Promise.resolve(current); // updateItem/removeItem retornam o carrinho
 });
@@ -69,9 +71,14 @@ jest.mock("../auth-context", () => ({ useAuth: () => ({ api: { request: mockRequ
 
 type Inst = renderer.ReactTestInstance;
 async function mount() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
   let tree!: renderer.ReactTestRenderer;
   await act(async () => {
-    tree = renderer.create(<CartScreen />);
+    tree = renderer.create(
+      <QueryClientProvider client={client}>
+        <CartScreen />
+      </QueryClientProvider>,
+    );
   });
   await act(async () => {
     await Promise.resolve();

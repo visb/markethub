@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   adminCreateCouponInputSchema,
+  availableCouponSchema,
   couponSchema,
   couponTypeSchema,
   createCouponInputSchema,
@@ -137,6 +138,51 @@ describe("adminCreateCouponInputSchema (admin)", () => {
     ).toBe(false);
     expect(
       adminCreateCouponInputSchema.safeParse({ code: "SEMTITULO", type: "percent", value: 5 }).success,
+    ).toBe(false);
+  });
+});
+
+describe("availableCouponSchema (story 74)", () => {
+  const base = {
+    code: "GLOBAL10",
+    title: "Dez off",
+    description: "10% de desconto",
+    type: "percent" as const,
+    value: 10,
+    merchantId: null,
+    minOrderCents: null,
+    discountCents: 200,
+    applicable: true,
+    reason: null,
+  };
+
+  it("cupom aplicável (reason null) passa", () => {
+    expect(availableCouponSchema.safeParse(base).success).toBe(true);
+  });
+
+  it("title/description null (cupom legado) são aceitos", () => {
+    expect(availableCouponSchema.safeParse({ ...base, title: null, description: null }).success).toBe(
+      true,
+    );
+  });
+
+  it("não aplicável com reason MIN_ORDER_NOT_MET + missingCents passa", () => {
+    expect(
+      availableCouponSchema.safeParse({
+        ...base,
+        applicable: false,
+        reason: { code: "MIN_ORDER_NOT_MET", missingCents: 3000 },
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejeita reason com code desconhecido", () => {
+    expect(
+      availableCouponSchema.safeParse({
+        ...base,
+        applicable: false,
+        reason: { code: "OUTRO", missingCents: 1 },
+      }).success,
     ).toBe(false);
   });
 });

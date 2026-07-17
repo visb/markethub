@@ -98,6 +98,24 @@ export interface CartView {
   totals: CartTotals;
 }
 
+/**
+ * Cupom disponível no carrinho (story 74) — resposta do `GET /cart/coupons`.
+ * Contrato espelhado em `@markethub/types` (`availableCouponSchema`). Card exibe
+ * `title ?? code`; `applicable: false` traz `reason` com quanto falta.
+ */
+export interface AvailableCoupon {
+  code: string;
+  title: string | null;
+  description: string | null;
+  type: "fixed" | "percent" | "free_shipping";
+  value: number;
+  merchantId: string | null;
+  minOrderCents: number | null;
+  discountCents: number;
+  applicable: boolean;
+  reason: { code: "MIN_ORDER_NOT_MET"; missingCents: number } | null;
+}
+
 export interface Address {
   id: string;
   label: string;
@@ -396,6 +414,8 @@ export function marketplace(api: ApiClient) {
       api.request<CartView>(`/cart/items/${id}`, { method: "PATCH", auth: true, body }),
     removeItem: (id: string) =>
       api.request<CartView>(`/cart/items/${id}`, { method: "DELETE", auth: true }),
+    availableCoupons: () =>
+      api.request<AvailableCoupon[]>("/cart/coupons", { auth: true }),
     applyCoupon: (code: string) =>
       api.request<CartView>("/cart/coupon", { method: "POST", auth: true, body: { code } }),
     removeCoupon: () => api.request<CartView>("/cart/coupon", { method: "DELETE", auth: true }),
