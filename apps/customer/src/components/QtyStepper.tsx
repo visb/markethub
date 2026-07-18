@@ -33,13 +33,20 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     borderRadius: radius.sm,
     overflow: "hidden",
-    height: 38,
+    height: 40, // paridade com Button size="sm" (packages/ui Button.tsx)
   },
-  btn: { width: 34, height: 38, alignItems: "center", justifyContent: "center" },
+  // botões quadrados nas extremidades; paddingBottom fino centra oticamente o glifo −/+
+  btn: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingBottom: 2,
+  },
   sign: { color: colors.primary, fontSize: 20, fontWeight: "600" },
   value: {
-    minWidth: 44,
-    height: 38,
+    flex: 1,
+    height: 40,
     alignItems: "center",
     justifyContent: "center",
     borderLeftWidth: 1,
