@@ -7,6 +7,7 @@ import { Text, colors, spacing } from "@markethub/ui";
 import { useAddAddress, useAddresses, useUpdateAddress } from "@/api/hooks/useAddresses";
 import { AddressForm, type AddressFormValue } from "@/components/AddressForm";
 import { Header } from "@/components/Header";
+import { useToast } from "@/components/Toast";
 
 /** Mensagem exibível de um erro de mutation (body pt-BR da API quando houver). */
 function errorMessage(err: unknown): string | null {
@@ -23,6 +24,7 @@ function errorMessage(err: unknown): string | null {
 export default function AddressEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const toast = useToast();
   const isNew = id === "new";
 
   const { addresses, loading } = useAddresses();
@@ -47,8 +49,12 @@ export default function AddressEditScreen() {
       longitude: value.longitude,
     };
     try {
-      if (isNew) await add.mutateAsync(body);
-      else await update.mutateAsync(body);
+      const saved = isNew ? await add.mutateAsync(body) : await update.mutateAsync(body);
+      // geocode best-effort: se o backend não achou a localização exata, avisa
+      // sem bloquear (story 75).
+      if (saved.latitude == null || saved.longitude == null) {
+        toast.show("Não encontramos a localização exata deste endereço");
+      }
       router.back();
     } catch {
       // erro exibido inline via add.error / update.error

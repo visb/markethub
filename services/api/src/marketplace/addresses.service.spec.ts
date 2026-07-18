@@ -153,6 +153,25 @@ describe("AddressesService (story 24)", () => {
       );
     });
 
+    it("editar só o CEP (sem lat nova, sem coord atual) → re-geocodifica (story 75)", async () => {
+      const { svc, geocode, update } = makeService({
+        owned: { id: "a1", userId: "u1", street: "Rua A", number: "100", city: "Curitiba", state: "PR", zipCode: "80000-000", latitude: null, longitude: null },
+      });
+      await svc.update("u1", "a1", { zipCode: "81000-000" });
+      expect(geocode).toHaveBeenCalled();
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ zipCode: "81000-000", latitude: -25.43 }) }),
+      );
+    });
+
+    it("editar só o bairro (sem lat nova, sem coord atual) → re-geocodifica (story 75)", async () => {
+      const { svc, geocode } = makeService({
+        owned: { id: "a1", userId: "u1", street: "Rua A", number: "100", city: "Curitiba", state: "PR", zipCode: "80000-000", latitude: null, longitude: null },
+      });
+      await svc.update("u1", "a1", { district: "Batel" });
+      expect(geocode).toHaveBeenCalled();
+    });
+
     it("lat informada → não re-geocodifica", async () => {
       const { svc, geocode, update } = makeService();
       await svc.update("u1", "a1", { street: "Rua Nova", latitude: -1, longitude: -2 });

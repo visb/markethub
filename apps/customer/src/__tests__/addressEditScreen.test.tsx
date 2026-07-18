@@ -39,6 +39,11 @@ jest.mock("../components/AddressForm", () => ({
   },
 }));
 
+const mockShow = jest.fn();
+jest.mock("../components/Toast", () => ({
+  useToast: () => ({ show: mockShow }),
+}));
+
 let mockList: Address[] = [];
 let mockLoading = false;
 const mockAdd = jest.fn();
@@ -95,6 +100,7 @@ beforeEach(() => {
   mockUpdateError = null;
   formProps = null;
   mockBack.mockClear();
+  mockShow.mockClear();
   mockUseUpdateAddress.mockClear();
   mockAdd.mockReset().mockResolvedValue(ADDR);
   mockUpdate.mockReset().mockResolvedValue(ADDR);
@@ -110,6 +116,22 @@ describe("AddressEditScreen (story 71)", () => {
     expect(mockAdd).toHaveBeenCalledWith(BODY);
     expect(mockUpdate).not.toHaveBeenCalled();
     expect(mockBack).toHaveBeenCalled();
+    // coords presentes na resposta → sem aviso (story 75)
+    expect(mockShow).not.toHaveBeenCalled();
+  });
+
+  it("resposta sem coords → mostra aviso não bloqueante e ainda volta pra lista (story 75)", async () => {
+    mockAdd.mockResolvedValue({ ...ADDR, latitude: null, longitude: null });
+    render();
+    await submit(VALUE);
+    expect(mockShow).toHaveBeenCalledWith("Não encontramos a localização exata deste endereço");
+    expect(mockBack).toHaveBeenCalled();
+  });
+
+  it("resposta com coords → não mostra aviso (story 75)", async () => {
+    render();
+    await submit(VALUE);
+    expect(mockShow).not.toHaveBeenCalled();
   });
 
   it("modo edição: initial do endereço da lista, submit edita e volta", async () => {

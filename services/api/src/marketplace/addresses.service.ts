@@ -51,9 +51,14 @@ export class AddressesService {
       this.assertCovered(input.city ?? current.city, input.state ?? current.state);
     }
     if (input.isDefault) await this.clearDefault(userId);
-    // endereço mudou sem coordenadas novas → re-geocodifica
+    // endereço mudou sem coordenadas novas → re-geocodifica (CEP e bairro também
+    // deslocam o ponto — story 75)
     const addressChanged =
-      input.street !== undefined || input.number !== undefined || input.city !== undefined;
+      input.street !== undefined ||
+      input.number !== undefined ||
+      input.city !== undefined ||
+      input.zipCode !== undefined ||
+      input.district !== undefined;
     const coords =
       input.latitude == null && addressChanged
         ? await this.resolveCoords({ ...current, ...input })

@@ -1,3 +1,4 @@
+import { GoogleGeocodingProvider } from "./google.geocoding-provider";
 import { MockGeocodingProvider } from "./mock.geocoding-provider";
 import { NominatimGeocodingProvider } from "./nominatim.geocoding-provider";
 
@@ -70,6 +71,73 @@ describe("NominatimGeocodingProvider.geocode", () => {
       state: "PR",
     });
     expect(fetchMock.mock.calls[0][0]).toContain(encodeURIComponent("Avenida Brasil"));
+  });
+});
+
+describe("GoogleGeocodingProvider.geocode", () => {
+  const okBody = () =>
+    Promise.resolve({
+      status: "OK",
+      results: [{ geometry: { location: { lat: -25.4321, lng: -49.2712 } } }],
+    });
+
+  it("monta o address (rua, número, cidade, UF, CEP) com region/language/key e parseia lat/lng", async () => {
+    const fetchMock = mockFetch({ json: okBody });
+    const res = await new GoogleGeocodingProvider("secret-key").geocode({
+      ...baseQuery,
+      zipCode: "80000-000",
+    });
+    expect(res).toEqual({ latitude: -25.4321, longitude: -49.2712 });
+    const url = fetchMock.mock.calls[0][0] as string;
+    expect(url).toContain("https://maps.googleapis.com/maps/api/geocode/json");
+    expect(url).toContain(
+      `address=${encodeURIComponent("Rua das Flores, 100, Curitiba, PR, 80000-000")}`,
+    );
+    expect(url).toContain("region=br");
+    expect(url).toContain("language=pt-BR");
+    expect(url).toContain("key=secret-key");
+  });
+
+  it("monta o address ignorando number e zipCode ausentes", async () => {
+    const fetchMock = mockFetch({ json: okBody });
+    await new GoogleGeocodingProvider("k").geocode({
+      street: "Avenida Brasil",
+      city: "Curitiba",
+      state: "PR",
+    });
+    expect(fetchMock.mock.calls[0][0]).toContain(
+      `address=${encodeURIComponent("Avenida Brasil, Curitiba, PR")}`,
+    );
+  });
+
+  it("retorna null em ZERO_RESULTS", async () => {
+    mockFetch({ json: () => Promise.resolve({ status: "ZERO_RESULTS", results: [] }) });
+    const res = await new GoogleGeocodingProvider("k").geocode(baseQuery);
+    expect(res).toBeNull();
+  });
+
+  it("retorna null em status de erro (ex. REQUEST_DENIED)", async () => {
+    mockFetch({ json: () => Promise.resolve({ status: "REQUEST_DENIED" }) });
+    const res = await new GoogleGeocodingProvider("k").geocode(baseQuery);
+    expect(res).toBeNull();
+  });
+
+  it("retorna null quando OK mas sem geometry", async () => {
+    mockFetch({ json: () => Promise.resolve({ status: "OK", results: [{}] }) });
+    const res = await new GoogleGeocodingProvider("k").geocode(baseQuery);
+    expect(res).toBeNull();
+  });
+
+  it("retorna null em HTTP não-ok", async () => {
+    mockFetch({ ok: false, status: 500 });
+    const res = await new GoogleGeocodingProvider("k").geocode(baseQuery);
+    expect(res).toBeNull();
+  });
+
+  it("retorna null quando o fetch lança", async () => {
+    global.fetch = jest.fn().mockRejectedValue(new Error("network down")) as never;
+    const res = await new GoogleGeocodingProvider("k").geocode(baseQuery);
+    expect(res).toBeNull();
   });
 });
 
