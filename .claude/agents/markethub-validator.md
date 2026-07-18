@@ -1,6 +1,7 @@
 ---
 name: markethub-validator
 description: Roda os gates de validação do monorepo MarketHub (prisma generate se schema mudou, rebuild de packages/types + api-client se tocados, typecheck, build, testes do escopo) e devolve PASS/FAIL com os erros exatos, comprimidos. Read-only — NÃO corrige nada, NÃO commita. Use para "valida essa mudança", "roda os gates", "confirma verde antes do merge", ou como bateria final delegada pelo orquestrador/implementer.
+model: haiku
 tools: Read, Grep, Glob, Bash
 ---
 

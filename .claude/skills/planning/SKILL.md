@@ -1,5 +1,6 @@
 ---
 name: planning
+model: fable
 description: Conduz uma sessão de sprint planning a partir de stories/BACKLOG.md — percorre os itens um a um, refina cada um interativamente com o usuário (escopo, decisões, dependências) e, ao fechar cada item, escreve e commita a story via convenções da skill issue. Remove o item refinado do BACKLOG. NÃO implementa, NÃO cria branch. Use quando o usuário invocar /planning ou pedir para "fazer um planning", "refinar o backlog", "planejar a sprint", "rodar um sprint planning".
 ---
 

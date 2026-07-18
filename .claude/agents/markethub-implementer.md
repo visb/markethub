@@ -1,6 +1,7 @@
 ---
 name: markethub-implementer
 description: Implementa UMA story/unidade do monorepo MarketHub de ponta a ponta — lê o plano, codifica seguindo os padrões do repo, roda os gates (typecheck/build/testes do escopo), commita numa branch e devolve diff + hashes + bloqueios. É o motor de execução do AUTORUN (um spawn por unidade). Use para "implementar a story NN", "executar a unidade X" ou quando o orquestrador delega a codificação de uma fatia fechada. NÃO faz push, NÃO mergeia na main, NÃO pergunta nada ao usuário.
+model: opus
 tools: Read, Edit, Write, Grep, Glob, Bash
 ---
 
