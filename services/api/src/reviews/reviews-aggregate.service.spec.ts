@@ -13,7 +13,7 @@ function makePrisma(over: Record<string, unknown> = {}) {
         .fn()
         .mockResolvedValue({ _avg: { rating: null }, _count: { _all: 0 } }),
     },
-    tip: {
+    tipItem: {
       aggregate: jest
         .fn()
         .mockResolvedValue({ _sum: { amountCents: null }, _count: { _all: 0 } }),
@@ -75,7 +75,7 @@ describe("ReviewsAggregateService.driver", () => {
       .mockResolvedValue({ _sum: { amountCents: 2500 }, _count: { _all: 5 } });
     const prisma = makePrisma({
       review: { aggregate: reviewAgg },
-      tip: { aggregate: tipAgg },
+      tipItem: { aggregate: tipAgg },
     });
     const out = await new ReviewsAggregateService(prisma).driver("d1");
     expect(out).toEqual({
@@ -95,10 +95,14 @@ describe("ReviewsAggregateService.tipsTotal", () => {
     const tipAgg = jest
       .fn()
       .mockResolvedValue({ _sum: { amountCents: 800 }, _count: { _all: 2 } });
-    const prisma = makePrisma({ tip: { aggregate: tipAgg } });
+    const prisma = makePrisma({ tipItem: { aggregate: tipAgg } });
     const out = await new ReviewsAggregateService(prisma).tipsTotal("d1");
     expect(out).toEqual({ totalCents: 800, count: 2 });
-    expect(tipAgg.mock.calls[0][0].where).toEqual({ driverId: "d1", status: "paid" });
+    expect(tipAgg.mock.calls[0][0].where).toEqual({
+      target: "driver",
+      targetDriverId: "d1",
+      tip: { status: "paid" },
+    });
   });
 
   it("totalCents 0 quando não há gorjetas", async () => {
@@ -110,20 +114,20 @@ describe("ReviewsAggregateService.tipsTotal", () => {
     const tipAgg = jest
       .fn()
       .mockResolvedValue({ _sum: { amountCents: 0 }, _count: { _all: 0 } });
-    const prisma = makePrisma({ tip: { aggregate: tipAgg } });
+    const prisma = makePrisma({ tipItem: { aggregate: tipAgg } });
     const from = new Date("2026-01-01");
     const to = new Date("2026-02-01");
     await new ReviewsAggregateService(prisma).tipsTotal("d1", { from, to });
-    expect(tipAgg.mock.calls[0][0].where.paidAt).toEqual({ gte: from, lte: to });
+    expect(tipAgg.mock.calls[0][0].where.tip.paidAt).toEqual({ gte: from, lte: to });
   });
 
   it("período só com from", async () => {
     const tipAgg = jest
       .fn()
       .mockResolvedValue({ _sum: { amountCents: 0 }, _count: { _all: 0 } });
-    const prisma = makePrisma({ tip: { aggregate: tipAgg } });
+    const prisma = makePrisma({ tipItem: { aggregate: tipAgg } });
     const from = new Date("2026-01-01");
     await new ReviewsAggregateService(prisma).tipsTotal("d1", { from });
-    expect(tipAgg.mock.calls[0][0].where.paidAt).toEqual({ gte: from });
+    expect(tipAgg.mock.calls[0][0].where.tip.paidAt).toEqual({ gte: from });
   });
 });

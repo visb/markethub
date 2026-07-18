@@ -222,14 +222,24 @@ export class DriverService {
    */
   async earnings(userId: string, period: EarningsPeriod) {
     const start = earningsPeriodStart(period);
+    // Gorjeta do entregador soma os TipItem (target=driver) deste entregador, com o
+    // status/data herdados do Tip agregado (story 77). Legado coberto pelo backfill.
     const [paid, pending, deliveriesCompleted] = await Promise.all([
-      this.prisma.tip.aggregate({
-        where: { driverId: userId, status: "paid", paidAt: { gte: start } },
+      this.prisma.tipItem.aggregate({
+        where: {
+          target: "driver",
+          targetDriverId: userId,
+          tip: { status: "paid", paidAt: { gte: start } },
+        },
         _sum: { amountCents: true },
         _count: { _all: true },
       }),
-      this.prisma.tip.aggregate({
-        where: { driverId: userId, status: "pending", createdAt: { gte: start } },
+      this.prisma.tipItem.aggregate({
+        where: {
+          target: "driver",
+          targetDriverId: userId,
+          tip: { status: "pending", createdAt: { gte: start } },
+        },
         _sum: { amountCents: true },
       }),
       this.prisma.delivery.count({

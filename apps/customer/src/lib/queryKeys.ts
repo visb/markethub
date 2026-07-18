@@ -29,6 +29,12 @@ export const queryKeys = {
     /** Substituições pendentes de um pedido. */
     substitutions: (orderId: string) => ["tracking", "substitutions", orderId] as const,
   },
+  tip: {
+    /** Gorjeta (agregado + itens) de um pedido, quando já criada (story 77). */
+    view: (orderId: string) => ["tip", "view", orderId] as const,
+    /** Alvos possíveis da gorjeta do pedido (entregador? mercados?). */
+    targets: (orderId: string) => ["tip", "targets", orderId] as const,
+  },
   explore: {
     /** Mercados dentro do viewport do mapa (bounding box). */
     nearby: (bounds: ViewportBoundsDTO) =>

@@ -17,6 +17,7 @@ function makeController() {
   } as unknown as ReviewsService;
   const tips = {
     get: jest.fn().mockResolvedValue(null),
+    targets: jest.fn().mockResolvedValue({ merchants: [] }),
     create: jest.fn().mockResolvedValue({ id: "t1" }),
     mockPay: jest.fn().mockResolvedValue({ status: "paid" }),
   } as unknown as TipsService;
@@ -43,10 +44,17 @@ describe("ReviewsController", () => {
     expect(tips.get).toHaveBeenCalledWith("u1", "o1");
   });
 
-  it("createTip repassa amountCents", () => {
+  it("tipTargets delega", () => {
     const { ctrl, tips } = makeController();
-    ctrl.createTip(USER, "o1", { amountCents: 500 });
-    expect(tips.create).toHaveBeenCalledWith("u1", "o1", 500);
+    ctrl.tipTargets(USER, "o1");
+    expect(tips.targets).toHaveBeenCalledWith("u1", "o1");
+  });
+
+  it("createTip repassa os itens", () => {
+    const { ctrl, tips } = makeController();
+    const items = [{ target: "platform" as const, amountCents: 500 }];
+    ctrl.createTip(USER, "o1", { items });
+    expect(tips.create).toHaveBeenCalledWith("u1", "o1", items);
   });
 
   it("mockPayTip delega", () => {

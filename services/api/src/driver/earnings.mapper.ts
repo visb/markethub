@@ -2,8 +2,9 @@ import type { DeliveryStatus, TipStatus } from "@prisma/client";
 
 /**
  * Include p/ montar um item do histórico de entregas do entregador (story 60):
- * loja, endereço-snapshot do pedido e a gorjeta do pedido (com o driver dono,
- * p/ só anexar quando é deste entregador).
+ * loja, endereço-snapshot do pedido e a gorjeta do pedido. Desde a story 77 a
+ * gorjeta do entregador é um TipItem (target=driver); anexamos os itens driver e
+ * o mapper escolhe o deste entregador (valor do item + status agregado do Tip).
  */
 export const HISTORY_INCLUDE = {
   orderGroup: {
@@ -13,7 +14,15 @@ export const HISTORY_INCLUDE = {
       order: {
         select: {
           addressSnapshot: true,
-          tip: { select: { amountCents: true, status: true, driverId: true } },
+          tip: {
+            select: {
+              status: true,
+              items: {
+                where: { target: "driver" as const },
+                select: { amountCents: true, targetDriverId: true },
+              },
+            },
+          },
         },
       },
     },
@@ -40,7 +49,10 @@ type DeliveryHistoryRow = {
     store: { name: string } | null;
     order: {
       addressSnapshot: unknown;
-      tip: { amountCents: number; status: TipStatus; driverId: string } | null;
+      tip: {
+        status: TipStatus;
+        items: { amountCents: number; targetDriverId: string | null }[];
+      } | null;
     } | null;
   };
 };
@@ -48,8 +60,9 @@ type DeliveryHistoryRow = {
 export function toHistoryItem(d: DeliveryHistoryRow, userId: string) {
   const addr = (d.orderGroup.order?.addressSnapshot ?? null) as AddressLike | null;
   const tip = d.orderGroup.order?.tip ?? null;
-  // Só anexa a gorjeta se ela for deste entregador (defensivo p/ pedido multi-loja).
-  const ownTip = tip && tip.driverId === userId ? { amountCents: tip.amountCents, status: tip.status } : undefined;
+  // Só anexa a gorjeta se houver um item driver deste entregador (defensivo p/ multi-loja).
+  const ownItem = tip?.items.find((i) => i.targetDriverId === userId);
+  const ownTip = ownItem ? { amountCents: ownItem.amountCents, status: tip!.status } : undefined;
   return {
     id: d.id,
     orderId: d.orderGroup.orderId,

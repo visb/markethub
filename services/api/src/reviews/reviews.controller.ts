@@ -1,5 +1,18 @@
 import { Body, Controller, Get, Param, Post } from "@nestjs/common";
-import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from "class-validator";
+import { Type } from "class-transformer";
+import {
+  ArrayMinSize,
+  IsArray,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+  ValidateNested,
+} from "class-validator";
+import type { TipTarget } from "@prisma/client";
 import { CurrentUser, Roles } from "../auth";
 import type { AuthUser } from "../auth";
 import { ReviewsService } from "./reviews.service";
@@ -13,8 +26,20 @@ class CreateReviewDto {
   @IsOptional() @IsString() merchantId?: string;
 }
 
-class CreateTipDto {
+/** Um item da gorjeta multi-alvo (story 77). */
+class TipItemDto {
+  @IsIn(["platform", "driver", "merchant"]) target!: TipTarget;
+  /** merchant → merchantId; platform/driver dispensam (driver resolvido no pedido). */
+  @IsOptional() @IsString() targetId?: string;
   @IsInt() @Min(1) amountCents!: number;
+}
+
+class CreateTipDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => TipItemDto)
+  items!: TipItemDto[];
 }
 
 /** Avaliações e gorjeta do cliente após a entrega (S5.2). */
@@ -45,13 +70,18 @@ export class ReviewsController {
     return this.tips.get(user.id, orderId);
   }
 
+  @Get("tip/targets")
+  tipTargets(@CurrentUser() user: AuthUser, @Param("orderId") orderId: string) {
+    return this.tips.targets(user.id, orderId);
+  }
+
   @Post("tip")
   createTip(
     @CurrentUser() user: AuthUser,
     @Param("orderId") orderId: string,
     @Body() dto: CreateTipDto,
   ) {
-    return this.tips.create(user.id, orderId, dto.amountCents);
+    return this.tips.create(user.id, orderId, dto.items);
   }
 
   @Post("tip/mock-pay")

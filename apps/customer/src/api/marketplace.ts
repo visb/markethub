@@ -237,16 +237,38 @@ export interface Review {
   targetDriverId: string | null;
   createdAt: string;
 }
+// Gorjeta individual por alvo (story 77)
+export type TipTarget = "platform" | "driver" | "merchant";
+export interface TipItemView {
+  target: TipTarget;
+  targetDriverId: string | null;
+  targetMerchantId: string | null;
+  amountCents: number;
+}
+/** Item enviado ao criar a gorjeta: alvo + (merchantId p/ merchant) + valor. */
+export interface TipItemInput {
+  target: TipTarget;
+  targetId?: string;
+  amountCents: number;
+}
 export interface TipView {
   id: string;
   orderId: string;
-  driverId: string;
-  amountCents: number;
+  driverId: string | null;
+  amountCents: number; // total (soma dos itens)
   status: "pending" | "paid" | "failed";
   qrCode: string | null;
   qrCodeUrl: string | null;
   expiresAt: string | null;
   paidAt: string | null;
+  items: TipItemView[];
+}
+/** Alvos possíveis da gorjeta do pedido — o app monta as linhas a partir daqui. */
+export interface TipTargets {
+  orderId: string;
+  hasDelivery: boolean;
+  driverName: string | null;
+  merchants: { merchantId: string; merchantName: string }[];
 }
 
 export interface FeedItem extends ProductView {
@@ -494,8 +516,9 @@ export function marketplace(api: ApiClient) {
       body: { axis: ReviewAxis; rating: number; comment?: string; merchantId?: string },
     ) => api.request<Review>(`/orders/${id}/reviews`, { method: "POST", auth: true, body }),
     tip: (id: string) => api.request<TipView>(`/orders/${id}/tip`, { auth: true }),
-    createTip: (id: string, amountCents: number) =>
-      api.request<TipView>(`/orders/${id}/tip`, { method: "POST", auth: true, body: { amountCents } }),
+    tipTargets: (id: string) => api.request<TipTargets>(`/orders/${id}/tip/targets`, { auth: true }),
+    createTip: (id: string, items: TipItemInput[]) =>
+      api.request<TipView>(`/orders/${id}/tip`, { method: "POST", auth: true, body: { items } }),
     mockPayTip: (id: string) =>
       api.request<{ handled: boolean }>(`/orders/${id}/tip/mock-pay`, { method: "POST", auth: true }),
 

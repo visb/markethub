@@ -25,6 +25,8 @@ function makePrisma(over: Record<string, unknown> = {}) {
     orderGroup: { count: jest.fn().mockResolvedValue(0) },
     tip: {
       aggregate: jest.fn().mockResolvedValue({ _sum: { amountCents: null }, _count: { _all: 0 } }),
+    },
+    tipItem: {
       groupBy: jest.fn().mockResolvedValue([]),
     },
     user: { findMany: jest.fn().mockResolvedValue([]) },
@@ -288,10 +290,10 @@ describe("AdminDashboardService.finance", () => {
 describe("AdminDashboardService.driverTips", () => {
   it("soma gorjetas por entregador, resolve nome e ordena desc", async () => {
     const prisma = makePrisma({
-      tip: {
+      tipItem: {
         groupBy: jest.fn().mockResolvedValue([
-          { driverId: "d1", _sum: { amountCents: 1000 }, _count: { _all: 2 } },
-          { driverId: "d2", _sum: { amountCents: 3000 }, _count: { _all: 1 } },
+          { targetDriverId: "d1", _sum: { amountCents: 1000 }, _count: { _all: 2 } },
+          { targetDriverId: "d2", _sum: { amountCents: 3000 }, _count: { _all: 1 } },
         ]),
       },
       user: {
@@ -308,14 +310,14 @@ describe("AdminDashboardService.driverTips", () => {
   it("totalCents 0 quando sum é null e aplica período", async () => {
     const groupBy = jest
       .fn()
-      .mockResolvedValue([{ driverId: "d1", _sum: { amountCents: null }, _count: { _all: 0 } }]);
+      .mockResolvedValue([{ targetDriverId: "d1", _sum: { amountCents: null }, _count: { _all: 0 } }]);
     const prisma = makePrisma({
-      tip: { groupBy },
+      tipItem: { groupBy },
       user: { findMany: jest.fn().mockResolvedValue([]) },
     });
     const from = new Date("2026-03-01");
     const out = await new AdminDashboardService(prisma).driverTips({ from });
     expect(out[0].totalCents).toBe(0);
-    expect(groupBy.mock.calls[0][0].where.paidAt).toEqual({ gte: from });
+    expect(groupBy.mock.calls[0][0].where.tip.paidAt).toEqual({ gte: from });
   });
 });
