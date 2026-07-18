@@ -17,7 +17,7 @@ Cuidados da rodada:
 | 77 | Gorjeta individual por alvo (plataforma/entregador/mercado) | — | done |
 | 78 | Perfil — "Meus dados" e "Segurança" como itens de menu | — | done |
 | 79 | Driver /earnings — histórico respeita o filtro de período | — | done |
-| 80 | Busca no customer — sugestões ao digitar + tela de resultado | — | todo |
+| 80 | Busca no customer — sugestões ao digitar + tela de resultado | — | done |
 
 ---
 
@@ -30,3 +30,42 @@ Cuidados da rodada:
 [OK] 77 — testes: api 1542, customer 332, api-client 70 — commit: d169eb8 — merge: 9cdf8d5 — 2026-07-18 — migration TipItem+backfill aplicada; PIX via mock; +escopo: admin-dashboard/reviews-aggregate migrados a TipItem
 [OK] 78 — testes: customer 341 — commit: 030756f — merge: f0ae80b — 2026-07-18 — só customer, sem backend
 [OK] 79 — testes: api 1546, driver 166, api-client 70 — commit: c16b694 — merge: fafa78f — 2026-07-18 — bugfix histórico driver
+[OK] 80 — testes: api 1553, customer 362, api-client 70 — commit: cf80685 — merge: fd60e97 — 2026-07-18
+
+---
+
+## Resumo final — rodada ENCERRADA (2026-07-18)
+
+**8/8 done. Nenhuma bloqueada.** Todas mergeadas na main (--no-ff) e arquivadas em `stories/done/`.
+
+| # | commit | merge | testes |
+|---|--------|-------|--------|
+| 73 | ff845d1 | 8eeefac | api 1479, admin 188, merchant 323, types 46, api-client 70 |
+| 74 | 14a013f | 2e5ab05 | api 1495, customer 315, types 50 |
+| 75 | 82670af | 12fc30e | api 1508, customer 317 |
+| 76 | b34f111 | e20ccad | api 1529, customer 317, api-client 70 |
+| 77 | d169eb8 | 9cdf8d5 | api 1542, customer 332, api-client 70 |
+| 78 | 030756f | f0ae80b | customer 341 |
+| 79 | c16b694 | fafa78f | api 1546, driver 166, api-client 70 |
+| 80 | cf80685 | fd60e97 | api 1553, customer 362, api-client 70 |
+
+**Migrations aplicadas:** 73 (coupons.title/description), 77 (TipItem + Tip.driverId nullable + backfill dos tips legados como item driver).
+
+**PENDENTE-MANUAL (dep externa sem credencial):**
+- **75/76 — Google Geocoding:** provider implementado atrás de `GeocodingProvider` + 100% mockado nos testes. Ativar em prod: `GEOCODING_PROVIDER=google` + `GOOGLE_MAPS_API_KEY=<key real>` (Geocoding API habilitada no Google Cloud). Sem a key, factory cai no Mock (dev) — seguro.
+- **77 — PIX Pagar.me:** cobrança da gorjeta rodou via `PaymentProvider` mock; ativação real herda config PIX existente (`PAYMENT_PROVIDER`, `PAGARME_*`).
+
+**Reproduzir gates (na raiz):**
+```
+pnpm --filter @markethub/api prisma:generate
+pnpm --filter @markethub/types build && pnpm --filter @markethub/api-client build
+pnpm typecheck && pnpm build
+pnpm --filter @markethub/api test:coverage
+pnpm --filter @markethub/customer test:coverage
+pnpm --filter @markethub/driver test:coverage
+pnpm --filter @markethub/admin test:coverage
+pnpm --filter @markethub/merchant test:coverage
+```
+
+**Sem push, sem PR** (protocolo AUTORUN). Branches `story/73..80` preservadas. Serviços (docker infra) de pé.
+Loop encerrado (cron `c8e45020` deletado).
