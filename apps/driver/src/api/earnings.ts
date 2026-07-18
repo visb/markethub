@@ -16,7 +16,8 @@ export function earnings(client: ApiClient) {
   return {
     /** Resumo de ganhos (gorjetas + entregas concluídas) no período. */
     summary: (period: EarningsPeriodDTO): Promise<DriverEarningsDTO> => client.driverEarnings(period),
-    /** Página do histórico de entregas concluídas/canceladas. */
-    history: (page: number): Promise<DeliveryHistoryPageDTO> => client.driverDeliveryHistory(page),
+    /** Página do histórico de entregas concluídas/canceladas, recortada pelo período. */
+    history: (page: number, period: EarningsPeriodDTO): Promise<DeliveryHistoryPageDTO> =>
+      client.driverDeliveryHistory(page, period),
   };
 }

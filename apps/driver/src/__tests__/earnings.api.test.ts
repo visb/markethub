@@ -21,9 +21,9 @@ describe("driver earnings api module", () => {
     expect(client.driverEarnings).toHaveBeenCalledWith("7d");
   });
 
-  it("history delega driverDeliveryHistory com a página", async () => {
+  it("history delega driverDeliveryHistory com a página e o período (story 79)", async () => {
     const { client, api } = setup();
-    await api.history(2);
-    expect(client.driverDeliveryHistory).toHaveBeenCalledWith(2);
+    await api.history(2, "7d");
+    expect(client.driverDeliveryHistory).toHaveBeenCalledWith(2, "7d");
   });
 });

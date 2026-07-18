@@ -87,7 +87,9 @@ afterEach(() => {
 describe("queryKeys.earnings/history", () => {
   it("compõe chaves não-literais", () => {
     expect(queryKeys.earnings.byPeriod("7d")).toEqual(["earnings", "7d"]);
-    expect(queryKeys.deliveries.history).toEqual(["deliveries", "history"]);
+    // story 79: a chave do histórico inclui o período (troca de chip refaz a lista)
+    expect(queryKeys.deliveries.history("7d")).toEqual(["deliveries", "history", "7d"]);
+    expect(queryKeys.deliveries.history("30d")).toEqual(["deliveries", "history", "30d"]);
   });
 });
 
@@ -102,34 +104,80 @@ describe("useDriverEarnings", () => {
 });
 
 describe("useDeliveryHistory", () => {
-  it("carrega a primeira página e expõe hasMore", async () => {
-    const { result, unmount } = renderHook(() => useDeliveryHistory());
+  it("carrega a primeira página com o período e expõe hasMore", async () => {
+    const { result, unmount } = renderHook(() => useDeliveryHistory("today"));
     await waitFor(() => result.current?.items.length === 1);
-    expect(mockHistory).toHaveBeenCalledWith(1);
+    expect(mockHistory).toHaveBeenCalledWith(1, "today");
     expect(result.current?.hasMore).toBe(true);
     unmount();
   });
 
-  it("loadMore acumula a próxima página", async () => {
-    const { result, unmount } = renderHook(() => useDeliveryHistory());
+  it("loadMore acumula a próxima página (mesmo período)", async () => {
+    const { result, unmount } = renderHook(() => useDeliveryHistory("today"));
     await waitFor(() => result.current?.items.length === 1);
     await act(async () => {
       result.current!.loadMore();
     });
     await waitFor(() => result.current?.items.length === 2);
-    expect(mockHistory).toHaveBeenCalledWith(2);
+    expect(mockHistory).toHaveBeenCalledWith(2, "today");
     expect(result.current?.hasMore).toBe(false);
     unmount();
   });
 
   it("loadMore não faz nada quando não há mais páginas", async () => {
     mockHistory.mockReset().mockResolvedValue(page(1, false));
-    const { result, unmount } = renderHook(() => useDeliveryHistory());
+    const { result, unmount } = renderHook(() => useDeliveryHistory("today"));
     await waitFor(() => result.current?.items.length === 1);
     await act(async () => {
       result.current!.loadMore();
     });
     expect(mockHistory).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it("trocar de período refaz a lista a partir da page 1 (story 79)", async () => {
+    // Cache compartilhado entre renders p/ simular a troca de chip na mesma tela.
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+    activeClient = qc;
+    const result: { current: ReturnType<typeof useDeliveryHistory> | null } = { current: null };
+    function Probe({ period }: { period: "today" | "7d" | "30d" }) {
+      result.current = useDeliveryHistory(period);
+      return null;
+    }
+    let tree: renderer.ReactTestRenderer;
+    act(() => {
+      tree = renderer.create(
+        <QueryClientProvider client={qc}>
+          <Probe period="today" />
+        </QueryClientProvider>,
+      );
+    });
+    await waitFor(() => result.current?.items.length === 1);
+    // avança para a página 2 no período "today"
+    await act(async () => {
+      result.current!.loadMore();
+    });
+    await waitFor(() => result.current?.items.length === 2);
+
+    // troca o chip para "7d": nova query key → começa da page 1 (não acumula as 2 anteriores)
+    act(() => {
+      tree!.update(
+        <QueryClientProvider client={qc}>
+          <Probe period="7d" />
+        </QueryClientProvider>,
+      );
+    });
+    await waitFor(() => result.current?.items.length === 1);
+    expect(mockHistory).toHaveBeenCalledWith(1, "7d");
+    act(() => tree!.unmount());
+  });
+
+  it("período sem entregas expõe lista vazia (empty state)", async () => {
+    mockHistory.mockReset().mockResolvedValue({ items: [], page: 1, pageSize: 20, hasMore: false });
+    const { result, unmount } = renderHook(() => useDeliveryHistory("today"));
+    await waitFor(() => result.current?.isLoading === false);
+    expect(result.current?.items).toEqual([]);
+    expect(result.current?.hasMore).toBe(false);
     unmount();
   });
 });

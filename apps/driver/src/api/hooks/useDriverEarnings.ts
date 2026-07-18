@@ -18,15 +18,17 @@ export function useDriverEarnings(period: EarningsPeriodDTO) {
 
 /**
  * Histórico paginado de entregas do entregador (story 60). `useInfiniteQuery`
- * acumula as páginas ("carregar mais"). Independente do período dos ganhos.
+ * acumula as páginas ("carregar mais"). Recortado pelo mesmo período dos cards
+ * (story 79): o período entra na chamada e na query key — trocar de período refaz
+ * a lista a partir da page 1; a paginação acumulada é preservada por período.
  */
-export function useDeliveryHistory() {
+export function useDeliveryHistory(period: EarningsPeriodDTO) {
   const { client } = useAuth();
 
   const query = useInfiniteQuery({
-    queryKey: queryKeys.deliveries.history,
+    queryKey: queryKeys.deliveries.history(period),
     initialPageParam: 1,
-    queryFn: ({ pageParam }) => earnings(client).history(pageParam),
+    queryFn: ({ pageParam }) => earnings(client).history(pageParam, period),
     getNextPageParam: (last) => (last.hasMore ? last.page + 1 : undefined),
   });
 

@@ -259,11 +259,24 @@ export class DriverService {
    * Histórico paginado de entregas concluídas/canceladas do entregador (story 60),
    * desc por data (entregue/cancelada). Anexa a gorjeta do pedido quando ela é
    * deste entregador. Busca `pageSize + 1` para saber se há próxima página.
+   *
+   * Recorta pelo mesmo período dos cards de resumo (story 79): reusa
+   * `earningsPeriodStart` e filtra pela data que o item exibe — entregue por
+   * `deliveredAt`, cancelada (sem `deliveredAt`) por `updatedAt`. Default `30d`
+   * mantém compat com chamadas sem o período.
    */
-  async deliveryHistory(userId: string, page = 1) {
+  async deliveryHistory(userId: string, page = 1, period: EarningsPeriod = "30d") {
     const currentPage = Number.isFinite(page) && page >= 1 ? Math.floor(page) : 1;
+    const start = earningsPeriodStart(period);
     const rows = await this.prisma.delivery.findMany({
-      where: { driverId: userId, status: { in: ["delivered", "canceled"] } },
+      where: {
+        driverId: userId,
+        status: { in: ["delivered", "canceled"] },
+        OR: [
+          { status: "delivered", deliveredAt: { gte: start } },
+          { status: "canceled", updatedAt: { gte: start } },
+        ],
+      },
       orderBy: { updatedAt: "desc" },
       skip: (currentPage - 1) * HISTORY_PAGE_SIZE,
       take: HISTORY_PAGE_SIZE + 1,

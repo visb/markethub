@@ -22,8 +22,11 @@ export const queryKeys = {
     available: (storeId: string | null) => ["deliveries", "available", storeId ?? "all"] as const,
     /** Detalhe de uma entrega (derivado da lista atribuída + atualizado por mutation). */
     detail: (id: string) => ["deliveries", "detail", id] as const,
-    /** Histórico paginado de entregas concluídas/canceladas (story 60). */
-    history: ["deliveries", "history"] as const,
+    /**
+     * Histórico paginado de entregas concluídas/canceladas (story 60), recortado
+     * pelo período (story 79) — trocar de período refaz a lista a partir da page 1.
+     */
+    history: (period: string) => ["deliveries", "history", period] as const,
   },
   /** Ganhos do entregador (gorjetas + entregas concluídas) por período (story 60). */
   earnings: {

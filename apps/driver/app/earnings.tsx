@@ -27,7 +27,7 @@ export default function EarningsScreen() {
   const router = useRouter();
   const [period, setPeriod] = useState<EarningsPeriodDTO>("today");
   const earningsQuery = useDriverEarnings(period);
-  const history = useDeliveryHistory();
+  const history = useDeliveryHistory(period);
 
   const data = earningsQuery.data;
 
