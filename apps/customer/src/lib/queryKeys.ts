@@ -35,6 +35,17 @@ export const queryKeys = {
     /** Alvos possíveis da gorjeta do pedido (entregador? mercados?). */
     targets: (orderId: string) => ["tip", "targets", orderId] as const,
   },
+  prefs: {
+    /** Raio de busca escolhido pelo usuário (storage local — story 80). */
+    radiusKm: ["prefs", "radius-km"] as const,
+  },
+  search: {
+    /** Sugestões conforme digita (termos + departamentos — story 80). */
+    suggestions: (q: string) => ["search", "suggestions", q] as const,
+    /** Resultado paginado da busca global, chaveado por termo + recorte geo (story 80). */
+    results: (q: string, geo?: { lat: number; lng: number; radiusKm?: number }) =>
+      ["search", "results", q, geo?.lat ?? null, geo?.lng ?? null, geo?.radiusKm ?? null] as const,
+  },
   explore: {
     /** Mercados dentro do viewport do mapa (bounding box). */
     nearby: (bounds: ViewportBoundsDTO) =>

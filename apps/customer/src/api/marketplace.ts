@@ -2,6 +2,8 @@ import type { ApiClient } from "@markethub/api-client";
 import type {
   NearbyStoreDTO,
   ReverseGeocodeResult,
+  SearchResultItemDTO,
+  SearchSuggestionsDTO,
   StoreReviewDTO,
   StoreReviewsPageDTO,
   StoreSummaryDTO,
@@ -14,6 +16,8 @@ export type { NearbyStoreDTO, StoreSummaryDTO, ViewportBoundsDTO } from "@market
 export type { ReverseGeocodeResult } from "@markethub/types";
 // Vitrine pública de avaliações da rede (story 56).
 export type { StoreReviewDTO, StoreReviewsPageDTO } from "@markethub/types";
+// Busca no marketplace: sugestões + item do resultado com loja (story 80).
+export type { SearchResultItemDTO, SearchSuggestionsDTO } from "@markethub/types";
 
 export type SaleType = "unit" | "weight";
 
@@ -419,6 +423,18 @@ export function marketplace(api: ApiClient) {
       api.request<Paginated<ProductView>>(
         `/search?storeId=${storeId}&q=${encodeURIComponent(q)}`,
       ),
+    /** Sugestões conforme digita (story 80): termos + departamentos que casam. */
+    searchSuggest: (q: string) =>
+      api.request<SearchSuggestionsDTO>(`/search/suggest?q=${encodeURIComponent(q)}`),
+    /**
+     * Busca global paginada (story 80): produtos de todas as lojas próximas (mesmo
+     * recorte geo da home). Item traz `storeId`/`storeName` p/ o badge da loja.
+     */
+    searchGlobal: (q: string, opts?: { geo?: GeoQuery; page?: number }) => {
+      const qs = geoQs(new URLSearchParams({ q }), opts?.geo);
+      if (opts?.page) qs.set("page", String(opts.page));
+      return api.request<Paginated<SearchResultItemDTO>>(`/search?${qs}`);
+    },
     sections: (storeId: string, geo?: GeoQuery) =>
       // auth opcional (story 34): com token, `store.following` reflete o usuário.
       api.request<{

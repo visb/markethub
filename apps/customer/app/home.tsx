@@ -1,9 +1,9 @@
 import React, { useCallback, useRef, useState } from "react";
-import { FlatList, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { FlatList, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
-import { Text, colors, radius, spacing } from "@markethub/ui";
+import { Text, colors, spacing } from "@markethub/ui";
 import { useAuth } from "@/auth-context";
 import { marketplace, type Address, type FeedSection, type GeoQuery } from "@/api/marketplace";
 import { useCart } from "@/use-cart";
@@ -11,6 +11,7 @@ import { ProductCard } from "@/components/ProductCard";
 import { BottomTabs } from "@/components/BottomTabs";
 import { CartFab } from "@/components/CartFab";
 import { CategoryMenu } from "@/components/CategoryMenu";
+import { SearchBar } from "@/components/SearchBar";
 import { DeliveryConfigSheet } from "@/components/DeliveryConfigSheet";
 import { FeedSkeleton } from "@/components/FeedSkeleton";
 import { MerchantLogo } from "@/components/MerchantLogo";
@@ -31,7 +32,6 @@ export default function MarketplaceHome() {
   const cart = useCart();
   const [sections, setSections] = useState<FeedSection[]>([]);
   const [address, setAddress] = useState<Address | null>(null);
-  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [mode, setMode] = useState<FulfillmentMode>("deliver");
@@ -99,17 +99,12 @@ export default function MarketplaceHome() {
         </Pressable>
       </View>
 
-      <View style={styles.searchWrap}>
-        <Ionicons name="search" size={18} color={colors.primary} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Busque por produtos, marcas ou departamento..."
-          placeholderTextColor={colors.textMuted}
-          value={search}
-          onChangeText={setSearch}
-          onSubmitEditing={() => router.push("/explore")}
-        />
-      </View>
+      <SearchBar
+        onSubmit={(q) => router.push({ pathname: "/search", params: { q } })}
+        onSelectCategory={(c) =>
+          router.push(`/category/${c.id}?name=${encodeURIComponent(c.name)}`)
+        }
+      />
 
       <CategoryMenu
         categories={sections.map((s) => s.category)}
@@ -202,18 +197,6 @@ const styles = StyleSheet.create({
   },
   location: { flexDirection: "row", alignItems: "center", gap: 4 },
   alterar: { color: colors.primary, fontWeight: "700", fontSize: 12, textDecorationLine: "underline" },
-  searchWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    marginHorizontal: spacing.md,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    height: 48,
-  },
-  searchInput: { flex: 1, color: colors.text },
   section: {
     fontSize: 16,
     fontWeight: "700",

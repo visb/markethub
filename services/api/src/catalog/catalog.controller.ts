@@ -3,6 +3,7 @@ import { Public, CurrentUser, OptionalJwtAuthGuard } from "../auth";
 import type { AuthUser } from "../auth";
 import { CatalogService, type GeoFilter } from "./catalog.service";
 import { StoresNearbyQueryDto } from "./dto/stores-nearby.dto";
+import { SearchSuggestQueryDto } from "./dto/search-suggest.dto";
 
 /** lat/lng/radiusKm de query string → filtro geo (undefined quando ausentes/inválidos). */
 function parseGeo(lat?: string, lng?: string, radiusKm?: string): GeoFilter | undefined {
@@ -120,17 +121,32 @@ export class CatalogController {
     return this.catalog.storeSections(id, parseGeo(lat, lng, undefined), user?.id);
   }
 
+  /**
+   * Sugestões conforme digita (story 80). Rota estática `search/suggest` (dois
+   * segmentos) registrada antes de `search` p/ o Nest casar a literal. O DTO exige
+   * `q` com no mínimo 2 caracteres (400 abaixo disso).
+   */
+  @Get("search/suggest")
+  suggest(@Query() query: SearchSuggestQueryDto) {
+    return this.catalog.searchSuggest(query.q);
+  }
+
   @Get("search")
   search(
     @Query("q") q = "",
     @Query("storeId") storeId?: string,
     @Query("page") page?: string,
     @Query("pageSize") pageSize?: string,
+    @Query("lat") lat?: string,
+    @Query("lng") lng?: string,
+    @Query("radiusKm") radiusKm?: string,
   ) {
     return this.catalog.search(q, {
       storeId,
       page: page ? Number(page) : undefined,
       pageSize: pageSize ? Number(pageSize) : undefined,
+      // Busca global (sem storeId) usa o mesmo recorte geo dos demais endpoints.
+      geo: parseGeo(lat, lng, radiusKm),
     });
   }
 
