@@ -4,10 +4,11 @@ import SearchScreen from "../../app/search";
 import type { SearchResultItemDTO } from "@/api/marketplace";
 
 /**
- * Story 80: tela de resultado da busca global. Mocka os hooks de dados
+ * Story 80/81: tela de resultado da busca global. Mocka os hooks de dados
  * (useProductSearch/useSearchGeo), o carrinho e o expo-router. Valida: itens
- * renderizam com o badge da loja, estado vazio, loading e paginação (onEndReached
- * → loadMore quando há mais).
+ * renderizam com o mesmo card da home (header do mercado + frete/tempo, sem o
+ * badge antigo `store-badge`), estados fechado/pausado, estado vazio, loading e
+ * paginação (onEndReached → loadMore quando há mais).
  */
 
 const item = (over: Partial<SearchResultItemDTO> = {}): SearchResultItemDTO => ({
@@ -23,8 +24,15 @@ const item = (over: Partial<SearchResultItemDTO> = {}): SearchResultItemDTO => (
   priceCents: 1000,
   promoPriceCents: null,
   storeId: "s1",
-  storeName: "Mercado A",
+  storeName: "Loja Centro",
+  merchant: "Rede Europa",
+  merchantLogoUrl: null,
+  deliveryFeeCents: 700,
+  deliveryEta: "30 min",
+  etaMinutes: 30,
   distanceKm: 2.5,
+  openNow: true,
+  paused: false,
   ...over,
 });
 
@@ -91,14 +99,30 @@ beforeEach(() => {
   mockPush.mockClear();
 });
 
-describe("SearchScreen — resultado (story 80)", () => {
-  it("renderiza os itens com o badge da loja", () => {
+describe("SearchScreen — resultado (story 80/81)", () => {
+  it("renderiza os itens no card da home: header do mercado + frete/tempo, sem badge antigo", () => {
     const tree = render();
-    expect(tree.root.findAll((n) => n.props.testID === "store-badge").length).toBeGreaterThan(0);
+    // Story 81: o badge caseiro de loja (`store-badge`) foi removido.
+    expect(tree.root.findAll((n) => n.props.testID === "store-badge")).toHaveLength(0);
     const t = texts(tree);
     expect(t).toContain("Arroz Branco");
-    expect(t).toContain("Mercado A");
+    // Header do card mostra o mercado (rede), não o nome da loja.
+    expect(t).toContain("Rede Europa");
+    expect(t).not.toContain("Loja Centro");
+    // Frete e tempo iguais ao card da home.
+    expect(t).toContain("R$ 7,00");
+    expect(t).toContain("30 min");
     expect(t).toContain("(2.5km)");
+  });
+
+  it("loja fechada/pausada continua na lista com o selo do card", () => {
+    mockSearchState.current = {
+      ...mockSearchState.current,
+      items: [item({ offerId: "o-fechada", openNow: false }), item({ offerId: "o-pausada", paused: true })],
+    };
+    const t = texts(render());
+    expect(t).toContain("Fechado");
+    expect(t).toContain("Pausada");
   });
 
   it("estado vazio informa que nada foi encontrado", () => {
@@ -109,7 +133,8 @@ describe("SearchScreen — resultado (story 80)", () => {
   it("loading mostra indicador e não a lista", () => {
     mockSearchState.current = { ...mockSearchState.current, isLoading: true, items: [] };
     const tree = render();
-    expect(tree.root.findAll((n) => n.props.testID === "store-badge")).toHaveLength(0);
+    // Sem FlatList durante o loading (só o indicador).
+    expect(tree.root.findAll((n) => typeof n.props.onEndReached === "function")).toHaveLength(0);
   });
 
   it("onEndReached dispara loadMore quando há mais páginas", () => {
