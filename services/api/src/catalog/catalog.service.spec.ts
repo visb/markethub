@@ -102,7 +102,7 @@ interface CatalogMocks {
   merchant: { findMany: AnyFn; findUnique: AnyFn };
   store: { findMany: AnyFn; findUnique: AnyFn };
   offer: { findMany: AnyFn; count: AnyFn };
-  product: { findUnique: AnyFn };
+  product: { findUnique: AnyFn; findMany: AnyFn };
   marketplaceCategory: { findMany: AnyFn; findUnique: AnyFn };
 }
 
@@ -111,8 +111,8 @@ function makeCatalog() {
     merchant: { findMany: jest.fn(), findUnique: jest.fn() },
     store: { findMany: jest.fn(), findUnique: jest.fn() },
     offer: { findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) },
-    product: { findUnique: jest.fn() },
-    marketplaceCategory: { findMany: jest.fn(), findUnique: jest.fn() },
+    product: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
+    marketplaceCategory: { findMany: jest.fn().mockResolvedValue([]), findUnique: jest.fn() },
   };
   const prisma = {
     ...m,
@@ -142,6 +142,19 @@ function offerRow(id: string, over: Partial<Record<string, unknown>> = {}) {
       category: { id: "c1", name: "Cat", slug: "cat" },
     },
     ...over,
+  };
+}
+
+// Story 80: linha da busca global — oferta+produto com a loja (coords p/ o recorte geo).
+function searchRow(
+  id: string,
+  storeId: string,
+  latitude: number | null = null,
+  longitude: number | null = null,
+) {
+  return {
+    ...offerRow(id),
+    store: { id: storeId, name: `Loja ${storeId}`, latitude, longitude },
   };
 }
 
@@ -284,6 +297,75 @@ describe("CatalogService.search", () => {
       active: true,
       merchant: { active: true },
     });
+  });
+
+  // Story 80: busca global (sem storeId) → item carrega storeId/storeName p/ o badge.
+  it("busca global anexa storeId/storeName ao item e seleciona a loja", async () => {
+    const { prisma, m } = makeCatalog();
+    m.offer.findMany.mockResolvedValue([searchRow("o1", "s1")]);
+    m.offer.count.mockResolvedValue(1);
+    const res = await new CatalogService(prisma, followsStub).search("arroz", {});
+    const select = m.offer.findMany.mock.calls[0][0].select;
+    expect(select.store).toBeDefined();
+    expect(res.items[0]).toMatchObject({ offerId: "o1", storeId: "s1", storeName: "Loja s1", distanceKm: null });
+  });
+
+  // Story 80: com geo+raio, exclui ofertas de loja fora do raio (filtro em memória).
+  it("busca global com raio exclui loja fora do raio e calcula distância", async () => {
+    const { prisma, m } = makeCatalog();
+    m.offer.findMany.mockResolvedValue([
+      searchRow("perto", "s-perto", -23.5, -46.6),
+      searchRow("longe", "s-longe", -3.1, -60.0),
+    ]);
+    const res = await new CatalogService(prisma, followsStub).search("arroz", {
+      geo: { lat: -23.5, lng: -46.6, radiusKm: 5 },
+    });
+    // Sem contagem separada: total = itens dentro do raio; count não é chamado.
+    expect(m.offer.count).not.toHaveBeenCalled();
+    expect(res.total).toBe(1);
+    expect(res.items.map((i) => (i as { storeId: string }).storeId)).toEqual(["s-perto"]);
+  });
+
+  // Story 80 (regressão): busca na loja segue com shape histórico (sem loja no item).
+  it("busca na loja não anexa storeId/storeName ao item (regressão)", async () => {
+    const { prisma, m } = makeCatalog();
+    m.offer.findMany.mockResolvedValue([searchRow("o1", "s1")]);
+    m.offer.count.mockResolvedValue(1);
+    const res = await new CatalogService(prisma, followsStub).search("arroz", { storeId: "s1" });
+    expect(res.items[0]).toMatchObject({ offerId: "o1", id: "p-o1" });
+    expect(res.items[0]).not.toHaveProperty("storeName");
+    expect(res.items[0]).not.toHaveProperty("distanceKm");
+  });
+});
+
+describe("CatalogService.searchSuggest", () => {
+  it("termo com menos de 2 caracteres → vazio sem tocar o banco", async () => {
+    const { prisma, m } = makeCatalog();
+    const res = await new CatalogService(prisma, followsStub).searchSuggest("a");
+    expect(res).toEqual({ terms: [], categories: [] });
+    expect(m.product.findMany).not.toHaveBeenCalled();
+    expect(m.marketplaceCategory.findMany).not.toHaveBeenCalled();
+  });
+
+  it("deduplica nomes (distinct) com teto 8 e limita categorias a 3", async () => {
+    const { prisma, m } = makeCatalog();
+    m.product.findMany.mockResolvedValue([{ name: "Arroz Branco" }, { name: "Arroz Integral" }]);
+    m.marketplaceCategory.findMany.mockResolvedValue([{ id: "c1", name: "Arroz e Grãos" }]);
+    const res = await new CatalogService(prisma, followsStub).searchSuggest("arr");
+
+    const prodArgs = m.product.findMany.mock.calls[0][0];
+    expect(prodArgs.distinct).toEqual(["name"]);
+    expect(prodArgs.take).toBe(8);
+    expect(prodArgs.where.name).toEqual({ contains: "arr", mode: "insensitive" });
+    // só sugere produto com oferta em loja visível (story 69)
+    expect(prodArgs.where.offers.some.store).toEqual({ active: true, merchant: { active: true } });
+
+    const catArgs = m.marketplaceCategory.findMany.mock.calls[0][0];
+    expect(catArgs.take).toBe(3);
+    expect(catArgs.where).toMatchObject({ visible: true, name: { contains: "arr", mode: "insensitive" } });
+
+    expect(res.terms).toEqual(["Arroz Branco", "Arroz Integral"]);
+    expect(res.categories).toEqual([{ id: "c1", name: "Arroz e Grãos" }]);
   });
 });
 

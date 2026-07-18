@@ -35,6 +35,8 @@ export interface ViewportBounds {
 const MAX_PAGE_SIZE = 100;
 /** Teto de marcadores por viewport — protege contra zoom-out total. */
 export const NEARBY_STORES_CAP = 200;
+/** Teto de ofertas lidas na busca global com raio antes do filtro por distância (story 80). */
+export const SEARCH_GEO_CAP = 300;
 
 @Injectable()
 export class CatalogService {
@@ -184,10 +186,50 @@ export class CatalogService {
     return { items: rows.map(toOfferView), page, pageSize, total };
   }
 
-  /** Busca por nome/marca/categoria. */
+  /**
+   * Sugestões de busca (story 80): nomes de produto que casam com o termo
+   * (deduplicados, teto ~8) + departamentos curados que casam (teto ~3). Termo com
+   * menos de 2 caracteres → vazio sem tocar o banco (o DTO também rejeita com 400).
+   */
+  async searchSuggest(
+    q: string,
+  ): Promise<{ terms: string[]; categories: { id: string; name: string }[] }> {
+    const term = q.trim();
+    if (term.length < 2) return { terms: [], categories: [] };
+
+    const [products, categories] = await this.prisma.$transaction([
+      this.prisma.product.findMany({
+        where: {
+          name: { contains: term, mode: "insensitive" },
+          // Só sugere produto com oferta em loja visível (ativa + rede ativa — story 69).
+          offers: { some: { available: true, store: this.visibleStoreWhere } },
+        },
+        select: { name: true },
+        distinct: ["name"],
+        take: 8,
+        orderBy: { name: "asc" },
+      }),
+      this.prisma.marketplaceCategory.findMany({
+        where: { visible: true, name: { contains: term, mode: "insensitive" } },
+        select: { id: true, name: true },
+        take: 3,
+        orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
+      }),
+    ]);
+
+    return { terms: products.map((p) => p.name), categories };
+  }
+
+  /**
+   * Busca por nome/marca/categoria. Com `storeId` (busca dentro da loja) o
+   * comportamento é o histórico: paginação no banco, item sem loja. Sem `storeId`
+   * (busca global — story 80) o item carrega `storeId`/`storeName` p/ o badge e,
+   * havendo `geo.radiusKm`, o recorte por distância (mesmo raio da home) filtra as
+   * ofertas de lojas fora do raio em memória.
+   */
   async search(
     q: string,
-    opts: { storeId?: string; page?: number; pageSize?: number },
+    opts: { storeId?: string; page?: number; pageSize?: number; geo?: GeoFilter },
   ): Promise<Paginated<unknown>> {
     const { page, pageSize, skip, take } = this.paginate(opts.page, opts.pageSize);
     const term = q.trim();
@@ -207,18 +249,36 @@ export class CatalogService {
       },
     };
 
+    // Busca global com raio: filtra por distância em memória (mesmo recorte do feed).
+    if (!opts.storeId && opts.geo?.radiusKm != null) {
+      const rows = await this.prisma.offer.findMany({
+        where,
+        take: SEARCH_GEO_CAP,
+        orderBy: { product: { name: "asc" } },
+        select: this.searchSelect(),
+      });
+      const near = rows
+        .map((r) => toSearchView(r, opts.geo))
+        .filter((v) => v.distanceKm != null && v.distanceKm <= opts.geo!.radiusKm!);
+      return { items: near.slice(skip, skip + take), page, pageSize, total: near.length };
+    }
+
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.offer.findMany({
         where,
         skip,
         take,
         orderBy: { product: { name: "asc" } },
-        select: this.offerSelect(),
+        select: this.searchSelect(),
       }),
       this.prisma.offer.count({ where }),
     ]);
 
-    return { items: rows.map(toOfferView), page, pageSize, total };
+    // Busca na loja: shape histórico (sem loja). Global: item com loja p/ o badge.
+    const items = opts.storeId
+      ? rows.map(toOfferView)
+      : rows.map((r) => toSearchView(r, opts.geo));
+    return { items, page, pageSize, total };
   }
 
   /** Detalhe do produto com ofertas por loja (preço/disponibilidade). */
@@ -550,6 +610,16 @@ export class CatalogService {
     } satisfies Prisma.OfferSelect;
   }
 
+  /** offerSelect + loja (id/nome/coords) para o badge e o recorte geo da busca global (story 80). */
+  private searchSelect() {
+    return {
+      ...this.offerSelect(),
+      store: {
+        select: { id: true, name: true, latitude: true, longitude: true },
+      },
+    } satisfies Prisma.OfferSelect;
+  }
+
   private paginate(page?: number, pageSize?: number) {
     const p = Math.max(1, page ?? 1);
     const size = Math.min(MAX_PAGE_SIZE, Math.max(1, pageSize ?? 20));
@@ -596,6 +666,28 @@ function toOfferView(row: OfferRow) {
     priceCents: row.priceCents,
     promoPriceCents: row.promoPriceCents,
     ...row.product,
+  };
+}
+
+type SearchRow = OfferRow & {
+  store: { id: string; name: string; latitude: number | null; longitude: number | null };
+};
+
+/**
+ * Item da busca global (story 80): produto achatado + identificação da loja
+ * (`storeId`/`storeName`) para o badge. Com geo, calcula a distância p/ o recorte
+ * por raio (mesmo do feed); sem geo, `distanceKm` é null.
+ */
+function toSearchView(row: SearchRow, geo?: GeoFilter) {
+  const hasGeo = geo && row.store.latitude != null && row.store.longitude != null;
+  const distanceKm = hasGeo
+    ? round1(haversineKm(geo.lat, geo.lng, row.store.latitude!, row.store.longitude!))
+    : null;
+  return {
+    ...toOfferView(row),
+    storeId: row.store.id,
+    storeName: row.store.name,
+    distanceKm,
   };
 }
 

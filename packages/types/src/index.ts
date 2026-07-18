@@ -14,3 +14,4 @@ export * from "./merchant";
 export * from "./coupons";
 export * from "./slots";
 export * from "./geocoding";
+export * from "./search";

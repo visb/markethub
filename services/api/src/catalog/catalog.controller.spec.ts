@@ -49,6 +49,7 @@ function makeFullController() {
     storeSections: jest.fn().mockResolvedValue({}),
     storeSummary: jest.fn().mockResolvedValue({ id: "s1" }),
     search: jest.fn().mockResolvedValue({}),
+    searchSuggest: jest.fn().mockResolvedValue({ terms: [], categories: [] }),
     productDetail: jest.fn().mockResolvedValue({}),
   };
   return { controller: new CatalogController(svc as unknown as CatalogService), svc };
@@ -124,14 +125,32 @@ describe("CatalogController delegação", () => {
     expect(svc.storeSections).toHaveBeenCalledWith("s1", undefined, "u1");
   });
 
-  it("search: default de q vazio e paginação opcional", () => {
+  it("search: default de q vazio e paginação opcional (geo undefined)", () => {
     const { controller, svc } = makeFullController();
     controller.search(undefined as unknown as string);
     expect(svc.search).toHaveBeenCalledWith("", {
       storeId: undefined,
       page: undefined,
       pageSize: undefined,
+      geo: undefined,
     });
+  });
+
+  it("search global: repassa geo (lat/lng/radiusKm) e paginação", () => {
+    const { controller, svc } = makeFullController();
+    controller.search("arroz", undefined, "2", "30", "-23.5", "-46.6", "10");
+    expect(svc.search).toHaveBeenCalledWith("arroz", {
+      storeId: undefined,
+      page: 2,
+      pageSize: 30,
+      geo: { lat: -23.5, lng: -46.6, radiusKm: 10 },
+    });
+  });
+
+  it("suggest: delega searchSuggest com o termo do DTO (story 80)", () => {
+    const { controller, svc } = makeFullController();
+    controller.suggest({ q: "arr" });
+    expect(svc.searchSuggest).toHaveBeenCalledWith("arr");
   });
 
   it("product: delega productDetail", () => {

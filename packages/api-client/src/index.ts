@@ -102,4 +102,6 @@ export type {
   AdminReviewDTO,
   AdminReviewsFilter,
   HideReviewInput,
+  SearchSuggestionsDTO,
+  SearchResultItemDTO,
 } from "@markethub/types";

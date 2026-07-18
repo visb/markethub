@@ -54,6 +54,31 @@ describe("marketplace api module", () => {
     expect(request).toHaveBeenCalledWith("/search?storeId=s1&q=arroz%20integral");
   });
 
+  it("searchSuggest faz encode do termo (story 80)", async () => {
+    const { request, mkt } = setup();
+    await mkt.searchSuggest("arroz integral");
+    expect(request).toHaveBeenCalledWith("/search/suggest?q=arroz%20integral");
+  });
+
+  it("searchGlobal monta q + geo + página (story 80)", async () => {
+    const { request, mkt } = setup();
+    await mkt.searchGlobal("arroz", { geo: { lat: -23.5, lng: -46.6, radiusKm: 10 }, page: 2 });
+    const url = request.mock.calls[0][0] as string;
+    expect(url.startsWith("/search?")).toBe(true);
+    expect(url).toContain("q=arroz");
+    expect(url).toContain("lat=-23.5");
+    expect(url).toContain("lng=-46.6");
+    expect(url).toContain("radiusKm=10");
+    expect(url).toContain("page=2");
+    expect(url).not.toContain("storeId");
+  });
+
+  it("searchGlobal sem geo nem página envia só o termo (story 80)", async () => {
+    const { request, mkt } = setup();
+    await mkt.searchGlobal("arroz");
+    expect(request).toHaveBeenCalledWith("/search?q=arroz");
+  });
+
   it("addItem faz POST autenticado com body", async () => {
     const { request, mkt } = setup();
     await mkt.addItem({ offerId: "o1", quantity: 2 });
