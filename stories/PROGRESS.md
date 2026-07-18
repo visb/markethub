@@ -16,7 +16,7 @@ Cuidados da rodada:
 | 76 | "Usar minha localização" — reverse geocode via backend | 75 | done |
 | 77 | Gorjeta individual por alvo (plataforma/entregador/mercado) | — | done |
 | 78 | Perfil — "Meus dados" e "Segurança" como itens de menu | — | done |
-| 79 | Driver /earnings — histórico respeita o filtro de período | — | todo |
+| 79 | Driver /earnings — histórico respeita o filtro de período | — | done |
 | 80 | Busca no customer — sugestões ao digitar + tela de resultado | — | todo |
 
 ---
@@ -29,3 +29,4 @@ Cuidados da rodada:
 [OK] 76 — testes: api 1529, customer 317, api-client 70 — commit: b34f111 — merge: e20ccad — 2026-07-18 — PENDENTE-MANUAL: herda key Google da 75
 [OK] 77 — testes: api 1542, customer 332, api-client 70 — commit: d169eb8 — merge: 9cdf8d5 — 2026-07-18 — migration TipItem+backfill aplicada; PIX via mock; +escopo: admin-dashboard/reviews-aggregate migrados a TipItem
 [OK] 78 — testes: customer 341 — commit: 030756f — merge: f0ae80b — 2026-07-18 — só customer, sem backend
+[OK] 79 — testes: api 1546, driver 166, api-client 70 — commit: c16b694 — merge: fafa78f — 2026-07-18 — bugfix histórico driver
