@@ -15,7 +15,7 @@ Cuidados da rodada:
 | 75 | Endereço — lat/lng exata ao salvar (provider Google) | — | done |
 | 76 | "Usar minha localização" — reverse geocode via backend | 75 | done |
 | 77 | Gorjeta individual por alvo (plataforma/entregador/mercado) | — | done |
-| 78 | Perfil — "Meus dados" e "Segurança" como itens de menu | — | todo |
+| 78 | Perfil — "Meus dados" e "Segurança" como itens de menu | — | done |
 | 79 | Driver /earnings — histórico respeita o filtro de período | — | todo |
 | 80 | Busca no customer — sugestões ao digitar + tela de resultado | — | todo |
 
@@ -28,3 +28,4 @@ Cuidados da rodada:
 [OK] 75 — testes: api 1508, customer 317 — commit: 82670af — merge: 12fc30e — 2026-07-18 — PENDENTE-MANUAL: ativar GEOCODING_PROVIDER=google + GOOGLE_MAPS_API_KEY real (provider mockado nos testes)
 [OK] 76 — testes: api 1529, customer 317, api-client 70 — commit: b34f111 — merge: e20ccad — 2026-07-18 — PENDENTE-MANUAL: herda key Google da 75
 [OK] 77 — testes: api 1542, customer 332, api-client 70 — commit: d169eb8 — merge: 9cdf8d5 — 2026-07-18 — migration TipItem+backfill aplicada; PIX via mock; +escopo: admin-dashboard/reviews-aggregate migrados a TipItem
+[OK] 78 — testes: customer 341 — commit: 030756f — merge: f0ae80b — 2026-07-18 — só customer, sem backend
