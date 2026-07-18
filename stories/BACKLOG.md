@@ -1,9 +1,5 @@
 # BACKLOG — itens crus para refinar
 
-## Busca, app customer
-
-- deve ser possivel buscar por nomes de mercado tambem na barra de busca
-
 ## Favoritos
 
 Na tela /favorites, esta mostrando o nome da loja, mas deveria mostrar o nome do mercado
