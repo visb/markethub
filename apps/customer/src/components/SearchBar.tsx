@@ -2,13 +2,17 @@ import React, { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Text, colors, radius, spacing } from "@markethub/ui";
+import type { SearchMerchant } from "@/api/marketplace";
 import { useSearchSuggestions } from "@/api/hooks/useProductSearch";
+import { MerchantLogo } from "@/components/MerchantLogo";
 
 interface SearchBarProps {
   /** Submit do form OU tap num termo sugerido → tela de resultado. */
   onSubmit: (q: string) => void;
   /** Tap num departamento sugerido → tela da categoria (`/category/[id]`). */
   onSelectCategory: (category: { id: string; name: string }) => void;
+  /** Tap num mercado sugerido → loja visível mais próxima da rede (story 82). */
+  onSelectMerchant: (merchant: SearchMerchant) => void;
   placeholder?: string;
 }
 
@@ -18,10 +22,15 @@ interface SearchBarProps {
  * Termos e departamentos aparecem conforme digita; submeter ou tocar um termo
  * dispara `onSubmit`, tocar um departamento dispara `onSelectCategory`.
  */
-export function SearchBar({ onSubmit, onSelectCategory, placeholder }: SearchBarProps) {
+export function SearchBar({
+  onSubmit,
+  onSelectCategory,
+  onSelectMerchant,
+  placeholder,
+}: SearchBarProps) {
   const [text, setText] = useState("");
   const [open, setOpen] = useState(false);
-  const { terms, categories } = useSearchSuggestions(text);
+  const { terms, categories, merchants } = useSearchSuggestions(text);
 
   const submit = (q: string) => {
     const term = q.trim();
@@ -35,7 +44,12 @@ export function SearchBar({ onSubmit, onSelectCategory, placeholder }: SearchBar
     onSelectCategory(c);
   };
 
-  const hasSuggestions = terms.length > 0 || categories.length > 0;
+  const selectMerchant = (mm: SearchMerchant) => {
+    setOpen(false);
+    onSelectMerchant(mm);
+  };
+
+  const hasSuggestions = terms.length > 0 || categories.length > 0 || merchants.length > 0;
   const showDropdown = open && text.trim().length >= 2 && hasSuggestions;
 
   return (
@@ -86,6 +100,19 @@ export function SearchBar({ onSubmit, onSelectCategory, placeholder }: SearchBar
               <Ionicons name="pricetag-outline" size={16} color={colors.primary} />
               <Text numberOfLines={1} style={styles.rowText}>
                 {c.name} <Text variant="caption" muted>em Categoria</Text>
+              </Text>
+            </Pressable>
+          ))}
+          {merchants.map((mm) => (
+            <Pressable
+              key={`m-${mm.merchantId}`}
+              testID={`suggestion-merchant-${mm.merchantId}`}
+              style={styles.row}
+              onPress={() => selectMerchant(mm)}
+            >
+              <MerchantLogo name={mm.name} logoUrl={mm.logoUrl} size={24} />
+              <Text numberOfLines={1} style={styles.rowText}>
+                {mm.name} <Text variant="caption" muted>em Mercados</Text>
               </Text>
             </Pressable>
           ))}

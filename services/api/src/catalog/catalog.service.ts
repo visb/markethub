@@ -188,36 +188,81 @@ export class CatalogService {
 
   /**
    * Sugestões de busca (story 80): nomes de produto que casam com o termo
-   * (deduplicados, teto ~8) + departamentos curados que casam (teto ~3). Termo com
+   * (deduplicados, teto ~8) + departamentos curados que casam (teto ~3) +, desde a
+   * story 82, redes (mercados) cujo nome casa e têm loja visível (teto ~3). Termo com
    * menos de 2 caracteres → vazio sem tocar o banco (o DTO também rejeita com 400).
+   * `geo` (opcional) escolhe a loja visível mais próxima da rede sugerida.
    */
   async searchSuggest(
     q: string,
-  ): Promise<{ terms: string[]; categories: { id: string; name: string }[] }> {
+    geo?: GeoFilter,
+  ): Promise<{
+    terms: string[];
+    categories: { id: string; name: string }[];
+    merchants: SuggestMerchant[];
+  }> {
     const term = q.trim();
-    if (term.length < 2) return { terms: [], categories: [] };
+    if (term.length < 2) return { terms: [], categories: [], merchants: [] };
 
-    const [products, categories] = await this.prisma.$transaction([
-      this.prisma.product.findMany({
-        where: {
-          name: { contains: term, mode: "insensitive" },
-          // Só sugere produto com oferta em loja visível (ativa + rede ativa — story 69).
-          offers: { some: { available: true, store: this.visibleStoreWhere } },
-        },
-        select: { name: true },
-        distinct: ["name"],
-        take: 8,
-        orderBy: { name: "asc" },
-      }),
-      this.prisma.marketplaceCategory.findMany({
-        where: { visible: true, name: { contains: term, mode: "insensitive" } },
-        select: { id: true, name: true },
-        take: 3,
-        orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
-      }),
+    const [[products, categories], merchants] = await Promise.all([
+      this.prisma.$transaction([
+        this.prisma.product.findMany({
+          where: {
+            name: { contains: term, mode: "insensitive" },
+            // Só sugere produto com oferta em loja visível (ativa + rede ativa — story 69).
+            offers: { some: { available: true, store: this.visibleStoreWhere } },
+          },
+          select: { name: true },
+          distinct: ["name"],
+          take: 8,
+          orderBy: { name: "asc" },
+        }),
+        this.prisma.marketplaceCategory.findMany({
+          where: { visible: true, name: { contains: term, mode: "insensitive" } },
+          select: { id: true, name: true },
+          take: 3,
+          orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
+        }),
+      ]),
+      this.suggestMerchants(term, geo),
     ]);
 
-    return { terms: products.map((p) => p.name), categories };
+    return { terms: products.map((p) => p.name), categories, merchants };
+  }
+
+  /**
+   * Redes (mercados) cujo nome casa com o termo e têm ao menos uma loja visível
+   * (ativa + rede ativa — story 69), teto 3 (story 82). Para cada rede devolve a loja
+   * de destino: com `geo`, a loja visível mais próxima (haversine); sem `geo`, a
+   * primeira loja visível. Usado no dropdown de sugestões e na busca global (página 1).
+   */
+  private async suggestMerchants(term: string, geo?: GeoFilter): Promise<SuggestMerchant[]> {
+    const rows = await this.prisma.merchant.findMany({
+      where: {
+        active: true,
+        name: { contains: term, mode: "insensitive" },
+        // Só sugere rede com ao menos uma loja visível (ativa + rede ativa — story 69).
+        stores: { some: this.visibleStoreWhere },
+      },
+      select: {
+        id: true,
+        name: true,
+        logoUrl: true,
+        stores: {
+          where: this.visibleStoreWhere,
+          select: { id: true, latitude: true, longitude: true },
+        },
+      },
+      take: 3,
+      orderBy: { name: "asc" },
+    });
+
+    return rows.map((mm) => ({
+      merchantId: mm.id,
+      name: mm.name,
+      logoUrl: mm.logoUrl,
+      storeId: nearestStoreId(mm.stores, geo),
+    }));
   }
 
   /**
@@ -251,6 +296,11 @@ export class CatalogService {
       },
     };
 
+    // Busca global (sem storeId) traz a seção de mercados que casam com o termo — só
+    // na primeira página, p/ não repetir a seção na paginação (story 82).
+    const merchants =
+      !opts.storeId && page === 1 ? await this.suggestMerchants(term, opts.geo) : undefined;
+
     // Busca global com raio: filtra por distância em memória (mesmo recorte do feed).
     if (!opts.storeId && opts.geo?.radiusKm != null) {
       const rows = await this.prisma.offer.findMany({
@@ -262,7 +312,13 @@ export class CatalogService {
       const near = rows
         .map((r) => toSearchView(r, opts.geo, now))
         .filter((v) => v.distanceKm != null && v.distanceKm <= opts.geo!.radiusKm!);
-      return { items: near.slice(skip, skip + take), page, pageSize, total: near.length };
+      return {
+        items: near.slice(skip, skip + take),
+        page,
+        pageSize,
+        total: near.length,
+        ...(merchants ? { merchants } : {}),
+      };
     }
 
     const [rows, total] = await this.prisma.$transaction([
@@ -280,7 +336,7 @@ export class CatalogService {
     const items = opts.storeId
       ? rows.map(toOfferView)
       : rows.map((r) => toSearchView(r, opts.geo, now));
-    return { items, page, pageSize, total };
+    return { items, page, pageSize, total, ...(merchants ? { merchants } : {}) };
   }
 
   /** Detalhe do produto com ofertas por loja (preço/disponibilidade). */
@@ -777,3 +833,34 @@ function toFeedView(row: FeedRow, geo?: GeoFilter, now: Date = new Date()) {
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
+
+/** Mercado (rede) sugerido pela busca (story 82): nome + loja de destino. */
+type SuggestMerchant = {
+  merchantId: string;
+  name: string;
+  logoUrl: string | null;
+  storeId: string;
+};
+
+type VisibleStore = { id: string; latitude: number | null; longitude: number | null };
+
+/**
+ * Loja de destino da sugestão de mercado (story 82): com `geo`, a visível mais
+ * próxima (haversine) entre as que têm coordenadas; sem `geo` (ou nenhuma
+ * geolocalizada), a primeira loja visível. Assume `stores` não vazio (o filtro
+ * `stores: { some }` garante ao menos uma).
+ */
+function nearestStoreId(stores: VisibleStore[], geo?: GeoFilter): string {
+  if (geo) {
+    const located = stores.filter((s) => s.latitude != null && s.longitude != null);
+    if (located.length > 0) {
+      return located.reduce((best, s) =>
+        haversineKm(geo.lat, geo.lng, s.latitude!, s.longitude!) <
+        haversineKm(geo.lat, geo.lng, best.latitude!, best.longitude!)
+          ? s
+          : best,
+      ).id;
+    }
+  }
+  return stores[0].id;
+}

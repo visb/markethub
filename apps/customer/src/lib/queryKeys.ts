@@ -40,8 +40,12 @@ export const queryKeys = {
     radiusKm: ["prefs", "radius-km"] as const,
   },
   search: {
-    /** Sugestões conforme digita (termos + departamentos — story 80). */
-    suggestions: (q: string) => ["search", "suggestions", q] as const,
+    /**
+     * Sugestões conforme digita (termos + departamentos + mercados — story 80/82).
+     * Inclui o geo (lat/lng): a loja de destino do mercado sugerido depende dele.
+     */
+    suggestions: (q: string, geo?: { lat: number; lng: number }) =>
+      ["search", "suggestions", q, geo?.lat ?? null, geo?.lng ?? null] as const,
     /** Resultado paginado da busca global, chaveado por termo + recorte geo (story 80). */
     results: (q: string, geo?: { lat: number; lng: number; radiusKm?: number }) =>
       ["search", "results", q, geo?.lat ?? null, geo?.lng ?? null, geo?.radiusKm ?? null] as const,

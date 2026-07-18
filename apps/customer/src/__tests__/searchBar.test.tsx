@@ -13,6 +13,9 @@ const mockSuggestions = {
   current: {
     terms: ["Arroz Branco", "Arroz Integral"],
     categories: [{ id: "mc1", name: "Mercearia" }],
+    merchants: [
+      { merchantId: "m1", name: "Atacadão", logoUrl: null, storeId: "s1" },
+    ] as { merchantId: string; name: string; logoUrl: string | null; storeId: string }[],
   },
 };
 
@@ -26,14 +29,18 @@ function findInput(tree: renderer.ReactTestRenderer) {
   return tree.root.findAll((n) => typeof n.props.onChangeText === "function")[0];
 }
 
-function render(onSubmit = jest.fn(), onSelectCategory = jest.fn()) {
+function render(onSubmit = jest.fn(), onSelectCategory = jest.fn(), onSelectMerchant = jest.fn()) {
   let tree!: renderer.ReactTestRenderer;
   act(() => {
     tree = renderer.create(
-      <SearchBar onSubmit={onSubmit} onSelectCategory={onSelectCategory} />,
+      <SearchBar
+        onSubmit={onSubmit}
+        onSelectCategory={onSelectCategory}
+        onSelectMerchant={onSelectMerchant}
+      />,
     );
   });
-  return { tree, onSubmit, onSelectCategory };
+  return { tree, onSubmit, onSelectCategory, onSelectMerchant };
 }
 
 function type(tree: renderer.ReactTestRenderer, value: string) {
@@ -46,6 +53,7 @@ beforeEach(() => {
   mockSuggestions.current = {
     terms: ["Arroz Branco", "Arroz Integral"],
     categories: [{ id: "mc1", name: "Mercearia" }],
+    merchants: [{ merchantId: "m1", name: "Atacadão", logoUrl: null, storeId: "s1" }],
   };
 });
 
@@ -71,10 +79,23 @@ describe("SearchBar — sugestões (story 80)", () => {
   });
 
   it("sem sugestões o dropdown não aparece mesmo com termo válido", () => {
-    mockSuggestions.current = { terms: [], categories: [] };
+    mockSuggestions.current = { terms: [], categories: [], merchants: [] };
     const { tree } = render();
     type(tree, "xyz");
     expect(tree.root.findAll((n) => n.props.testID === "search-suggestions")).toHaveLength(0);
+  });
+
+  it("só com mercados (sem termos/departamentos) o dropdown ainda aparece", () => {
+    mockSuggestions.current = {
+      terms: [],
+      categories: [],
+      merchants: [{ merchantId: "m1", name: "Atacadão", logoUrl: null, storeId: "s1" }],
+    };
+    const { tree } = render();
+    type(tree, "atac");
+    expect(
+      tree.root.findAll((n) => n.props.testID === "suggestion-merchant-m1").length,
+    ).toBeGreaterThan(0);
   });
 
   it("tap num termo dispara onSubmit com o termo", () => {
@@ -104,6 +125,30 @@ describe("SearchBar — sugestões (story 80)", () => {
       tree.root.findAll((n) => n.props.testID === "suggestion-category-mc1")[0].props.onPress();
     });
     expect(onSelectCategory).toHaveBeenCalledWith({ id: "mc1", name: "Mercearia" });
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  // Story 82: seção "Mercados" no dropdown.
+  it("ao digitar ≥ 2 caracteres mostra a seção de mercados", () => {
+    const { tree } = render();
+    type(tree, "atac");
+    expect(
+      tree.root.findAll((n) => n.props.testID === "suggestion-merchant-m1").length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("tap num mercado dispara onSelectMerchant (e não onSubmit)", () => {
+    const { tree, onSubmit, onSelectMerchant } = render();
+    type(tree, "atac");
+    act(() => {
+      tree.root.findAll((n) => n.props.testID === "suggestion-merchant-m1")[0].props.onPress();
+    });
+    expect(onSelectMerchant).toHaveBeenCalledWith({
+      merchantId: "m1",
+      name: "Atacadão",
+      logoUrl: null,
+      storeId: "s1",
+    });
     expect(onSubmit).not.toHaveBeenCalled();
   });
 });

@@ -147,10 +147,22 @@ describe("CatalogController delegação", () => {
     });
   });
 
-  it("suggest: delega searchSuggest com o termo do DTO (story 80)", () => {
+  it("suggest: delega searchSuggest com o termo do DTO, sem geo (story 80)", () => {
     const { controller, svc } = makeFullController();
     controller.suggest({ q: "arr" });
-    expect(svc.searchSuggest).toHaveBeenCalledWith("arr");
+    expect(svc.searchSuggest).toHaveBeenCalledWith("arr", undefined);
+  });
+
+  it("suggest: lat/lng do DTO viram geo p/ a loja mais próxima (story 82)", () => {
+    const { controller, svc } = makeFullController();
+    controller.suggest({ q: "atac", lat: -23.5, lng: -46.6 });
+    expect(svc.searchSuggest).toHaveBeenCalledWith("atac", { lat: -23.5, lng: -46.6 });
+  });
+
+  it("suggest: só lat (sem lng) → sem geo (story 82)", () => {
+    const { controller, svc } = makeFullController();
+    controller.suggest({ q: "atac", lat: -23.5 });
+    expect(svc.searchSuggest).toHaveBeenCalledWith("atac", undefined);
   });
 
   it("product: delega productDetail", () => {

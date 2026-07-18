@@ -60,6 +60,13 @@ describe("marketplace api module", () => {
     expect(request).toHaveBeenCalledWith("/search/suggest?q=arroz%20integral");
   });
 
+  it("searchSuggest anexa lat/lng quando há geo (story 82)", async () => {
+    const { request, mkt } = setup();
+    await mkt.searchSuggest("atac", { lat: -23.5, lng: -46.6, radiusKm: 10 });
+    // raio não se aplica às sugestões: só lat/lng são enviados.
+    expect(request).toHaveBeenCalledWith("/search/suggest?q=atac&lat=-23.5&lng=-46.6");
+  });
+
   it("searchGlobal monta q + geo + página (story 80)", async () => {
     const { request, mkt } = setup();
     await mkt.searchGlobal("arroz", { geo: { lat: -23.5, lng: -46.6, radiusKm: 10 }, page: 2 });

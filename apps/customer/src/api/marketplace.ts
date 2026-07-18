@@ -2,6 +2,7 @@ import type { ApiClient } from "@markethub/api-client";
 import type {
   NearbyStoreDTO,
   ReverseGeocodeResult,
+  SearchMerchantDTO,
   SearchResultItemDTO,
   SearchSuggestionsDTO,
   StoreReviewDTO,
@@ -18,6 +19,8 @@ export type { ReverseGeocodeResult } from "@markethub/types";
 export type { StoreReviewDTO, StoreReviewsPageDTO } from "@markethub/types";
 // Busca no marketplace: sugestões + item do resultado com loja (story 80).
 export type { SearchResultItemDTO, SearchSuggestionsDTO } from "@markethub/types";
+// Mercado (rede) encontrado pela busca — sugestões + tela de resultado (story 82).
+export type { SearchMerchantDTO as SearchMerchant } from "@markethub/types";
 
 export type SaleType = "unit" | "weight";
 
@@ -423,18 +426,29 @@ export function marketplace(api: ApiClient) {
       api.request<Paginated<ProductView>>(
         `/search?storeId=${storeId}&q=${encodeURIComponent(q)}`,
       ),
-    /** Sugestões conforme digita (story 80): termos + departamentos que casam. */
-    searchSuggest: (q: string) =>
-      api.request<SearchSuggestionsDTO>(`/search/suggest?q=${encodeURIComponent(q)}`),
+    /**
+     * Sugestões conforme digita (story 80): termos + departamentos + mercados que
+     * casam (story 82). `geo` opcional escolhe a loja visível mais próxima da rede
+     * sugerida (raio não se aplica às sugestões, então não é enviado).
+     */
+    searchSuggest: (q: string, geo?: GeoQuery) => {
+      const geoQ = geo ? `&lat=${geo.lat}&lng=${geo.lng}` : "";
+      return api.request<SearchSuggestionsDTO>(
+        `/search/suggest?q=${encodeURIComponent(q)}${geoQ}`,
+      );
+    },
     /**
      * Busca global paginada (story 80): produtos de todas as lojas próximas (mesmo
      * recorte geo da home). Item traz o mesmo card de entrega do feed (story 81):
      * mercado, frete, tempo e estado (`openNow`/`paused`), além de `storeId`/`storeName`.
+     * A página 1 ainda carrega `merchants` — redes cujo nome casa com o termo (story 82).
      */
     searchGlobal: (q: string, opts?: { geo?: GeoQuery; page?: number }) => {
       const qs = geoQs(new URLSearchParams({ q }), opts?.geo);
       if (opts?.page) qs.set("page", String(opts.page));
-      return api.request<Paginated<SearchResultItemDTO>>(`/search?${qs}`);
+      return api.request<Paginated<SearchResultItemDTO> & { merchants?: SearchMerchantDTO[] }>(
+        `/search?${qs}`,
+      );
     },
     sections: (storeId: string, geo?: GeoQuery) =>
       // auth opcional (story 34): com token, `store.following` reflete o usuário.

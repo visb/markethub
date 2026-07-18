@@ -104,6 +104,9 @@ export default function MarketplaceHome() {
         onSelectCategory={(c) =>
           router.push(`/category/${c.id}?name=${encodeURIComponent(c.name)}`)
         }
+        onSelectMerchant={(mm) =>
+          router.push(`/store/${mm.storeId}?name=${encodeURIComponent(mm.name)}`)
+        }
       />
 
       <CategoryMenu

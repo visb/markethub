@@ -9,6 +9,23 @@
 export interface SearchSuggestionsDTO {
   terms: string[];
   categories: { id: string; name: string }[];
+  /**
+   * Redes (merchants) cujo nome casa com o termo e têm ao menos uma loja visível
+   * (story 82). `storeId` é a loja visível mais próxima (com geo) ou a primeira
+   * visível (sem geo) — o tap na sugestão navega direto para ela.
+   */
+  merchants: SearchMerchantDTO[];
+}
+
+/**
+ * Mercado (rede) encontrado pela busca (story 82). Exibido nas sugestões e na tela
+ * de resultado; `storeId` é a loja de destino ao tocar (loja visível mais próxima).
+ */
+export interface SearchMerchantDTO {
+  merchantId: string;
+  name: string;
+  logoUrl: string | null;
+  storeId: string;
 }
 
 /**
