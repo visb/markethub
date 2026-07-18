@@ -22,7 +22,7 @@ jest.mock("expo-router", () => ({
 
 jest.mock("@/api/hooks/useDriverEarnings", () => ({
   useDriverEarnings: (...a: unknown[]) => mockUseEarnings(...a),
-  useDeliveryHistory: () => mockUseHistory(),
+  useDeliveryHistory: (...a: unknown[]) => mockUseHistory(...a),
 }));
 
 const earnings: DriverEarningsDTO = {
@@ -112,6 +112,16 @@ describe("EarningsScreen", () => {
     const chip30 = tree.root.findByProps({ testID: "period-30d" });
     act(() => chip30.props.onPress());
     expect(mockUseEarnings).toHaveBeenLastCalledWith("30d");
+  });
+
+  it("o histórico recebe o mesmo período do seletor (story 79)", () => {
+    const tree = render(<EarningsScreen />);
+    // histórico começa acompanhando os cards em "today"
+    expect(mockUseHistory).toHaveBeenLastCalledWith("today");
+    const chip7 = tree.root.findByProps({ testID: "period-7d" });
+    act(() => chip7.props.onPress());
+    // ao trocar o chip, o histórico refaz com o novo período (page 1 é do hook)
+    expect(mockUseHistory).toHaveBeenLastCalledWith("7d");
   });
 
   it("botão carregar mais chama loadMore quando há mais páginas", () => {

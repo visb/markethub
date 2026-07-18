@@ -220,12 +220,12 @@ describe("ApiClient — frota merchant + veículo do entregador", () => {
     expect(url(fetchMock, 1)).toBe("http://api.test/api/v1/driver/earnings?period=30d");
   });
 
-  it("driverDeliveryHistory: GET /driver/deliveries/history com a página (default 1)", async () => {
+  it("driverDeliveryHistory: GET /driver/deliveries/history com página e período (default 1, 30d)", async () => {
     const { client, fetchMock } = withFetch();
     await client.driverDeliveryHistory();
-    expect(url(fetchMock)).toBe("http://api.test/api/v1/driver/deliveries/history?page=1");
-    await client.driverDeliveryHistory(3);
-    expect(url(fetchMock, 1)).toBe("http://api.test/api/v1/driver/deliveries/history?page=3");
+    expect(url(fetchMock)).toBe("http://api.test/api/v1/driver/deliveries/history?page=1&period=30d");
+    await client.driverDeliveryHistory(3, "7d");
+    expect(url(fetchMock, 1)).toBe("http://api.test/api/v1/driver/deliveries/history?page=3&period=7d");
   });
 
   it("driverAvailability: GET /driver/availability (story 62)", async () => {

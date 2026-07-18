@@ -146,7 +146,7 @@ describe("DriverService.deliveryHistory", () => {
     const svc = makeService(prisma);
     const out = await svc.deliveryHistory("drv1");
     const args = deliveryFindMany.mock.calls[0][0];
-    expect(args.where).toEqual({ driverId: "drv1", status: { in: ["delivered", "canceled"] } });
+    expect(args.where).toMatchObject({ driverId: "drv1", status: { in: ["delivered", "canceled"] } });
     expect(args.orderBy).toEqual({ updatedAt: "desc" });
     expect(out.items).toHaveLength(1);
     expect(out.items[0]).toMatchObject({
@@ -246,5 +246,64 @@ describe("DriverService.deliveryHistory", () => {
     const out = await svc.deliveryHistory("drv1");
     expect(out.items[0].status).toBe("canceled");
     expect(out.items[0].date).toBe("2026-07-09T08:00:00.000Z");
+  });
+});
+
+describe("DriverService.deliveryHistory — recorte por período (story 79)", () => {
+  /** Extrai o `OR` do where para inspecionar a janela de recorte. */
+  function whereOr(deliveryFindMany: jest.Mock) {
+    return deliveryFindMany.mock.calls[0][0].where.OR as [
+      { status: string; deliveredAt: { gte: Date } },
+      { status: string; updatedAt: { gte: Date } },
+    ];
+  }
+
+  it("default 30d quando o período é omitido: recorta entregue por deliveredAt e cancelada por updatedAt", async () => {
+    const now = new Date();
+    const { prisma, deliveryFindMany } = makePrisma({ historyRows: [] });
+    const svc = makeService(prisma);
+    await svc.deliveryHistory("drv1");
+    const or = whereOr(deliveryFindMany);
+    expect(or[0]).toMatchObject({ status: "delivered" });
+    expect(or[1]).toMatchObject({ status: "canceled" });
+    // 30d ≈ agora − 30 dias (tolerância de 1min p/ o tempo de execução do teste)
+    const expected = now.getTime() - 30 * 24 * 60 * 60 * 1000;
+    expect(Math.abs(or[0].deliveredAt.gte.getTime() - expected)).toBeLessThan(60_000);
+    expect(or[1].updatedAt.gte.getTime()).toBe(or[0].deliveredAt.gte.getTime());
+  });
+
+  it("period=today corta em 00:00 do servidor (mesma janela dos cards)", async () => {
+    const { prisma, deliveryFindMany } = makePrisma({ historyRows: [] });
+    const svc = makeService(prisma);
+    await svc.deliveryHistory("drv1", 1, "today");
+    const or = whereOr(deliveryFindMany);
+    const start = or[0].deliveredAt.gte;
+    const expected = new Date();
+    expected.setHours(0, 0, 0, 0);
+    expect(start.getTime()).toBe(expected.getTime());
+    expect(start.getHours()).toBe(0);
+    expect(start.getMinutes()).toBe(0);
+  });
+
+  it("period=7d recorta entregue e cancelada por agora − 7 dias", async () => {
+    const now = Date.now();
+    const { prisma, deliveryFindMany } = makePrisma({ historyRows: [] });
+    const svc = makeService(prisma);
+    await svc.deliveryHistory("drv1", 1, "7d");
+    const or = whereOr(deliveryFindMany);
+    const expected = now - 7 * 24 * 60 * 60 * 1000;
+    expect(Math.abs(or[0].deliveredAt.gte.getTime() - expected)).toBeLessThan(60_000);
+    expect(or[1].updatedAt.gte.getTime()).toBe(or[0].deliveredAt.gte.getTime());
+  });
+
+  it("recorte convive com a paginação: page 2 mantém skip e o OR do período", async () => {
+    const { prisma, deliveryFindMany } = makePrisma({ historyRows: [] });
+    const svc = makeService(prisma);
+    const out = await svc.deliveryHistory("drv1", 2, "7d");
+    const args = deliveryFindMany.mock.calls[0][0];
+    expect(out.page).toBe(2);
+    expect(args.skip).toBe(20);
+    expect(args.where.OR).toHaveLength(2);
+    expect(args.where.driverId).toBe("drv1");
   });
 });

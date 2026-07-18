@@ -98,12 +98,13 @@ describe("DriverController", () => {
     expect(driver.earnings).toHaveBeenLastCalledWith("u1", "today");
   });
 
-  it("deliveryHistory: converte page para número (default 1)", () => {
+  it("deliveryHistory: converte page para número e repassa o período (default page 1, 30d)", () => {
     const { controller, driver } = makeController();
-    controller.deliveryHistory(user, "3");
-    expect(driver.deliveryHistory).toHaveBeenCalledWith("u1", 3);
-    controller.deliveryHistory(user, undefined);
-    expect(driver.deliveryHistory).toHaveBeenLastCalledWith("u1", 1);
+    controller.deliveryHistory(user, { page: "3", period: "7d" });
+    expect(driver.deliveryHistory).toHaveBeenCalledWith("u1", 3, "7d");
+    // sem query: page 1 e período 30d (compat, story 79)
+    controller.deliveryHistory(user, {});
+    expect(driver.deliveryHistory).toHaveBeenLastCalledWith("u1", 1, "30d");
   });
 
   // ── Seleção de veículo (story 15) ──

@@ -42,6 +42,11 @@ class EarningsQueryDto {
   @IsOptional() @IsIn(["today", "7d", "30d"]) period?: "today" | "7d" | "30d";
 }
 
+class DeliveryHistoryQueryDto {
+  @IsOptional() @IsIn(["today", "7d", "30d"]) period?: "today" | "7d" | "30d";
+  @IsOptional() @IsString() page?: string;
+}
+
 /** App do entregador (entrega própria): lojas, fila de entregas, coleta e entrega. */
 @Roles("driver")
 @Controller("driver")
@@ -93,10 +98,13 @@ export class DriverController {
     return this.driver.earnings(user.id, query.period ?? "today");
   }
 
-  /** Histórico paginado de entregas concluídas/canceladas do entregador (story 60). */
+  /**
+   * Histórico paginado de entregas concluídas/canceladas do entregador (story 60).
+   * Recorta pelo mesmo período dos cards (story 79); default `30d` sem o param.
+   */
   @Get("deliveries/history")
-  deliveryHistory(@CurrentUser() user: AuthUser, @Query("page") page?: string) {
-    return this.driver.deliveryHistory(user.id, page ? Number(page) : 1);
+  deliveryHistory(@CurrentUser() user: AuthUser, @Query() query: DeliveryHistoryQueryDto) {
+    return this.driver.deliveryHistory(user.id, query.page ? Number(query.page) : 1, query.period ?? "30d");
   }
 
   /** Aceita uma entrega do pool (auto-atribuição). */

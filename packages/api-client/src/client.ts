@@ -701,9 +701,12 @@ export class ApiClient {
     return this.request(`/driver/earnings?period=${period}`, { auth: true });
   }
 
-  /** Histórico paginado de entregas concluídas/canceladas do entregador (story 60). */
-  driverDeliveryHistory(page = 1): Promise<DeliveryHistoryPageDTO> {
-    return this.request(`/driver/deliveries/history?page=${page}`, { auth: true });
+  /**
+   * Histórico paginado de entregas concluídas/canceladas do entregador (story 60).
+   * Recorta pelo mesmo período dos cards de resumo (story 79); default `30d`.
+   */
+  driverDeliveryHistory(page = 1, period: EarningsPeriodDTO = "30d"): Promise<DeliveryHistoryPageDTO> {
+    return this.request(`/driver/deliveries/history?page=${page}&period=${period}`, { auth: true });
   }
 
   /**
