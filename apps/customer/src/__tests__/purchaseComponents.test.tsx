@@ -221,6 +221,12 @@ describe("MerchantLogo", () => {
 });
 
 describe("QtyStepper", () => {
+  /** Achata style (array/objeto do StyleSheet) num único objeto. */
+  function flatStyle(style: unknown): Record<string, unknown> {
+    if (Array.isArray(style)) return style.reduce((acc, s) => ({ ...acc, ...flatStyle(s) }), {});
+    return (style as Record<string, unknown>) ?? {};
+  }
+
   it("dispara onDec/onInc", () => {
     const onDec = jest.fn();
     const onInc = jest.fn();
@@ -228,6 +234,36 @@ describe("QtyStepper", () => {
     onPressNodes(tree).forEach((p) => act(() => p.props.onPress()));
     expect(onDec).toHaveBeenCalled();
     expect(onInc).toHaveBeenCalled();
+  });
+
+  it("caixa com altura 40 (paridade com Button sm)", () => {
+    const tree = render(<QtyStepper label="2" onDec={jest.fn()} onInc={jest.fn()} />);
+    // a caixa é o View raiz (sem onPress) que contém os botões
+    const box = tree.root.find(
+      (n) => String(n.type) === "View" && flatStyle(n.props.style).flexDirection === "row",
+    );
+    expect(flatStyle(box.props.style).height).toBe(40);
+  });
+
+  it("botões −/+ são quadrados 40×40", () => {
+    const tree = render(<QtyStepper label="2" onDec={jest.fn()} onInc={jest.fn()} />);
+    const btns = onPressNodes(tree);
+    expect(btns.length).toBeGreaterThanOrEqual(2);
+    btns.forEach((b) => {
+      const s = flatStyle(b.props.style);
+      expect(s.width).toBe(40);
+      expect(s.height).toBe(40);
+    });
+  });
+
+  it("valor central usa flex 1 (ocupa o meio entre os botões)", () => {
+    const tree = render(<QtyStepper label="2" onDec={jest.fn()} onInc={jest.fn()} />);
+    const value = tree.root.find(
+      (n) => String(n.type) === "View" && flatStyle(n.props.style).borderLeftWidth === 1,
+    );
+    const s = flatStyle(value.props.style);
+    expect(s.flex).toBe(1);
+    expect(s.minWidth).toBeUndefined();
   });
 });
 
