@@ -223,21 +223,28 @@ export class AdminDashboardService {
       filter.from || filter.to
         ? { ...(filter.from ? { gte: filter.from } : {}), ...(filter.to ? { lte: filter.to } : {}) }
         : undefined;
-    const rows = await this.prisma.tip.groupBy({
-      by: ["driverId"],
-      where: { status: "paid", ...(paidRange ? { paidAt: paidRange } : {}) },
+    // Gorjeta do entregador é o TipItem (target=driver), com status/data do Tip
+    // (story 77). Agrupa pelo alvo entregador para não contar plataforma/mercado.
+    const rows = await this.prisma.tipItem.groupBy({
+      by: ["targetDriverId"],
+      where: {
+        target: "driver",
+        targetDriverId: { not: null },
+        tip: { status: "paid", ...(paidRange ? { paidAt: paidRange } : {}) },
+      },
       _sum: { amountCents: true },
       _count: { _all: true },
     });
+    const driverIds = rows.map((r) => r.targetDriverId).filter((id): id is string => !!id);
     const drivers = await this.prisma.user.findMany({
-      where: { id: { in: rows.map((r) => r.driverId) } },
+      where: { id: { in: driverIds } },
       select: { id: true, name: true },
     });
     const nameById = new Map(drivers.map((d) => [d.id, d.name]));
     return rows
       .map((r) => ({
-        driverId: r.driverId,
-        driverName: nameById.get(r.driverId) ?? r.driverId,
+        driverId: r.targetDriverId!,
+        driverName: nameById.get(r.targetDriverId!) ?? r.targetDriverId!,
         totalCents: r._sum.amountCents ?? 0,
         count: r._count._all,
       }))

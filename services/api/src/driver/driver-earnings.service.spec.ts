@@ -1,13 +1,14 @@
 import { DriverService, earningsPeriodStart } from "./driver.service";
 
 /**
- * Story 60 — ganhos (gorjetas) e histórico do entregador. Testa a agregação:
- * gorjeta paga soma, pendente aparece separada, o período filtra por `paidAt` e o
- * entregador só vê o seu; e o histórico: paginação (hasMore), só delivered/canceled
- * e gorjeta anexada. Prisma mockado — sem rede/DB.
+ * Story 60 + 77 — ganhos (gorjetas) e histórico do entregador. Desde a story 77 a
+ * gorjeta do entregador é um TipItem (target=driver) e a agregação passa a somar os
+ * itens do próprio driver com status/data herdados do Tip. Testa: item pago soma,
+ * pendente aparece separado, filtro por alvo/driver/período; e o histórico: paginação
+ * (hasMore), só delivered/canceled e gorjeta anexada. Prisma mockado — sem rede/DB.
  */
 
-type TipAggArgs = { where: Record<string, unknown> };
+type TipAggArgs = { where: { tip?: { status?: string } } & Record<string, unknown> };
 
 function makePrisma(over: {
   paidSum?: number | null;
@@ -16,8 +17,8 @@ function makePrisma(over: {
   deliveredCount?: number;
   historyRows?: unknown[];
 } = {}) {
-  const tipAggregate = jest.fn((args: TipAggArgs) => {
-    const status = (args.where as { status?: string }).status;
+  const tipItemAggregate = jest.fn((args: TipAggArgs) => {
+    const status = args.where.tip?.status;
     if (status === "paid") {
       return Promise.resolve({ _sum: { amountCents: over.paidSum ?? 0 }, _count: { _all: over.paidCount ?? 0 } });
     }
@@ -26,10 +27,10 @@ function makePrisma(over: {
   const deliveryCount = jest.fn().mockResolvedValue(over.deliveredCount ?? 0);
   const deliveryFindMany = jest.fn().mockResolvedValue(over.historyRows ?? []);
   const prisma = {
-    tip: { aggregate: tipAggregate },
+    tipItem: { aggregate: tipItemAggregate },
     delivery: { count: deliveryCount, findMany: deliveryFindMany },
   } as never;
-  return { prisma, tipAggregate, deliveryCount, deliveryFindMany };
+  return { prisma, tipItemAggregate, deliveryCount, deliveryFindMany };
 }
 
 function makeService(prisma: unknown) {
@@ -74,15 +75,36 @@ describe("DriverService.earnings", () => {
     expect(out.tipsPendingCents).toBe(700);
   });
 
-  it("filtra as gorjetas pagas por driverId e paidAt no período", async () => {
-    const { prisma, tipAggregate } = makePrisma();
+  it("soma só o item driver do próprio entregador com Tip pago no período", async () => {
+    const { prisma, tipItemAggregate } = makePrisma();
     const svc = makeService(prisma);
     await svc.earnings("drv1", "30d");
-    const paidCall = tipAggregate.mock.calls.find((c) => (c[0].where as { status?: string }).status === "paid");
-    const where = paidCall![0].where as { driverId: string; status: string; paidAt: { gte: Date } };
-    expect(where.driverId).toBe("drv1");
-    expect(where.status).toBe("paid");
-    expect(where.paidAt.gte).toBeInstanceOf(Date);
+    const paidCall = tipItemAggregate.mock.calls.find((c) => c[0].where.tip?.status === "paid");
+    const where = paidCall![0].where as {
+      target: string;
+      targetDriverId: string;
+      tip: { status: string; paidAt: { gte: Date } };
+    };
+    expect(where.target).toBe("driver");
+    expect(where.targetDriverId).toBe("drv1");
+    expect(where.tip.status).toBe("paid");
+    expect(where.tip.paidAt.gte).toBeInstanceOf(Date);
+  });
+
+  it("pendente filtra o item driver por Tip pendente e createdAt (não soma no pago)", async () => {
+    const { prisma, tipItemAggregate } = makePrisma();
+    const svc = makeService(prisma);
+    await svc.earnings("drv1", "7d");
+    const pendingCall = tipItemAggregate.mock.calls.find((c) => c[0].where.tip?.status === "pending");
+    const where = pendingCall![0].where as {
+      target: string;
+      targetDriverId: string;
+      tip: { status: string; createdAt: { gte: Date } };
+    };
+    expect(where.target).toBe("driver");
+    expect(where.targetDriverId).toBe("drv1");
+    expect(where.tip.status).toBe("pending");
+    expect(where.tip.createdAt.gte).toBeInstanceOf(Date);
   });
 
   it("as entregas concluídas contam só delivered do próprio driver no período", async () => {
@@ -111,7 +133,7 @@ function mkRow(over: Partial<Record<string, unknown>> = {}) {
       store: { name: "Loja" },
       order: {
         addressSnapshot: { district: "Centro", city: "Sampa" },
-        tip: { amountCents: 500, status: "paid", driverId: "drv1" },
+        tip: { status: "paid", items: [{ amountCents: 500, targetDriverId: "drv1" }] },
       },
     },
     ...over,
@@ -170,12 +192,15 @@ describe("DriverService.deliveryHistory", () => {
     expect(deliveryFindMany.mock.calls[0][0].skip).toBe(0);
   });
 
-  it("não anexa gorjeta de outro entregador (pedido multi-loja)", async () => {
+  it("não anexa gorjeta quando o item driver é de outro entregador (multi-loja)", async () => {
     const row = mkRow({
       orderGroup: {
         orderId: "o1",
         store: { name: "Loja" },
-        order: { addressSnapshot: null, tip: { amountCents: 500, status: "paid", driverId: "outro" } },
+        order: {
+          addressSnapshot: null,
+          tip: { status: "paid", items: [{ amountCents: 500, targetDriverId: "outro" }] },
+        },
       },
     });
     const { prisma } = makePrisma({ historyRows: [row] });
@@ -183,6 +208,23 @@ describe("DriverService.deliveryHistory", () => {
     const out = await svc.deliveryHistory("drv1");
     expect(out.items[0].tip).toBeUndefined();
     expect(out.items[0].destinationArea).toBeUndefined();
+  });
+
+  it("anexa a gorjeta legada/backfill (item driver deste entregador)", async () => {
+    const row = mkRow({
+      orderGroup: {
+        orderId: "o2",
+        store: { name: "Loja" },
+        order: {
+          addressSnapshot: null,
+          tip: { status: "paid", items: [{ amountCents: 300, targetDriverId: "drv1" }] },
+        },
+      },
+    });
+    const { prisma } = makePrisma({ historyRows: [row] });
+    const svc = makeService(prisma);
+    const out = await svc.deliveryHistory("drv1");
+    expect(out.items[0].tip).toEqual({ amountCents: 300, status: "paid" });
   });
 
   it("tolera loja/pedido ausentes no include (defensivo)", async () => {

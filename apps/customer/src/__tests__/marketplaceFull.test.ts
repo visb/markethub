@@ -188,16 +188,19 @@ describe("marketplace api — reviews, tip e pagamento", () => {
     });
   });
 
-  it("tip / createTip / mockPayTip", async () => {
+  it("tip / tipTargets / createTip / mockPayTip", async () => {
     const { request, mkt } = setup();
+    const items = [{ target: "platform" as const, amountCents: 500 }];
     await mkt.tip("ord1");
-    await mkt.createTip("ord1", 500);
+    await mkt.tipTargets("ord1");
+    await mkt.createTip("ord1", items);
     await mkt.mockPayTip("ord1");
     expect(request).toHaveBeenCalledWith("/orders/ord1/tip", { auth: true });
+    expect(request).toHaveBeenCalledWith("/orders/ord1/tip/targets", { auth: true });
     expect(request).toHaveBeenCalledWith("/orders/ord1/tip", {
       method: "POST",
       auth: true,
-      body: { amountCents: 500 },
+      body: { items },
     });
     expect(request).toHaveBeenCalledWith("/orders/ord1/tip/mock-pay", { method: "POST", auth: true });
   });

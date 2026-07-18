@@ -4,15 +4,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Button, Text, colors, radius, spacing } from "@markethub/ui";
-import {
-  brl,
-  marketplace,
-  type OrderTracking,
-  type Review,
-  type TipView,
-} from "@/api/marketplace";
+import { brl, marketplace, type OrderTracking, type Review } from "@/api/marketplace";
 import { useAuth } from "@/auth-context";
-import { QtyStepper } from "@/components/QtyStepper";
+import { useTip } from "@/api/hooks/useTip";
+import { TipForm } from "@/components/TipForm";
 
 /** Linha de avaliação da tela "Tudo certo!" (ref: Order Completed.jpg). */
 interface AxisRow {
@@ -22,8 +17,6 @@ interface AxisRow {
   axis: "platform" | "delivery" | "merchant";
   merchantId?: string;
 }
-
-const TIP_STEP_CENTS = 100;
 
 function Stars({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   return (
@@ -51,23 +44,18 @@ export default function ReviewScreen() {
   const [done, setDone] = useState<Review[]>([]);
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [comment, setComment] = useState("");
-  const [tipChecked, setTipChecked] = useState(false);
-  const [tipCents, setTipCents] = useState(200);
-  const [tip, setTip] = useState<TipView | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [finished, setFinished] = useState(false);
+
+  // Gorjeta individual por alvo (story 77) — server-state via React Query.
+  const { targets, tip, busy: tipBusy, createTip, payTip } = useTip(id);
 
   const load = useCallback(async () => {
     try {
       const [t, reviews] = await Promise.all([mkt.tracking(id), mkt.reviews(id)]);
       setTracking(t);
       setDone(reviews);
-      try {
-        setTip(await mkt.tip(id));
-      } catch {
-        /* sem gorjeta ainda */
-      }
     } finally {
       setLoading(false);
     }
@@ -122,7 +110,7 @@ export default function ReviewScreen() {
     );
 
   const pendingRated = rows.filter((r) => !doneFor(r) && (ratings[r.key] ?? 0) > 0);
-  const canConclude = pendingRated.length > 0 || (tipChecked && !tip);
+  const canConclude = pendingRated.length > 0;
 
   async function conclude() {
     setBusy(true);
@@ -136,20 +124,7 @@ export default function ReviewScreen() {
         });
         setDone((d) => [...d, r]);
       }
-      if (tipChecked && !tip && tipCents > 0) {
-        setTip(await mkt.createTip(id, tipCents));
-      }
       setFinished(true);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function payTip() {
-    setBusy(true);
-    try {
-      await mkt.mockPayTip(id);
-      setTip(await mkt.tip(id));
     } finally {
       setBusy(false);
     }
@@ -180,25 +155,6 @@ export default function ReviewScreen() {
           <Text muted>Avalie sua experiência</Text>
         </View>
 
-        {/* Gorjeta ao entregador (S5.2) — só com entrega própria */}
-        {tracking?.hasDelivery && driver && !tip && (
-          <View style={styles.tipRow}>
-            <Pressable style={styles.checkboxRow} onPress={() => setTipChecked((v) => !v)}>
-              <View style={[styles.checkbox, tipChecked && styles.checkboxOn]}>
-                {tipChecked && <Ionicons name="checkmark" size={14} color={colors.white} />}
-              </View>
-              <Text style={{ color: colors.primary, fontWeight: "700" }}>Gorjeta</Text>
-            </Pressable>
-            {tipChecked && (
-              <QtyStepper
-                label={brl(tipCents)}
-                onDec={() => setTipCents((c) => Math.max(TIP_STEP_CENTS, c - TIP_STEP_CENTS))}
-                onInc={() => setTipCents((c) => c + TIP_STEP_CENTS)}
-              />
-            )}
-          </View>
-        )}
-
         {rows.map((row) => {
           const existing = doneFor(row);
           return (
@@ -227,14 +183,17 @@ export default function ReviewScreen() {
           onChangeText={setComment}
         />
 
-        {/* Cobrança da gorjeta após o Concluir */}
+        {/* Gorjeta individual por alvo (story 77) — só antes de criada. */}
+        {targets && !tip && <TipForm targets={targets} submitting={tipBusy} onSubmit={createTip} />}
+
+        {/* Cobrança da gorjeta após "Dar gorjeta". */}
         {tip && tip.status !== "paid" && tip.qrCode && (
           <View style={styles.tipPayCard}>
             <Text variant="caption" muted>
-              Gorjeta de {brl(tip.amountCents)} para {driver} — pague via PIX:
+              Gorjeta de {brl(tip.amountCents)} — pague via PIX:
             </Text>
             <Text selectable style={styles.tipQr}>{tip.qrCode}</Text>
-            <Button title="Já paguei (simular)" size="sm" disabled={busy} onPress={payTip} />
+            <Button title="Já paguei (simular)" size="sm" disabled={tipBusy} onPress={() => void payTip()} />
           </View>
         )}
         {tip?.status === "paid" && (
@@ -272,23 +231,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  tipRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    gap: spacing.md,
-  },
-  checkboxRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: radius.sm,
-    borderWidth: 2,
-    borderColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  checkboxOn: { backgroundColor: colors.primary },
   input: {
     borderWidth: 1,
     borderColor: colors.border,

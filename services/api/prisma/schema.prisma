@@ -959,6 +959,13 @@ enum TipStatus {
   failed // cobrança falhou/expirou
 }
 
+// Alvo de um item de gorjeta (story 77): a gorjeta virou individual por alvo.
+enum TipTarget {
+  platform // gorjeta à plataforma MarketHub
+  driver // gorjeta ao entregador (só quando houve entrega)
+  merchant // gorjeta a um mercado do pedido
+}
+
 model Review {
   id               String     @id @default(cuid())
   order            Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -987,13 +994,17 @@ model Review {
   @@map("reviews")
 }
 
+// Gorjeta do pedido (story 77): agregado de cobrança. Uma cobrança PIX por pedido
+// soma os itens (plataforma/entregador/mercados). driverId legado passa a nullable —
+// o alvo entregador agora vive num TipItem (target=driver). Migration backfilla os
+// tips existentes com um TipItem driver de mesmo valor.
 model Tip {
   id               String    @id @default(cuid())
   order            Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
   orderId          String    @unique
-  driver           User      @relation("DriverTips", fields: [driverId], references: [id])
-  driverId         String
-  amountCents      Int
+  driver           User?     @relation("DriverTips", fields: [driverId], references: [id])
+  driverId         String?
+  amountCents      Int // total (soma dos itens)
   status           TipStatus @default(pending)
   provider         String // "pagarme" | "mock"
   providerChargeId String?
@@ -1004,9 +1015,30 @@ model Tip {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
+  items TipItem[]
+
   @@index([driverId, status])
   @@index([providerChargeId])
   @@map("tips")
+}
+
+// Item individual da gorjeta (story 77): um valor por alvo (plataforma, entregador
+// ou um mercado do pedido). Alvos são weak refs (sem FK) no padrão do Review — o
+// histórico não pode quebrar se o usuário/loja mudar. O status/pagamento herda do Tip.
+model TipItem {
+  id               String    @id @default(cuid())
+  tip              Tip       @relation(fields: [tipId], references: [id], onDelete: Cascade)
+  tipId            String
+  target           TipTarget
+  // alvo weak ref conforme o target: driver → targetDriverId; merchant → targetMerchantId
+  targetDriverId   String?
+  targetMerchantId String?
+  amountCents      Int
+  createdAt        DateTime  @default(now())
+
+  @@index([tipId])
+  @@index([target, targetDriverId])
+  @@map("tip_items")
 }
 
 // ─────────────────────────────────────────────────────────────

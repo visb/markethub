@@ -32,15 +32,22 @@ export class ReviewsAggregateService {
     return { rating, tips };
   }
 
-  /** Total de gorjetas pagas por entregador (opcional período). */
+  /**
+   * Total de gorjetas pagas por entregador (opcional período). Desde a story 77 a
+   * gorjeta do entregador é o TipItem (target=driver) — soma só a fatia dele, com o
+   * status/`paidAt` herdados do Tip agregado (legado coberto pelo backfill).
+   */
   async tipsTotal(driverId: string, range?: { from?: Date; to?: Date }) {
-    const agg = await this.prisma.tip.aggregate({
+    const agg = await this.prisma.tipItem.aggregate({
       where: {
-        driverId,
-        status: "paid",
-        ...(range?.from || range?.to
-          ? { paidAt: { ...(range.from ? { gte: range.from } : {}), ...(range.to ? { lte: range.to } : {}) } }
-          : {}),
+        target: "driver",
+        targetDriverId: driverId,
+        tip: {
+          status: "paid",
+          ...(range?.from || range?.to
+            ? { paidAt: { ...(range.from ? { gte: range.from } : {}), ...(range.to ? { lte: range.to } : {}) } }
+            : {}),
+        },
       },
       _sum: { amountCents: true },
       _count: { _all: true },

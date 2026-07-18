@@ -3,6 +3,9 @@
 export type ReviewAxisDTO = "platform" | "delivery" | "merchant";
 export type TipStatusDTO = "pending" | "paid" | "failed";
 
+/** Alvo de um item de gorjeta (story 77): plataforma, entregador ou um mercado. */
+export type TipTargetDTO = "platform" | "driver" | "merchant";
+
 export interface ReviewDTO {
   id: string;
   orderId: string;
@@ -20,16 +23,51 @@ export interface CreateReviewInput {
   comment?: string;
 }
 
+/** Item individual da gorjeta (story 77): valor de um alvo do pedido. */
+export interface TipItemDTO {
+  target: TipTargetDTO;
+  targetDriverId: string | null;
+  targetMerchantId: string | null;
+  amountCents: number;
+}
+
+/** Item de gorjeta enviado pelo cliente ao criar a cobrança (story 77). */
+export interface TipItemInputDTO {
+  target: TipTargetDTO;
+  /** merchant → merchantId; platform/driver dispensam. */
+  targetId?: string;
+  amountCents: number;
+}
+
+/** Corpo do POST de gorjeta multi-alvo (story 77): uma cobrança PIX do total. */
+export interface CreateTipInput {
+  items: TipItemInputDTO[];
+}
+
+/**
+ * Gorjeta do pedido (story 77): agregado de cobrança (total + PIX) com os itens por
+ * alvo. `driverId` legado segue exposto (nullable) por compat.
+ */
 export interface TipDTO {
   id: string;
   orderId: string;
-  driverId: string;
-  amountCents: number;
+  driverId: string | null;
+  amountCents: number; // total (soma dos itens)
   status: TipStatusDTO;
   qrCode: string | null;
   qrCodeUrl: string | null;
   expiresAt: string | null;
   paidAt: string | null;
+  items: TipItemDTO[];
+}
+
+/** Alvos possíveis da gorjeta do pedido (story 77) — o app monta as linhas a partir daqui. */
+export interface TipTargetsDTO {
+  orderId: string;
+  /** Houve entrega própria (há entregador) — habilita a linha "Entregador". */
+  hasDelivery: boolean;
+  driverName: string | null;
+  merchants: { merchantId: string; merchantName: string }[];
 }
 
 /** Média de avaliações agregada por eixo/alvo (admin/merchant). */
