@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ApiClient } from "@markethub/api-client";
 import {
   useAddCartItem,
+  useAddFavoriteToCart,
   useFavorites,
   useProductDetail,
   useToggleFavorite,
@@ -173,6 +174,28 @@ describe("useAddCartItem (story 31)", () => {
       await result.current!.mutateAsync({ offerId: "off1", quantity: 2, note: "x" });
     });
     expect(mockAddItem).toHaveBeenCalledWith({ offerId: "off1", quantity: 2, note: "x" });
+    unmount();
+  });
+});
+
+describe("useAddFavoriteToCart (story 83)", () => {
+  it("produto por unidade → addItem com quantity 1", async () => {
+    const { result, unmount } = renderHook(() => useAddFavoriteToCart());
+    const fav = { offerId: "off1", product: { saleType: "unit" } } as FavoriteView;
+    await act(async () => {
+      await result.current!.mutateAsync(fav);
+    });
+    expect(mockAddItem).toHaveBeenCalledWith({ offerId: "off1", quantity: 1 });
+    unmount();
+  });
+
+  it("produto por peso → addItem com weightGrams 300", async () => {
+    const { result, unmount } = renderHook(() => useAddFavoriteToCart());
+    const fav = { offerId: "off2", product: { saleType: "weight" } } as FavoriteView;
+    await act(async () => {
+      await result.current!.mutateAsync(fav);
+    });
+    expect(mockAddItem).toHaveBeenCalledWith({ offerId: "off2", weightGrams: 300 });
     unmount();
   });
 });
