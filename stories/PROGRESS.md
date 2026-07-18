@@ -13,7 +13,7 @@ Cuidados da rodada:
 | 73 | Cupons — título e descrição | — | done |
 | 74 | Cupons disponíveis no carrinho (seleção) | 73 | done |
 | 75 | Endereço — lat/lng exata ao salvar (provider Google) | — | done |
-| 76 | "Usar minha localização" — reverse geocode via backend | 75 | todo |
+| 76 | "Usar minha localização" — reverse geocode via backend | 75 | done |
 | 77 | Gorjeta individual por alvo (plataforma/entregador/mercado) | — | todo |
 | 78 | Perfil — "Meus dados" e "Segurança" como itens de menu | — | todo |
 | 79 | Driver /earnings — histórico respeita o filtro de período | — | todo |
@@ -26,3 +26,4 @@ Cuidados da rodada:
 [OK] 73 — testes: api 1479, admin 188, merchant 323, types 46, api-client 70 — commit: ff845d1 — merge: 8eeefac — 2026-07-17
 [OK] 74 — testes: api 1495, customer 315, types 50 — commit: 14a013f — merge: 2e5ab05 — 2026-07-17
 [OK] 75 — testes: api 1508, customer 317 — commit: 82670af — merge: 12fc30e — 2026-07-18 — PENDENTE-MANUAL: ativar GEOCODING_PROVIDER=google + GOOGLE_MAPS_API_KEY real (provider mockado nos testes)
+[OK] 76 — testes: api 1529, customer 317, api-client 70 — commit: b34f111 — merge: e20ccad — 2026-07-18 — PENDENTE-MANUAL: herda key Google da 75
