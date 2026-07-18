@@ -1,7 +1,9 @@
 import { Logger, Module } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { Env } from "../config/env";
+import { GeocodingController } from "./geocoding.controller";
 import { GEOCODING_PROVIDER, type GeocodingProvider } from "./geocoding-provider.interface";
+import { GeocodingService } from "./geocoding.service";
 import { GoogleGeocodingProvider } from "./providers/google.geocoding-provider";
 import { MockGeocodingProvider } from "./providers/mock.geocoding-provider";
 import { NominatimGeocodingProvider } from "./providers/nominatim.geocoding-provider";
@@ -31,9 +33,11 @@ export function createGeocodingProvider(config: ConfigService<Env, true>): Geoco
   return new MockGeocodingProvider();
 }
 
-/** Geocodificação direta (S6.2): provider escolhido por env, mock em dev. */
+/** Geocodificação direta (S6.2) + reversa (story 76): provider por env, mock em dev. */
 @Module({
+  controllers: [GeocodingController],
   providers: [
+    GeocodingService,
     {
       provide: GEOCODING_PROVIDER,
       inject: [ConfigService],

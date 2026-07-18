@@ -16,18 +16,20 @@ jest.mock("expo-location", () => ({
   Accuracy: { Balanced: 3 },
   requestForegroundPermissionsAsync: jest.fn(),
   getCurrentPositionAsync: jest.fn(),
-  reverseGeocodeAsync: jest.fn(),
 }));
 
+// Reverse geocode via backend (story 76): `mkt.reverseGeocode` bate em
+// `/geocoding/reverse` — retorno controlado por teste (default: null).
+let reverseResult: unknown = null;
 const mockRequest = jest.fn((url: string) => {
   if (url === "/coverage/cities") return Promise.resolve([{ city: "Curitiba", state: "PR" }]);
+  if (url.startsWith("/geocoding/reverse")) return Promise.resolve(reverseResult);
   return Promise.resolve({});
 });
 jest.mock("../auth-context", () => ({ useAuth: () => ({ api: { request: mockRequest } }) }));
 
 const reqPerm = Location.requestForegroundPermissionsAsync as jest.Mock;
 const getPos = Location.getCurrentPositionAsync as jest.Mock;
-const reverse = Location.reverseGeocodeAsync as jest.Mock;
 
 async function mountForm(props: Partial<React.ComponentProps<typeof AddressForm>> = {}) {
   const onSubmit = jest.fn();
@@ -60,7 +62,7 @@ beforeEach(() => {
   mockRequest.mockClear();
   reqPerm.mockReset();
   getPos.mockReset();
-  reverse.mockReset();
+  reverseResult = null;
   (globalThis as { fetch?: unknown }).fetch = jest.fn();
 });
 
@@ -142,30 +144,50 @@ describe("AddressForm — usar minha localização (GPS)", () => {
     expect(json(tree)).toContain("Permissão de localização negada");
   });
 
-  it("sucesso preenche os campos a partir do reverse geocode (estado por extenso → UF)", async () => {
+  it("sucesso chama o backend com as coords do GPS e preenche o form (story 76)", async () => {
     reqPerm.mockResolvedValue({ granted: true });
     getPos.mockResolvedValue({ coords: { latitude: -25.4, longitude: -49.2 } });
-    reverse.mockResolvedValue([
-      { street: "Rua B", streetNumber: "10", district: "Centro", city: "Curitiba", region: "Paraná", postalCode: "80010-000" },
-    ]);
+    reverseResult = {
+      street: "Rua B",
+      number: "10",
+      district: "Centro",
+      city: "Curitiba",
+      state: "PR",
+      zipCode: "80010-000",
+    };
     const { tree } = await mountForm();
     await act(async () => {
       await gps(tree).props.onPress();
     });
+    expect(mockRequest).toHaveBeenCalledWith(
+      "/geocoding/reverse?lat=-25.4&lng=-49.2",
+      { auth: true },
+    );
     const j = json(tree);
     expect(j).toContain("Rua B");
     expect(j).toContain("Curitiba");
   });
 
-  it("reverse sem resultado mostra erro", async () => {
+  it("backend retorna null → erro amigável + coords do GPS preservadas no form", async () => {
     reqPerm.mockResolvedValue({ granted: true });
-    getPos.mockResolvedValue({ coords: { latitude: 0, longitude: 0 } });
-    reverse.mockResolvedValue([]);
-    const { tree } = await mountForm();
+    getPos.mockResolvedValue({ coords: { latitude: -25.4, longitude: -49.2 } });
+    reverseResult = null;
+    const onSubmit = jest.fn();
+    const { tree } = await mountForm({
+      initial: { street: "Rua Preenchida", number: "5", city: "Curitiba", state: "PR", zipCode: "80000-000" },
+      onSubmit,
+    });
     await act(async () => {
       await gps(tree).props.onPress();
     });
     expect(json(tree)).toContain("Não foi possível identificar o endereço");
+    // coords do GPS entram no form mesmo sem endereço resolvido
+    await act(async () => {
+      await submitBtn(tree).props.onPress();
+    });
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ latitude: -25.4, longitude: -49.2 }),
+    );
   });
 
   it("exceção no GPS mostra erro de falha", async () => {
