@@ -79,8 +79,11 @@ git switch -c story/NN-{slug}
 
 1. **Reler estado:** ledger + `git log`. Unidades com commit/hash = prontas; pular.
 2. **Se a sessão estiver no limite** (`You've hit your session limit · resets <hora>`): **não fazer
-   nada**, encerrar o turno. O `/loop` (intervalo fixo) redispara depois do reset e retoma sozinho —
-   não rearmar nada. (Encher a **janela de contexto** é outro caso: há auto-compactação e segue no
+   nada**, encerrar o turno. Os disparos do `/loop` ficam enfileirados e retomam após o reset —
+   não rearmar nada. **Atenção:** o CLI atual bloqueia num prompt interativo ao bater o limite; a
+   fila só anda depois de um humano interagir (1 tecla). Sem setting p/ auto-retomar (verificado
+   2026-07-18) — run atravessando reset sem humano presente: usar `/schedule` cloud ou créditos de
+   extra usage. (Encher a **janela de contexto** é outro caso: há auto-compactação e segue no
    mesmo turno.)
 3. **Caso contrário:** escolher a próxima unidade `todo`/`in_progress` na ordem (respeitando deps
    rígidas), disparar `markethub-implementer` com o plano + branch. Ao receber o recibo: se OK e

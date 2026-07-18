@@ -1,51 +1,27 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback } from "react";
 import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { Button, Text, colors, radius, spacing } from "@markethub/ui";
-import { useAuth } from "@/auth-context";
-import { brl, marketplace, type FavoriteView } from "@/api/marketplace";
+import { brl, type FavoriteView } from "@/api/marketplace";
+import { useAddFavoriteToCart, useFavorites } from "@/api/hooks/useProductDetail";
 import { Header } from "@/components/Header";
 import { MerchantLogo } from "@/components/MerchantLogo";
 
 /** Lista de favoritos (S6.5): ofertas salvas, abre o detalhe e adiciona ao carrinho direto. */
 export default function FavoritesScreen() {
-  const { api } = useAuth();
-  const mkt = marketplace(api);
   const router = useRouter();
-  const [items, setItems] = useState<FavoriteView[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState<string | null>(null);
+  const { favorites, loading } = useFavorites();
+  const addToCart = useAddFavoriteToCart();
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      setItems(await mkt.favorites());
-    } finally {
-      setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  async function add(fav: FavoriteView) {
-    if (busy) return;
-    setBusy(fav.offerId);
-    try {
-      if (fav.product.saleType === "weight") {
-        await mkt.addItem({ offerId: fav.offerId, weightGrams: 300 });
-      } else {
-        await mkt.addItem({ offerId: fav.offerId, quantity: 1 });
-      }
-      router.push("/cart");
-    } finally {
-      setBusy(null);
-    }
-  }
+  const add = useCallback(
+    (fav: FavoriteView) => {
+      if (addToCart.isPending) return;
+      addToCart.mutate(fav, { onSuccess: () => router.push("/cart") });
+    },
+    [addToCart, router],
+  );
 
   return (
     <SafeAreaView style={styles.flex} edges={["top"]}>
@@ -54,7 +30,7 @@ export default function FavoritesScreen() {
         <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
       ) : (
         <FlatList
-          data={items}
+          data={favorites}
           keyExtractor={(f) => f.offerId}
           contentContainerStyle={{ padding: spacing.md }}
           ListEmptyComponent={
@@ -81,7 +57,7 @@ export default function FavoritesScreen() {
                   <View style={styles.storeRow}>
                     <MerchantLogo name={item.store.merchantName} logoUrl={item.store.merchantLogoUrl} size={18} />
                     <Text variant="caption" muted numberOfLines={1} style={{ flex: 1 }}>
-                      {item.store.name}
+                      {item.store.merchantName}
                     </Text>
                   </View>
                   {item.available ? (
@@ -104,8 +80,11 @@ export default function FavoritesScreen() {
                   <Button
                     title="Adicionar"
                     size="sm"
-                    disabled={!item.available || busy === item.offerId}
-                    onPress={() => void add(item)}
+                    disabled={
+                      !item.available ||
+                      (addToCart.isPending && addToCart.variables?.offerId === item.offerId)
+                    }
+                    onPress={() => add(item)}
                   />
                 </View>
               </Pressable>

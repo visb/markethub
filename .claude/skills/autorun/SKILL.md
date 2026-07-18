@@ -12,6 +12,12 @@ próprio contexto, **não** dá push, **não** abre PR, **não** pergunta nada d
 
 > Substitui o mecanismo antigo de Windows Task Scheduler (`phase-7-quality/run-sweep.ps1`, aposentado).
 > O `/loop` sobrevive ao limite de sessão pelo próprio harness — sem schtasks, lock ou watchdog.
+>
+> **Limitação conhecida (2026-07-18):** ao bater o limite de sessão, o CLI atual exibe um prompt
+> interativo ("prosseguir com extra usage / aguardar reset") que **bloqueia a fila** — os disparos do
+> loop ficam enfileirados até um humano interagir (1 tecla). Não há setting/flag documentado para
+> auto-retomar. Para run realmente unattended atravessando o reset: estar presente no horário do
+> reset, ou usar `/schedule` (cloud), ou créditos de extra usage (`/usage-credits`).
 
 ## Argumento
 

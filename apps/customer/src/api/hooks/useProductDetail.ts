@@ -69,4 +69,21 @@ export function useAddCartItem() {
   });
 }
 
+/**
+ * Adiciona um favorito ao carrinho (story 83): encapsula a regra unit/weight que
+ * antes ficava inline na tela de favoritos — produto por peso entra com 300g, por
+ * unidade com quantidade 1. Recebe o `FavoriteView` e resolve com o item criado.
+ */
+export function useAddFavoriteToCart() {
+  const { api } = useAuth();
+  const mkt = marketplace(api);
+
+  return useMutation({
+    mutationFn: (fav: FavoriteView) =>
+      fav.product.saleType === "weight"
+        ? mkt.addItem({ offerId: fav.offerId, weightGrams: 300 })
+        : mkt.addItem({ offerId: fav.offerId, quantity: 1 }),
+  });
+}
+
 export type { ProductDetail };
