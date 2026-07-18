@@ -145,16 +145,37 @@ function offerRow(id: string, over: Partial<Record<string, unknown>> = {}) {
   };
 }
 
-// Story 80: linha da busca global — oferta+produto com a loja (coords p/ o recorte geo).
+// Story 80/81: linha da busca global — oferta+produto com a loja (coords p/ o
+// recorte geo + card de entrega: mercado/frete/horário/pausa iguais ao feed).
 function searchRow(
   id: string,
   storeId: string,
   latitude: number | null = null,
   longitude: number | null = null,
+  storeOver: Partial<{
+    avgPrepMinutes: number;
+    pausedAt: Date | null;
+    deliveryFeeCents: number | null;
+    merchant: { name: string; logoUrl: string | null; deliveryFeeCents: number };
+    hours: { dayOfWeek: number; opensAt: number; closesAt: number }[];
+    closures: { date: Date }[];
+  }> = {},
 ) {
   return {
     ...offerRow(id),
-    store: { id: storeId, name: `Loja ${storeId}`, latitude, longitude },
+    store: {
+      id: storeId,
+      name: `Loja ${storeId}`,
+      latitude,
+      longitude,
+      avgPrepMinutes: 15,
+      pausedAt: null,
+      deliveryFeeCents: null,
+      merchant: { name: `Rede ${storeId}`, logoUrl: null, deliveryFeeCents: 700 },
+      hours: [],
+      closures: [],
+      ...storeOver,
+    },
   };
 }
 
@@ -308,6 +329,57 @@ describe("CatalogService.search", () => {
     const select = m.offer.findMany.mock.calls[0][0].select;
     expect(select.store).toBeDefined();
     expect(res.items[0]).toMatchObject({ offerId: "o1", storeId: "s1", storeName: "Loja s1", distanceKm: null });
+  });
+
+  // Story 81: o item da busca global carrega o mesmo card de entrega do feed.
+  it("busca global anexa o card de entrega (mercado/frete/tempo/estado) ao item", async () => {
+    const { prisma, m } = makeCatalog();
+    m.offer.findMany.mockResolvedValue([searchRow("o1", "s1")]);
+    m.offer.count.mockResolvedValue(1);
+    const res = await new CatalogService(prisma, followsStub).search("arroz", {});
+    // A loja é selecionada com os campos do card (mercado + horário), não só id/nome/coords.
+    const store = m.offer.findMany.mock.calls[0][0].select.store.select;
+    expect(store.merchant).toBeDefined();
+    expect(store.hours).toBeDefined();
+    expect(store.pausedAt).toBe(true);
+    expect(res.items[0]).toMatchObject({
+      storeId: "s1",
+      merchant: "Rede s1",
+      merchantLogoUrl: null,
+      deliveryFeeCents: 700, // herda a rede (override da loja null)
+      deliveryEta: "15 min",
+      etaMinutes: 15,
+      openNow: true, // sem horário configurado → aberta
+      paused: false,
+    });
+  });
+
+  // Story 81/58: a taxa efetiva usa o override da loja quando presente; senão herda a rede.
+  it("deliveryFeeCents usa o override da loja quando definido", async () => {
+    const { prisma, m } = makeCatalog();
+    m.offer.findMany.mockResolvedValue([searchRow("o1", "s1", null, null, { deliveryFeeCents: 300 })]);
+    m.offer.count.mockResolvedValue(1);
+    const res = await new CatalogService(prisma, followsStub).search("arroz", {});
+    expect((res.items[0] as { deliveryFeeCents: number }).deliveryFeeCents).toBe(300);
+  });
+
+  // Story 81 (decisão): loja fechada/pausada NÃO é filtrada — segue no resultado com as flags.
+  it("loja fechada e loja pausada continuam no resultado com openNow/paused corretos", async () => {
+    const { prisma, m } = makeCatalog();
+    const now = new Date("2026-07-19T12:00:00Z"); // domingo (dayOfWeek 0) em SP
+    m.offer.findMany.mockResolvedValue([
+      // horário só na segunda (dayOfWeek 1) → fechada no domingo
+      searchRow("o-fechada", "s-fechada", null, null, {
+        hours: [{ dayOfWeek: 1, opensAt: 0, closesAt: 1439 }],
+      }),
+      searchRow("o-pausada", "s-pausada", null, null, { pausedAt: new Date("2026-07-19T10:00:00Z") }),
+    ]);
+    m.offer.count.mockResolvedValue(2);
+    const res = await new CatalogService(prisma, followsStub).search("arroz", { now });
+    // Ambas continuam na lista (não são filtradas).
+    expect(res.items).toHaveLength(2);
+    expect(res.items[0]).toMatchObject({ storeId: "s-fechada", openNow: false, paused: false });
+    expect(res.items[1]).toMatchObject({ storeId: "s-pausada", openNow: false, paused: true });
   });
 
   // Story 80: com geo+raio, exclui ofertas de loja fora do raio (filtro em memória).

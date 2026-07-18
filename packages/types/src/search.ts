@@ -13,8 +13,10 @@ export interface SearchSuggestionsDTO {
 
 /**
  * Item da busca global (`GET /search` sem `storeId` — story 80): produto achatado
- * + identificação da loja (`storeId`/`storeName`) para o badge. `distanceKm` vem
- * preenchido quando a busca leva geo; null caso contrário.
+ * + o mesmo card de entrega do feed (story 81) — mercado (rede), frete, tempo e
+ * estado (`openNow`/`paused`). `storeId`/`storeName` seguem no payload (loja
+ * necessária p/ o carrinho); a UI exibe o mercado, não o nome da loja. `distanceKm`
+ * vem preenchido quando a busca leva geo; null caso contrário.
  */
 export interface SearchResultItemDTO {
   offerId: string;
@@ -30,5 +32,17 @@ export interface SearchResultItemDTO {
   promoPriceCents: number | null;
   storeId: string;
   storeName: string;
+  /** Rede (merchant) da loja — exibida no header do card (story 81). */
+  merchant: string;
+  merchantLogoUrl: string | null;
+  /** Taxa de entrega efetiva (story 58/81): override da loja > tarifa da rede. */
+  deliveryFeeCents: number;
+  /** ETA formatada ("NN min") e em minutos, iguais ao card do feed. */
+  deliveryEta: string;
+  etaMinutes: number;
   distanceKm: number | null;
+  /** Loja aberta agora (story 52) — dirige o selo "Fechado" no card. */
+  openNow: boolean;
+  /** Loja em pausa temporária (story 57) — selo "Pausada" (pausa força fechado). */
+  paused: boolean;
 }

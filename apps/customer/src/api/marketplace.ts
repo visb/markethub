@@ -428,7 +428,8 @@ export function marketplace(api: ApiClient) {
       api.request<SearchSuggestionsDTO>(`/search/suggest?q=${encodeURIComponent(q)}`),
     /**
      * Busca global paginada (story 80): produtos de todas as lojas próximas (mesmo
-     * recorte geo da home). Item traz `storeId`/`storeName` p/ o badge da loja.
+     * recorte geo da home). Item traz o mesmo card de entrega do feed (story 81):
+     * mercado, frete, tempo e estado (`openNow`/`paused`), além de `storeId`/`storeName`.
      */
     searchGlobal: (q: string, opts?: { geo?: GeoQuery; page?: number }) => {
       const qs = geoQs(new URLSearchParams({ q }), opts?.geo);

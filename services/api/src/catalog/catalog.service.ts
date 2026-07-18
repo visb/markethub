@@ -223,15 +223,17 @@ export class CatalogService {
   /**
    * Busca por nome/marca/categoria. Com `storeId` (busca dentro da loja) o
    * comportamento é o histórico: paginação no banco, item sem loja. Sem `storeId`
-   * (busca global — story 80) o item carrega `storeId`/`storeName` p/ o badge e,
-   * havendo `geo.radiusKm`, o recorte por distância (mesmo raio da home) filtra as
-   * ofertas de lojas fora do raio em memória.
+   * (busca global — story 80) o item carrega o mesmo card de entrega do feed
+   * (story 81: mercado/frete/tempo/estado + `storeId`/`storeName`) e, havendo
+   * `geo.radiusKm`, o recorte por distância (mesmo raio da home) filtra as ofertas
+   * de lojas fora do raio em memória.
    */
   async search(
     q: string,
-    opts: { storeId?: string; page?: number; pageSize?: number; geo?: GeoFilter },
+    opts: { storeId?: string; page?: number; pageSize?: number; geo?: GeoFilter; now?: Date },
   ): Promise<Paginated<unknown>> {
     const { page, pageSize, skip, take } = this.paginate(opts.page, opts.pageSize);
+    const now = opts.now ?? new Date();
     const term = q.trim();
     if (term.length === 0) return { items: [], page, pageSize, total: 0 };
 
@@ -258,7 +260,7 @@ export class CatalogService {
         select: this.searchSelect(),
       });
       const near = rows
-        .map((r) => toSearchView(r, opts.geo))
+        .map((r) => toSearchView(r, opts.geo, now))
         .filter((v) => v.distanceKm != null && v.distanceKm <= opts.geo!.radiusKm!);
       return { items: near.slice(skip, skip + take), page, pageSize, total: near.length };
     }
@@ -274,10 +276,10 @@ export class CatalogService {
       this.prisma.offer.count({ where }),
     ]);
 
-    // Busca na loja: shape histórico (sem loja). Global: item com loja p/ o badge.
+    // Busca na loja: shape histórico (sem loja). Global: item com o card da home.
     const items = opts.storeId
       ? rows.map(toOfferView)
-      : rows.map((r) => toSearchView(r, opts.geo));
+      : rows.map((r) => toSearchView(r, opts.geo, now));
     return { items, page, pageSize, total };
   }
 
@@ -610,12 +612,27 @@ export class CatalogService {
     } satisfies Prisma.OfferSelect;
   }
 
-  /** offerSelect + loja (id/nome/coords) para o badge e o recorte geo da busca global (story 80). */
+  /**
+   * offerSelect + loja com o card de entrega da busca global: id/nome/coords para o
+   * recorte geo (story 80) e mercado/frete/horário/pausa para o mesmo card do feed
+   * (story 81).
+   */
   private searchSelect() {
     return {
       ...this.offerSelect(),
       store: {
-        select: { id: true, name: true, latitude: true, longitude: true },
+        select: {
+          id: true,
+          name: true,
+          latitude: true,
+          longitude: true,
+          avgPrepMinutes: true,
+          pausedAt: true,
+          deliveryFeeCents: true,
+          merchant: { select: { name: true, logoUrl: true, deliveryFeeCents: true } },
+          hours: { select: { dayOfWeek: true, opensAt: true, closesAt: true } },
+          closures: { select: { date: true } },
+        },
       },
     } satisfies Prisma.OfferSelect;
   }
@@ -669,25 +686,65 @@ function toOfferView(row: OfferRow) {
   };
 }
 
-type SearchRow = OfferRow & {
-  store: { id: string; name: string; latitude: number | null; longitude: number | null };
+/**
+ * Loja no shape do card de entrega (feed + busca global). `deliveryFeeCents` é o
+ * override da loja (story 58): `null`/ausente herda a tarifa da rede. Opcional para
+ * o feed, que não seleciona o campo e sempre herda o merchant.
+ */
+type DeliveryStore = {
+  id: string;
+  name: string;
+  latitude: number | null;
+  longitude: number | null;
+  avgPrepMinutes: number;
+  pausedAt: Date | null;
+  deliveryFeeCents?: number | null;
+  merchant: { name: string; logoUrl: string | null; deliveryFeeCents: number };
+  hours: { dayOfWeek: number; opensAt: number; closesAt: number }[];
+  closures: { date: Date }[];
 };
 
 /**
- * Item da busca global (story 80): produto achatado + identificação da loja
- * (`storeId`/`storeName`) para o badge. Com geo, calcula a distância p/ o recorte
- * por raio (mesmo do feed); sem geo, `distanceKm` é null.
+ * Campos de entrega do card (mercado + frete + tempo + estado). Compartilhado entre
+ * o feed multi-mercado e a busca global para não duplicar o cálculo de distância/ETA.
+ * Com geo, calcula distância e ETA real (preparo da loja + deslocamento, S6.7); sem
+ * geo, ETA usa só o preparo. `deliveryFeeCents` respeita o override da loja (story 58).
+ * `openNow` (story 52) dirige o selo "Fechado"; `paused` (story 57) o distingue como
+ * "Pausada" (pausa força fechado).
  */
-function toSearchView(row: SearchRow, geo?: GeoFilter) {
-  const hasGeo = geo && row.store.latitude != null && row.store.longitude != null;
+function toDeliveryCard(store: DeliveryStore, geo?: GeoFilter, now: Date = new Date()) {
+  const hasGeo = geo && store.latitude != null && store.longitude != null;
   const distanceKm = hasGeo
-    ? round1(haversineKm(geo.lat, geo.lng, row.store.latitude!, row.store.longitude!))
+    ? round1(haversineKm(geo.lat, geo.lng, store.latitude!, store.longitude!))
     : null;
+  const eta = etaMinutes(store.avgPrepMinutes, distanceKm ?? 0);
+  const paused = store.pausedAt != null;
+  return {
+    storeId: store.id,
+    merchant: store.merchant.name,
+    merchantLogoUrl: store.merchant.logoUrl,
+    deliveryFeeCents: store.deliveryFeeCents ?? store.merchant.deliveryFeeCents,
+    deliveryEta: `${eta} min`,
+    etaMinutes: eta,
+    distanceKm,
+    openNow: paused ? false : isStoreAvailable(store.hours, store.closures.map((c) => c.date), now),
+    paused,
+  };
+}
+
+type SearchRow = OfferRow & { store: DeliveryStore };
+
+/**
+ * Item da busca global (story 80): produto achatado + o mesmo card de entrega do
+ * feed (story 81) — `merchant`, `merchantLogoUrl`, `deliveryFeeCents`, `deliveryEta`,
+ * `openNow`, `paused` e `distanceKm`. `storeId`/`storeName` seguem no payload (loja
+ * necessária p/ o carrinho); a UI usa o mercado, não o nome da loja.
+ */
+function toSearchView(row: SearchRow, geo?: GeoFilter, now: Date = new Date()) {
   return {
     ...toOfferView(row),
-    storeId: row.store.id,
+    ...toDeliveryCard(row.store, geo, now),
     storeName: row.store.name,
-    distanceKm,
   };
 }
 
@@ -695,17 +752,7 @@ type FeedRow = {
   id: string;
   priceCents: number;
   promoPriceCents: number | null;
-  store: {
-    id: string;
-    name: string;
-    latitude: number | null;
-    longitude: number | null;
-    avgPrepMinutes: number;
-    pausedAt: Date | null;
-    merchant: { name: string; logoUrl: string | null; deliveryFeeCents: number };
-    hours: { dayOfWeek: number; opensAt: number; closesAt: number }[];
-    closures: { date: Date }[];
-  };
+  store: DeliveryStore;
   product: {
     id: string;
     name: string;
@@ -717,31 +764,14 @@ type FeedRow = {
 };
 
 /**
- * Card do feed multi-mercado: produto + mercado + frete + tempo. Com geo, calcula
- * distância e ETA real (preparo da loja + deslocamento, S6.7); sem geo, ETA usa só
- * o preparo (sem distância). `openNow` (story 52) dirige o selo "Fechado" no card;
- * `paused` (story 57) o distingue como "Pausada" (pausa força fechado).
+ * Card do feed multi-mercado: produto + card de entrega compartilhado (`toDeliveryCard`).
  */
 function toFeedView(row: FeedRow, geo?: GeoFilter, now: Date = new Date()) {
-  const hasGeo = geo && row.store.latitude != null && row.store.longitude != null;
-  const distanceKm = hasGeo
-    ? round1(haversineKm(geo.lat, geo.lng, row.store.latitude!, row.store.longitude!))
-    : null;
-  const eta = etaMinutes(row.store.avgPrepMinutes, distanceKm ?? 0);
-  const paused = row.store.pausedAt != null;
   return {
     offerId: row.id,
     priceCents: row.priceCents,
     promoPriceCents: row.promoPriceCents,
-    storeId: row.store.id,
-    merchant: row.store.merchant.name,
-    merchantLogoUrl: row.store.merchant.logoUrl,
-    deliveryFeeCents: row.store.merchant.deliveryFeeCents,
-    deliveryEta: `${eta} min`,
-    etaMinutes: eta,
-    distanceKm,
-    openNow: paused ? false : isStoreAvailable(row.store.hours, row.store.closures.map((c) => c.date), now),
-    paused,
+    ...toDeliveryCard(row.store, geo, now),
     ...row.product,
   };
 }

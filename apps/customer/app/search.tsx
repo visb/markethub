@@ -1,6 +1,5 @@
 import React from "react";
 import { ActivityIndicator, FlatList, StyleSheet, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Text, colors, spacing } from "@markethub/ui";
@@ -12,7 +11,8 @@ import { Header } from "@/components/Header";
 
 /**
  * Resultado da busca global (story 80): produtos de todas as lojas próximas, cada
- * card com o badge da loja. A tela só orquestra `useProductSearch` (paginado) +
+ * um no mesmo card da home (story 81) — header com o mercado, frete e tempo, e os
+ * estados `closed`/`paused`. A tela só orquestra `useProductSearch` (paginado) +
  * `useSearchGeo` (recorte da home); add ao carrinho segue o fluxo existente.
  */
 export default function SearchScreen() {
@@ -55,15 +55,17 @@ export default function SearchScreen() {
           }
           renderItem={({ item }) => (
             <View style={styles.cell}>
-              <View style={styles.badge} testID="store-badge">
-                <Ionicons name="storefront-outline" size={12} color={colors.primary} />
-                <Text variant="caption" numberOfLines={1} style={styles.badgeText}>
-                  {item.storeName}
-                  {item.distanceKm != null ? ` (${item.distanceKm}km)` : ""}
-                </Text>
-              </View>
               <ProductCard
                 product={item}
+                header={{
+                  merchant: item.merchant,
+                  logoUrl: item.merchantLogoUrl,
+                  eta: item.deliveryEta,
+                  distanceKm: item.distanceKm,
+                  deliveryFeeCents: item.deliveryFeeCents,
+                }}
+                closed={!item.openNow}
+                paused={item.paused}
                 cartLabel={cart.labelFor(item.offerId, item.saleType)}
                 onAdd={() => cart.add(item.offerId, item.saleType)}
                 onInc={() => cart.inc(item.offerId, item.saleType)}
@@ -82,7 +84,5 @@ export default function SearchScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
-  cell: { flex: 1, gap: spacing.xs },
-  badge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: spacing.xs },
-  badgeText: { flex: 1, fontWeight: "600" },
+  cell: { flex: 1 },
 });
