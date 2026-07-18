@@ -32,15 +32,6 @@ const EMPTY: AddressFormValue = {
   longitude: null,
 };
 
-/** Nome do estado (reverse geocode) → UF. */
-const STATE_UF: Record<string, string> = {
-  parana: "PR",
-  "paraná": "PR",
-  "santa catarina": "SC",
-  "sao paulo": "SP",
-  "são paulo": "SP",
-};
-
 const normalize = (s: string) =>
   s
     .normalize("NFD")
@@ -138,7 +129,11 @@ export function AddressForm({
     }
   }
 
-  /** GPS do dispositivo → geocodificação reversa preenche tudo. */
+  /**
+   * GPS do dispositivo → o backend faz a geocodificação reversa (story 76) e
+   * preenche o form. As coords do GPS entram sempre (prevalecem sobre o geocode);
+   * se o backend não resolver, mantém o erro amigável e as coords no form.
+   */
   async function useMyLocation() {
     setLocating(true);
     setError(null);
@@ -151,26 +146,23 @@ export function AddressForm({
       const pos = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
-      const places = await Location.reverseGeocodeAsync({
-        latitude: pos.coords.latitude,
-        longitude: pos.coords.longitude,
-      });
-      const p = places[0];
-      if (!p) {
+      const { latitude, longitude } = pos.coords;
+      const addr = await mkt.reverseGeocode(latitude, longitude);
+      if (!addr) {
+        // coords do GPS preservadas no form mesmo sem endereço resolvido
+        set({ latitude, longitude });
         setError("Não foi possível identificar o endereço — preencha pelo CEP.");
         return;
       }
-      const ufRaw = (p.region ?? "").trim();
-      const uf = ufRaw.length === 2 ? ufRaw.toUpperCase() : STATE_UF[normalize(ufRaw)] ?? ufRaw;
       set({
-        zipCode: p.postalCode ?? f.zipCode,
-        street: p.street ?? f.street,
-        number: p.streetNumber ?? f.number,
-        district: p.district ?? f.district,
-        city: p.city ?? p.subregion ?? f.city,
-        state: uf,
-        latitude: pos.coords.latitude,
-        longitude: pos.coords.longitude,
+        zipCode: addr.zipCode ?? f.zipCode,
+        street: addr.street ?? f.street,
+        number: addr.number ?? f.number,
+        district: addr.district ?? f.district,
+        city: addr.city ?? f.city,
+        state: addr.state ?? f.state,
+        latitude,
+        longitude,
       });
     } catch {
       setError("Falha ao obter a localização — preencha pelo CEP.");

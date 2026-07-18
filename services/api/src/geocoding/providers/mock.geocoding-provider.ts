@@ -3,6 +3,7 @@ import type {
   GeocodeQuery,
   GeocodeResult,
   GeocodingProvider,
+  ReverseGeocodeResult,
 } from "../geocoding-provider.interface";
 
 /** Centro de Curitiba — âncora do mock em dev. */
@@ -23,6 +24,26 @@ export class MockGeocodingProvider implements GeocodingProvider {
     return {
       latitude: CURITIBA.latitude + dLat,
       longitude: CURITIBA.longitude + dLng,
+    };
+  }
+
+  /**
+   * Reverso determinístico p/ dev/test: endereço fixo em Curitiba/PR com número
+   * derivado das coords (mesmas coords → mesmo endereço). Nunca retorna null —
+   * o mock sempre "resolve".
+   */
+  async reverseGeocode(
+    latitude: number,
+    longitude: number,
+  ): Promise<ReverseGeocodeResult | null> {
+    const number = String(Math.abs(Math.round((latitude + longitude) * 1000)) % 9999 + 1);
+    return {
+      street: "Rua Mock",
+      number,
+      district: "Centro",
+      city: "Curitiba",
+      state: "PR",
+      zipCode: "80000-000",
     };
   }
 }

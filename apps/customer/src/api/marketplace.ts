@@ -1,6 +1,7 @@
 import type { ApiClient } from "@markethub/api-client";
 import type {
   NearbyStoreDTO,
+  ReverseGeocodeResult,
   StoreReviewDTO,
   StoreReviewsPageDTO,
   StoreSummaryDTO,
@@ -9,6 +10,8 @@ import type {
 
 // Re-export dos contratos compartilhados do mapa (stories 04/05/06/29) — fonte única em packages/types.
 export type { NearbyStoreDTO, StoreSummaryDTO, ViewportBoundsDTO } from "@markethub/types";
+// Geocodificação reversa via backend (story 76).
+export type { ReverseGeocodeResult } from "@markethub/types";
 // Vitrine pública de avaliações da rede (story 56).
 export type { StoreReviewDTO, StoreReviewsPageDTO } from "@markethub/types";
 
@@ -430,6 +433,12 @@ export function marketplace(api: ApiClient) {
     setDefaultAddress: (id: string) =>
       api.request<Address>(`/addresses/${id}/default`, { method: "POST", auth: true }),
     coverageCities: () => api.request<CoveredCity[]>("/coverage/cities"),
+    /** GPS → endereço estruturado pelo backend (story 76); null quando não resolve. */
+    reverseGeocode: (lat: number, lng: number) =>
+      api.request<ReverseGeocodeResult | null>(
+        `/geocoding/reverse?lat=${lat}&lng=${lng}`,
+        { auth: true },
+      ),
 
     favorites: () => api.request<FavoriteView[]>("/favorites", { auth: true }),
     addFavorite: (offerId: string) =>
