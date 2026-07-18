@@ -6,8 +6,9 @@ Cuidados da rodada: sem migration; 81/82 tocam contrato em `apps/customer/src/ap
 | #  | Título | Dep | Status |
 |----|--------|-----|--------|
 | 81 | Busca — card do resultado igual ao da home | — | done |
-| 82 | Busca — encontrar mercados pelo nome | 81 | in_progress |
+| 82 | Busca — encontrar mercados pelo nome | 81 | done |
+| 83 | Favoritos — nome do mercado + migração React Query | — | in_progress |
+| 84 | QtyStepper — altura igual ao botão e alinhamento | — | todo |
 
 [OK] 81 — testes: api 1556/1556 (catalog 74/74), customer 363/363 (searchScreen 6/6); coverage api 90.76% / customer 87.83% — commit: a2f8075 — merge: main (no-ff) — 2026-07-18
-| 83 | Favoritos — nome do mercado + migração React Query | — | todo |
-| 84 | QtyStepper — altura igual ao botão e alinhamento | — | todo |
+[OK] 82 — testes: api 1571/1571 (catalog 162/162), customer 371/371; coverage api+customer verdes — commit: fd8f435 — merge: main (no-ff) — 2026-07-18
