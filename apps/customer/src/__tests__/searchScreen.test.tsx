@@ -36,9 +36,12 @@ const item = (over: Partial<SearchResultItemDTO> = {}): SearchResultItemDTO => (
   ...over,
 });
 
+type Merchant = { merchantId: string; name: string; logoUrl: string | null; storeId: string };
+
 const mockSearchState = {
   current: {
     items: [item()] as SearchResultItemDTO[],
+    merchants: [] as Merchant[],
     isLoading: false,
     hasMore: false,
     loadMore: jest.fn(),
@@ -91,6 +94,7 @@ function texts(tree: renderer.ReactTestRenderer): string {
 beforeEach(() => {
   mockSearchState.current = {
     items: [item()],
+    merchants: [],
     isLoading: false,
     hasMore: false,
     loadMore: jest.fn(),
@@ -157,5 +161,43 @@ describe("SearchScreen — resultado (story 80/81)", () => {
       list.props.onEndReached();
     });
     expect(loadMore).not.toHaveBeenCalled();
+  });
+});
+
+describe("SearchScreen — seção de mercados (story 82)", () => {
+  const merchant = (over: Partial<Merchant> = {}): Merchant => ({
+    merchantId: "m1",
+    name: "Atacadão",
+    logoUrl: null,
+    storeId: "s9",
+    ...over,
+  });
+
+  it("sem mercados a seção não é renderizada", () => {
+    mockSearchState.current = { ...mockSearchState.current, merchants: [] };
+    const tree = render();
+    expect(tree.root.findAll((n) => n.props.testID === "search-merchants")).toHaveLength(0);
+  });
+
+  it("com mercados renderiza a seção 'Mercados' acima do grid", () => {
+    mockSearchState.current = { ...mockSearchState.current, merchants: [merchant()] };
+    const tree = render();
+    expect(
+      tree.root.findAll((n) => n.props.testID === "search-merchants").length,
+    ).toBeGreaterThan(0);
+    expect(texts(tree)).toContain("Mercados");
+    expect(texts(tree)).toContain("Atacadão");
+  });
+
+  it("tap num mercado navega para a loja de destino com o nome da rede", () => {
+    mockSearchState.current = {
+      ...mockSearchState.current,
+      merchants: [merchant({ merchantId: "m1", name: "Atacadão", storeId: "s9" })],
+    };
+    const tree = render();
+    act(() => {
+      tree.root.findAll((n) => n.props.testID === "search-merchant-m1")[0].props.onPress();
+    });
+    expect(mockPush).toHaveBeenCalledWith("/store/s9?name=Atacad%C3%A3o");
   });
 });

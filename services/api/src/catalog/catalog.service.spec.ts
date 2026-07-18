@@ -108,7 +108,7 @@ interface CatalogMocks {
 
 function makeCatalog() {
   const m: CatalogMocks = {
-    merchant: { findMany: jest.fn(), findUnique: jest.fn() },
+    merchant: { findMany: jest.fn().mockResolvedValue([]), findUnique: jest.fn() },
     store: { findMany: jest.fn(), findUnique: jest.fn() },
     offer: { findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) },
     product: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
@@ -408,13 +408,67 @@ describe("CatalogService.search", () => {
     expect(res.items[0]).not.toHaveProperty("storeName");
     expect(res.items[0]).not.toHaveProperty("distanceKm");
   });
+
+  // Story 82: busca global página 1 traz a seção de mercados que casam com o termo.
+  it("busca global página 1 anexa merchants que casam", async () => {
+    const { prisma, m } = makeCatalog();
+    m.offer.findMany.mockResolvedValue([searchRow("o1", "s1")]);
+    m.offer.count.mockResolvedValue(1);
+    m.merchant.findMany.mockResolvedValue([
+      { id: "m1", name: "Atacadão", logoUrl: null, stores: [{ id: "s9", latitude: null, longitude: null }] },
+    ]);
+    const res = (await new CatalogService(prisma, followsStub).search("atac", {})) as {
+      merchants?: { merchantId: string; storeId: string }[];
+    };
+    expect(res.merchants).toEqual([
+      { merchantId: "m1", name: "Atacadão", logoUrl: null, storeId: "s9" },
+    ]);
+  });
+
+  // Story 82: página 2 não repete a seção de mercados (só na primeira página).
+  it("busca global página 2 não anexa merchants", async () => {
+    const { prisma, m } = makeCatalog();
+    m.offer.findMany.mockResolvedValue([searchRow("o1", "s1")]);
+    m.offer.count.mockResolvedValue(1);
+    m.merchant.findMany.mockResolvedValue([
+      { id: "m1", name: "Atacadão", logoUrl: null, stores: [{ id: "s9", latitude: null, longitude: null }] },
+    ]);
+    const res = await new CatalogService(prisma, followsStub).search("atac", { page: 2 });
+    expect(res).not.toHaveProperty("merchants");
+    expect(m.merchant.findMany).not.toHaveBeenCalled();
+  });
+
+  // Story 82: busca global com raio também traz merchants na página 1.
+  it("busca global com raio anexa merchants na página 1", async () => {
+    const { prisma, m } = makeCatalog();
+    m.offer.findMany.mockResolvedValue([searchRow("perto", "s-perto", -23.5, -46.6)]);
+    m.merchant.findMany.mockResolvedValue([
+      { id: "m1", name: "Atacadão", logoUrl: null, stores: [{ id: "s9", latitude: null, longitude: null }] },
+    ]);
+    const res = (await new CatalogService(prisma, followsStub).search("atac", {
+      geo: { lat: -23.5, lng: -46.6, radiusKm: 5 },
+    })) as { merchants?: { merchantId: string }[] };
+    expect(res.merchants).toEqual([
+      { merchantId: "m1", name: "Atacadão", logoUrl: null, storeId: "s9" },
+    ]);
+  });
+
+  // Story 82: busca dentro da loja não traz merchants (só a busca global).
+  it("busca na loja não anexa merchants", async () => {
+    const { prisma, m } = makeCatalog();
+    m.offer.findMany.mockResolvedValue([searchRow("o1", "s1")]);
+    m.offer.count.mockResolvedValue(1);
+    const res = await new CatalogService(prisma, followsStub).search("atac", { storeId: "s1" });
+    expect(res).not.toHaveProperty("merchants");
+    expect(m.merchant.findMany).not.toHaveBeenCalled();
+  });
 });
 
 describe("CatalogService.searchSuggest", () => {
   it("termo com menos de 2 caracteres → vazio sem tocar o banco", async () => {
     const { prisma, m } = makeCatalog();
     const res = await new CatalogService(prisma, followsStub).searchSuggest("a");
-    expect(res).toEqual({ terms: [], categories: [] });
+    expect(res).toEqual({ terms: [], categories: [], merchants: [] });
     expect(m.product.findMany).not.toHaveBeenCalled();
     expect(m.marketplaceCategory.findMany).not.toHaveBeenCalled();
   });
@@ -438,6 +492,95 @@ describe("CatalogService.searchSuggest", () => {
 
     expect(res.terms).toEqual(["Arroz Branco", "Arroz Integral"]);
     expect(res.categories).toEqual([{ id: "c1", name: "Arroz e Grãos" }]);
+  });
+
+  // Story 82: seção de mercados — redes cujo nome casa e têm loja visível, teto 3.
+  it("sugere mercados que casam com o termo e exigem loja visível (teto 3)", async () => {
+    const { prisma, m } = makeCatalog();
+    m.merchant.findMany.mockResolvedValue([
+      { id: "m1", name: "Atacadão", logoUrl: "logo.png", stores: [{ id: "s1", latitude: null, longitude: null }] },
+    ]);
+    const res = await new CatalogService(prisma, followsStub).searchSuggest("atac");
+
+    const args = m.merchant.findMany.mock.calls[0][0];
+    expect(args.take).toBe(3);
+    expect(args.where.active).toBe(true);
+    expect(args.where.name).toEqual({ contains: "atac", mode: "insensitive" });
+    // rede só entra se tem loja visível (ativa + rede ativa — story 69)
+    expect(args.where.stores.some).toEqual({ active: true, merchant: { active: true } });
+    // a loja selecionada da rede também respeita a visibilidade
+    expect(args.select.stores.where).toEqual({ active: true, merchant: { active: true } });
+
+    expect(res.merchants).toEqual([
+      { merchantId: "m1", name: "Atacadão", logoUrl: "logo.png", storeId: "s1" },
+    ]);
+  });
+
+  // Story 82: com geo, storeId = loja visível mais próxima da rede (haversine).
+  it("com geo escolhe a loja visível mais próxima da rede", async () => {
+    const { prisma, m } = makeCatalog();
+    m.merchant.findMany.mockResolvedValue([
+      {
+        id: "m1",
+        name: "Atacadão",
+        logoUrl: null,
+        stores: [
+          { id: "s-longe", latitude: -3.1, longitude: -60.0 },
+          { id: "s-perto", latitude: -23.5, longitude: -46.6 },
+        ],
+      },
+    ]);
+    const res = await new CatalogService(prisma, followsStub).searchSuggest("atac", {
+      lat: -23.5,
+      lng: -46.6,
+    });
+    expect(res.merchants[0].storeId).toBe("s-perto");
+  });
+
+  // Story 82: sem geo (ou lojas sem coordenadas), storeId = primeira loja visível.
+  it("sem geo devolve a primeira loja visível da rede", async () => {
+    const { prisma, m } = makeCatalog();
+    m.merchant.findMany.mockResolvedValue([
+      {
+        id: "m1",
+        name: "Atacadão",
+        logoUrl: null,
+        stores: [
+          { id: "s-primeira", latitude: -23.5, longitude: -46.6 },
+          { id: "s-outra", latitude: -3.1, longitude: -60.0 },
+        ],
+      },
+    ]);
+    const res = await new CatalogService(prisma, followsStub).searchSuggest("atac");
+    expect(res.merchants[0].storeId).toBe("s-primeira");
+  });
+
+  // Story 82: com geo mas nenhuma loja geolocalizada, cai na primeira visível.
+  it("com geo mas sem lojas geolocalizadas cai na primeira loja visível", async () => {
+    const { prisma, m } = makeCatalog();
+    m.merchant.findMany.mockResolvedValue([
+      {
+        id: "m1",
+        name: "Atacadão",
+        logoUrl: null,
+        stores: [
+          { id: "s-primeira", latitude: null, longitude: null },
+          { id: "s-outra", latitude: null, longitude: null },
+        ],
+      },
+    ]);
+    const res = await new CatalogService(prisma, followsStub).searchSuggest("atac", {
+      lat: -23.5,
+      lng: -46.6,
+    });
+    expect(res.merchants[0].storeId).toBe("s-primeira");
+  });
+
+  it("termo curto → merchants vazio sem consultar redes", async () => {
+    const { prisma, m } = makeCatalog();
+    const res = await new CatalogService(prisma, followsStub).searchSuggest("a");
+    expect(res.merchants).toEqual([]);
+    expect(m.merchant.findMany).not.toHaveBeenCalled();
   });
 });
 

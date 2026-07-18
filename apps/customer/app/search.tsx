@@ -1,11 +1,13 @@
 import React from "react";
-import { ActivityIndicator, FlatList, StyleSheet, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Text, colors, spacing } from "@markethub/ui";
+import type { SearchMerchant } from "@/api/marketplace";
 import { useCart } from "@/use-cart";
 import { useProductSearch, useSearchGeo } from "@/api/hooks/useProductSearch";
 import { ProductCard } from "@/components/ProductCard";
+import { MerchantLogo } from "@/components/MerchantLogo";
 import { CartFab } from "@/components/CartFab";
 import { Header } from "@/components/Header";
 
@@ -22,7 +24,13 @@ export default function SearchScreen() {
   const geo = useSearchGeo();
   const term = (q ?? "").trim();
 
-  const { items, isLoading, hasMore, loadMore, isLoadingMore } = useProductSearch(term, geo);
+  const { items, merchants, isLoading, hasMore, loadMore, isLoadingMore } = useProductSearch(
+    term,
+    geo,
+  );
+
+  const openMerchant = (mm: SearchMerchant) =>
+    router.push(`/store/${mm.storeId}?name=${encodeURIComponent(mm.name)}`);
 
   return (
     <SafeAreaView style={styles.flex} edges={["top"]}>
@@ -37,6 +45,34 @@ export default function SearchScreen() {
           numColumns={2}
           columnWrapperStyle={{ gap: spacing.md, paddingHorizontal: spacing.md }}
           contentContainerStyle={{ gap: spacing.lg, paddingVertical: spacing.md, paddingBottom: spacing.xxl }}
+          ListHeaderComponent={
+            merchants.length > 0 ? (
+              <View testID="search-merchants" style={styles.merchants}>
+                <Text variant="title" style={styles.merchantsTitle}>
+                  Mercados
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.merchantsRow}
+                >
+                  {merchants.map((mm) => (
+                    <Pressable
+                      key={mm.merchantId}
+                      testID={`search-merchant-${mm.merchantId}`}
+                      style={styles.merchantChip}
+                      onPress={() => openMerchant(mm)}
+                    >
+                      <MerchantLogo name={mm.name} logoUrl={mm.logoUrl} size={44} />
+                      <Text variant="caption" numberOfLines={1} style={styles.merchantName}>
+                        {mm.name}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+            ) : null
+          }
           onEndReachedThreshold={0.4}
           onEndReached={() => {
             if (hasMore) loadMore();
@@ -85,4 +121,9 @@ export default function SearchScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.background },
   cell: { flex: 1 },
+  merchants: { paddingTop: spacing.sm, paddingBottom: spacing.md },
+  merchantsTitle: { paddingHorizontal: spacing.md, marginBottom: spacing.sm },
+  merchantsRow: { gap: spacing.md, paddingHorizontal: spacing.md },
+  merchantChip: { alignItems: "center", width: 72, gap: spacing.xs },
+  merchantName: { textAlign: "center" },
 });

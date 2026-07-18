@@ -128,7 +128,11 @@ export class CatalogController {
    */
   @Get("search/suggest")
   suggest(@Query() query: SearchSuggestQueryDto) {
-    return this.catalog.searchSuggest(query.q);
+    // Geo opcional (story 82): quando lat/lng vêm, a sugestão de mercado escolhe a
+    // loja visível mais próxima da rede. Sem ambos → sem geo.
+    const geo: GeoFilter | undefined =
+      query.lat != null && query.lng != null ? { lat: query.lat, lng: query.lng } : undefined;
+    return this.catalog.searchSuggest(query.q, geo);
   }
 
   @Get("search")

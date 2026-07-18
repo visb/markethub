@@ -96,8 +96,31 @@ describe("useSearchSuggestions", () => {
   it("busca e expõe termos + departamentos com termo ≥ 2 chars", async () => {
     const { result, unmount } = renderHook(() => useSearchSuggestions("arr"));
     await waitFor(() => result.current!.terms.length > 0);
-    expect(mockSearchSuggest).toHaveBeenCalledWith("arr");
+    // Sem endereço ativo → geo undefined (story 82).
+    expect(mockSearchSuggest).toHaveBeenCalledWith("arr", undefined);
     expect(result.current!.categories).toEqual([{ id: "c1", name: "Mercearia" }]);
+    unmount();
+  });
+
+  // Story 82: repassa o geo do endereço ativo e expõe a seção de mercados.
+  it("repassa geo do endereço ativo e expõe merchants", async () => {
+    mockActiveAddress.current = { latitude: -23.5, longitude: -46.6 };
+    mockSearchSuggest.mockResolvedValue({
+      terms: [],
+      categories: [],
+      merchants: [{ merchantId: "m1", name: "Atacadão", logoUrl: null, storeId: "s1" }],
+    });
+    const { result, unmount } = renderHook(() => useSearchSuggestions("atac"));
+    await waitFor(() => result.current!.merchants.length > 0);
+    // A sugestão só usa lat/lng (raio não se aplica); o raio pode ainda estar
+    // resolvendo nas prefs quando a chamada dispara, então não é fixado aqui.
+    expect(mockSearchSuggest).toHaveBeenCalledWith(
+      "atac",
+      expect.objectContaining({ lat: -23.5, lng: -46.6 }),
+    );
+    expect(result.current!.merchants).toEqual([
+      { merchantId: "m1", name: "Atacadão", logoUrl: null, storeId: "s1" },
+    ]);
     unmount();
   });
 });
@@ -149,7 +172,15 @@ describe("useSearchGeo", () => {
 
 describe("query keys da busca (story 80)", () => {
   it("suggestions e results não usam literais soltos", () => {
-    expect(queryKeys.search.suggestions("arr")).toEqual(["search", "suggestions", "arr"]);
+    // Story 82: a chave de sugestões inclui o geo (lat/lng) — muda a loja do mercado.
+    expect(queryKeys.search.suggestions("arr")).toEqual(["search", "suggestions", "arr", null, null]);
+    expect(queryKeys.search.suggestions("arr", { lat: 1, lng: 2 })).toEqual([
+      "search",
+      "suggestions",
+      "arr",
+      1,
+      2,
+    ]);
     expect(queryKeys.search.results("arr", { lat: 1, lng: 2, radiusKm: 3 })).toEqual([
       "search",
       "results",
